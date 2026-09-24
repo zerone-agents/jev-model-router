@@ -1,5 +1,12 @@
 # Repository instructions
 
+## Product architecture
+
+Before changing module boundaries, public capabilities, or CLI/UI behavior,
+read `docs/architecture.md` and `contracts/README.md`.
+When changing a CLI workflow, keep `skills/jev-router/SKILL.md` aligned with
+the implemented capability contract. Mark planned capabilities explicitly.
+
 ## GitHub CLI execution
 
 Run `gh` commands outside the sandbox with the required escalation when
