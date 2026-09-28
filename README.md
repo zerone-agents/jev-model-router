@@ -1,70 +1,93 @@
 # Jev Model Router
 
-面向 Agent 的模型路由网关：用 Jev 或 Laya，根据任务与可编辑的模型描述选择生成模型；提供 Chat Completions 兼容入口、Agent CLI 和配套 SKILL，人类通过简单 UI 查看与调整。
+面向 Agent 的轻量模型路由网关。以 Jev 原生 choice 根据任务和可编辑模型卡选模，提供 OpenAI Chat Completions 兼容 JSON/SSE、管理 CLI 与配套 SKILL。
 
-**当前状态：架构与目录骨架。尚无可执行 CLI、HTTP 服务或 UI。** 目录内说明定义实现位置，不代表功能已交付。未声明 AgentUse 认证。
+首版已实现 Go 单实例 + SQLite、显式/自动选模和 OpenAI 兼容生成适配。本地 Laya、敏感会话锁定、ArbiterOS、PostgreSQL 与 UI 属于后续阶段。尚未完成真实模型付费质量基线，未声明 AgentUse 认证。
 
-## 产品约定
+## 启动
 
-- `model=auto` 通过提示词选模；指定模型 ID 则跳过任务选模，保留权限、能力和敏感边界检查。
-- 默认只提供一份可编辑的均衡提示词，不内置多档策略模式或任务到模型的映射表。
-- Jev 模式不启用敏感路由；本地 Laya 模式可启用，并保持敏感会话的本地锁定。
-- Go 承担网关和 CLI；Bifrost Core 封装为供应商适配，Laya 的推理与完整输入检查留在本地 Python 服务。
-- Agent 管理能力优先通过自描述 CLI 暴露，SKILL 提供工作流；UI 复用同一管理能力。
+需要 Go 1.27.0；SQLite 驱动无需 CGO。
+
+```sh
+go build -o /tmp/jev-router ./cmd/jev-router
+# 通过安全环境注入不同的 JEV_ROUTER_SETTINGS_TOKEN / JEV_ROUTER_INFERENCE_TOKEN
+/tmp/jev-router serve
+```
+
+默认监听 `127.0.0.1:8080`，数据库为 `.data/router.sqlite`。支持 `serve --config conf.json` 和环境变量覆盖，详见[启动配置](docs/configuration.md)。启动时必须存在两种不同凭证。
+
+## Agent 配置流程
+
+```sh
+/tmp/jev-router --help
+/tmp/jev-router schema
+/tmp/jev-router schema providers.put
+/tmp/jev-router call status.get --json /tmp/empty-object.json
+/tmp/jev-router call providers.put --json /tmp/provider.json --expected-version 1 --idempotency-key setup-provider-1
+```
+
+`empty-object.json` 内容是 `{}`。供应商完整配置示例（先注入 `PROVIDER_API_KEY`）：
+
+```json
+{"id":"cloud","base_url":"https://api.openai.com/v1","secret_ref":"env:PROVIDER_API_KEY"}
+```
+
+按 `schema models.put` 配置禁用模型 → `call models.test --id <ID>` 固定连接测试 → 读取版本并启用 → `route.inspect` 检查。多候选 auto 还需 `decision.put` 配置 Jev 根地址、原生模型版本和密钥引用。用 `prompt.put` 修改唯一默认均衡模板。复杂输入使用 JSON 文件或 stdin，所有写入携带版本与幂等键。完整工作流见[配套 SKILL](skills/jev-router/SKILL.md)。
+
+推理客户端配置 base URL 为 `http://127.0.0.1:8080/v1`，API key 使用 inference 凭证；`model: "auto"` 自动选择，也可使用 `/v1/models` 返回的已启用外部 ID。settings 仅用于管理及固定测试。
+
+## 路由约定
+
+- 零候选失败、单候选直达、多候选每次调用 Jev；显式选择跳过 Jev。
+- 偏好尽量交给提示词和自然语言模型卡；代码仅锁定权限、能力、容量及协议边界。
+- `auto` 为保留 ID。完整生成请求不裁剪，参数不静默丢失，不重试或换模。
+- Jev 模式没有敏感路由保证；图片字段不送 Jev，文本和工具结果可能送往 Jev。
+- 配置写入立即影响新请求；禁用模型不撤销在途快照。
+- 记录默认保留 7 天，只存路由元数据，尽力写入并公开降级状态，不是审计日志。
+
+支持字段及估算局限见[兼容矩阵](docs/compatibility.md)，真实质量与费用的验证方式见[评测说明](docs/evaluation.md)。
 
 ## 架构
 
-以下为待实现架构。CLI 与 UI 复用管理能力；模型客户端通过 Chat Completions 接口发起推理。
-
 ```mermaid
 flowchart TD
-    Agent["Agent 模型客户端"] --> Inference
-    Skill["配套 SKILL"] --> CLI["Agent CLI"]
-    CLI --> ManagementHTTP
-    UI["简单管理 UI"] --> ManagementHTTP
-
-    subgraph Gateway["Go 网关"]
-        Inference["Chat Completions HTTP 入口"] --> Routing["路由核心：auto / 显式模型"]
-        ManagementHTTP["管理 HTTP 入口"] --> Management["共享管理能力"]
-        Management --> State["配置版本与会话状态"]
-        Management -->|选模检查| Routing
-        Routing --> State
-        Routing -->|auto 决策| Decision["Jev / Laya 决策适配"]
-        Routing -->|推理执行| Provider["生成供应商接口"]
-        Provider --> Bifrost["Bifrost Core 适配"]
-    end
-
-    Decision --> Jev["Jev 云端 API"]
-    Decision --> Laya["本地 Laya Python 服务"]
-    Bifrost --> Local["本地生成模型"]
-    Bifrost --> Cloud["云端生成 API"]
+    Agent[Agent 模型客户端] --> API[Chat Completions JSON / SSE]
+    Skill[配套 SKILL] --> CLI[Go CLI]
+    CLI --> Admin[管理 HTTP / schema]
+    Admin --> Management[共享管理服务]
+    Management --> SQLite[SQLite 配置 / 版本 / 幂等 / 记录]
+    Management -->|route.inspect| Planner[路由规划]
+    API --> Planner
+    SQLite -->|配置快照| Planner
+    Planner -->|多候选 auto| Jev[Jev 原生 choice]
+    Planner --> Executor[单目标执行]
+    Executor --> Bifrost[Bifrost Core]
+    Bifrost --> Models[OpenAI 兼容生成端点]
+    API -->|尽力写入| SQLite
 ```
 
-选模检查只预览路由结果，不执行生成或修改会话状态；调用决策后端仍可能产生费用和数据外发。敏感路由仅在本地 Laya 模式下可启用，Jev 模式不启用。
-
-## 目录结构
-
-当前目录以职责说明为主，后续代码按以下边界实现：
+## 目录
 
 ```text
 .
-├── cmd/                    # 可执行入口与命令装配
-├── internal/               # Go 网关核心、协议适配与状态管理
-├── contracts/              # Agent 管理能力契约
-├── templates/              # 可编辑的默认均衡提示词
-├── skills/                 # 配套 CLI 使用技能
-│   └── jev-router/SKILL.md
-├── services/               # 本地 Laya 等独立服务
-├── web/                    # 简单管理 UI
-└── docs/                   # 详细架构、决策记录与协作规范
+├── cmd/          # 可执行入口
+├── internal/     # 路由、管理、存储与协议适配
+├── contracts/    # 机器契约与校验
+├── templates/    # 唯一均衡提示词
+├── skills/       # Agent 工作流
+├── tests/        # 黑盒端到端测试
+├── evals/        # 显式付费评测工具与合成数据
+├── services/     # 后续本地 Laya 服务
+├── web/          # 后续 UI
+└── docs/         # 架构、配置、兼容及协作规范
 ```
 
-## 从哪里开始
+## 开发验证
 
-- [架构与目录边界](docs/architecture.md)
-- [Agent 管理契约](contracts/README.md)
-- [领域术语](CONTEXT.md)
-- [CLI 配套技能](skills/jev-router/SKILL.md)
-- [默认均衡提示词](templates/balanced.md)
+```sh
+go test ./... -count=1
+go test -race ./... -count=1
+go vet ./...
+```
 
-运行时的命令、参数和能力以实际发布的 CLI schema 为准；当前没有安装或运行指令。开发阶段的本地调研、过程规格和 ADR 保存在忽略目录，公开架构不依赖这些文件。
+测试只访问本地模拟端点。[架构](docs/architecture.md)、[管理契约](contracts/README.md)、[领域术语](CONTEXT.md) 是协作入口。本地研究、实施规格与 ADR 按约定不进入 Git。
