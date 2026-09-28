@@ -3,6 +3,7 @@ package httptransport
 import (
 	"context"
 	"encoding/json"
+	"github.com/zerone-agents/jev-model-router/internal/management"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"io"
 	"net/http"
@@ -10,26 +11,52 @@ import (
 )
 
 func (s *server) chat(w http.ResponseWriter, r *http.Request) {
+	rec := routing.Record{RequestID: w.Header().Get("X-Request-ID"), CreatedAt: time.Now().UTC()}
+	var finalErr error
+	var generationStart time.Time
+	defer func() {
+		if !generationStart.IsZero() {
+			rec.GenerationMillis = time.Since(generationStart).Milliseconds()
+		}
+		rec.Outcome = "success"
+		if finalErr != nil {
+			rec.Outcome = "error"
+			rec.ErrorCode = management.Failure(finalErr).Error.Code
+		}
+		s.limits.Recorder.Save(rec)
+	}()
+	fail := func(e error) { finalErr = e; writeError(w, e) }
 	r.Body = http.MaxBytesReader(w, r.Body, s.limits.MaxBodyBytes)
 	var req routing.Request
 	d := json.NewDecoder(r.Body)
 	if d.Decode(&req) != nil || d.Decode(new(any)) != io.EOF {
-		writeError(w, routing.Fail("invalid_request", "invalid chat body"))
+		fail(routing.Fail("invalid_request", "invalid chat body"))
 		return
+	}
+	rec.Mode = "explicit"
+	if req.Model == "auto" {
+		rec.Mode = "auto"
 	}
 	cfg, e := s.store.Snapshot(r.Context())
 	if e != nil {
-		writeError(w, e)
+		fail(e)
 		return
 	}
+	rec.ConfigVersion = cfg.Version
+	decisionStart := time.Now()
 	ctx, cancel := context.WithTimeout(r.Context(), s.limits.DecisionTimeout)
 	plan, e := s.planner.Plan(ctx, cfg, req)
+	rec.DecisionMillis = time.Since(decisionStart).Milliseconds()
+	rec.CandidateIDs = plan.CandidateIDs
+	rec.Path = plan.Path
+	rec.ModelID = plan.ModelID
 	e = contextError(ctx, e)
 	cancel()
 	if e != nil {
-		writeError(w, e)
+		fail(e)
 		return
 	}
+	generationStart = time.Now()
 	id := w.Header().Get("X-Request-ID")
 	if !req.Stream {
 		ctx, cancel := context.WithTimeout(r.Context(), s.limits.FirstEventTimeout)
@@ -37,11 +64,11 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 		result, e := s.executor.Complete(ctx, plan, req)
 		e = contextError(ctx, e)
 		if e != nil {
-			writeError(w, e)
+			fail(e)
 			return
 		}
 		http.NewResponseController(w).SetWriteDeadline(time.Now().Add(s.limits.IdleTimeout))
-		WriteCompletion(w, result, plan.ModelID, id)
+		finalErr = WriteCompletion(w, result, plan.ModelID, id)
 		return
 	}
 	ctx, stop := context.WithCancelCause(r.Context())
@@ -50,7 +77,7 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 	defer timer.Stop()
 	stream, e := s.executor.Stream(ctx, plan, req)
 	if e != nil {
-		writeError(w, contextError(ctx, e))
+		fail(contextError(ctx, e))
 		return
 	}
 	buffer := bufferStream(ctx, stream, s.limits.StreamBuffer)
@@ -61,7 +88,7 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 	for {
 		first, e = buffer.Next(ctx)
 		if e != nil {
-			writeError(w, contextError(ctx, e))
+			fail(contextError(ctx, e))
 			return
 		}
 		if validEvent(first) {
@@ -69,10 +96,10 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !timer.Stop() {
-		writeError(w, routing.Fail("timeout", "first event timed out"))
+		fail(routing.Fail("timeout", "first event timed out"))
 		return
 	}
-	writeStream(ctx, w, &prependStream{first: &first, rest: buffer}, plan.ModelID, id, s.limits.IdleTimeout)
+	finalErr = writeStream(ctx, w, &prependStream{first: &first, rest: buffer}, plan.ModelID, id, s.limits.IdleTimeout)
 }
 func completionBody(result routing.Completion, model, kind string) map[string]any {
 	b := map[string]any{"id": result.ID, "object": kind, "created": result.Created, "model": model, "choices": result.Choices}

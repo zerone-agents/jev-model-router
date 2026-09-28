@@ -12,6 +12,7 @@ import (
 )
 
 type Limits struct {
+	Recorder                                        *routing.Recorder
 	DecisionTimeout, FirstEventTimeout, IdleTimeout time.Duration
 	MaxBodyBytes                                    int64
 	StreamBuffer                                    int

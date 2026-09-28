@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/zerone-agents/jev-model-router/internal/decision"
 	"github.com/zerone-agents/jev-model-router/internal/management"
@@ -31,7 +32,33 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 		store.Close()
 		return nil, nil, e
 	}
+	recordCtx, recordCancel := context.WithCancel(context.Background())
+	recordDone := make(chan struct{})
+	recorder := &routing.Recorder{Sink: store, Timeout: cfg.RecordTimeout}
+	prune := func() {
+		ctx, cancel := context.WithTimeout(recordCtx, cfg.RecordTimeout)
+		defer cancel()
+		if store.Prune(ctx, time.Now(), cfg.RetentionDays) != nil {
+			recorder.MarkDegraded()
+		}
+	}
+	prune()
+	go func() {
+		defer close(recordDone)
+		tick := time.NewTicker(time.Hour)
+		defer tick.Stop()
+		for {
+			select {
+			case <-recordCtx.Done():
+				return
+			case <-tick.C:
+				prune()
+			}
+		}
+	}()
 	close := func() {
+		recordCancel()
+		<-recordDone
 		if c, ok := gen.(io.Closer); ok {
 			c.Close()
 		}
@@ -53,8 +80,21 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 	planner := &routing.Planner{Decider: decision.New(nil, resolve, decision.DefaultBudget()), Check: provider.Check}
 	checks := management.Checks{Store: store, Planner: planner, Generator: gen, DecisionTimeout: cfg.DecisionTimeout, FirstEventTimeout: cfg.FirstEventTimeout}
 	checks.Register(service)
+	service.RecordsDegraded = recorder.Degraded
+	service.Register("records.list", func(ctx context.Context, _ string, call management.Call) (management.Result, error) {
+		var in struct {
+			Cursor string
+			Limit  int
+		}
+		json.Unmarshal(call.Input, &in)
+		page, e := store.ListRecords(ctx, in.Cursor, in.Limit)
+		if e != nil {
+			return management.Result{}, e
+		}
+		return management.Success(page, time.Now()), nil
+	})
 	auth := func(h string) (management.Principal, error) { return Authenticate(h, creds) }
-	return httptransport.NewHandler(service, store, planner, &routing.Executor{Generator: gen}, auth, httptransport.Limits{DecisionTimeout: cfg.DecisionTimeout, FirstEventTimeout: cfg.FirstEventTimeout, IdleTimeout: cfg.IdleTimeout, MaxBodyBytes: cfg.MaxBodyBytes, StreamBuffer: cfg.StreamBuffer}), close, nil
+	return httptransport.NewHandler(service, store, planner, &routing.Executor{Generator: gen}, auth, httptransport.Limits{Recorder: recorder, DecisionTimeout: cfg.DecisionTimeout, FirstEventTimeout: cfg.FirstEventTimeout, IdleTimeout: cfg.IdleTimeout, MaxBodyBytes: cfg.MaxBodyBytes, StreamBuffer: cfg.StreamBuffer}), close, nil
 }
 func Run(ctx context.Context, cfg Config) error {
 	h, close, e := Handler(cfg)

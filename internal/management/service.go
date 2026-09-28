@@ -19,10 +19,11 @@ type ConfigStore interface {
 }
 type Handler func(context.Context, string, Call) (Result, error)
 type Service struct {
-	store    ConfigStore
-	validate func(routing.Snapshot) error
-	mu       sync.RWMutex
-	handlers map[string]Handler
+	store           ConfigStore
+	validate        func(routing.Snapshot) error
+	mu              sync.RWMutex
+	handlers        map[string]Handler
+	RecordsDegraded func() bool
 }
 
 func New(store ConfigStore, validate func(routing.Snapshot) error) *Service {
@@ -101,7 +102,12 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 				n++
 			}
 		}
-		return Success(map[string]any{"version": cfg.Version, "ready": n > 0 && (n == 1 || cfg.Decision.Model != ""), "enabled_models": n}, time.Now()), nil
+		degraded := s.RecordsDegraded != nil && s.RecordsDegraded()
+		result := Success(map[string]any{"version": cfg.Version, "ready": n > 0 && (n == 1 || cfg.Decision.Model != ""), "enabled_models": n, "records_degraded": degraded}, time.Now())
+		if degraded {
+			result.Warnings = append(result.Warnings, "records_degraded")
+		}
+		return result, nil
 	case "prompt.get":
 		return Success(map[string]any{"version": cfg.Version, "text": cfg.Prompt}, time.Now()), nil
 	case "decision.get":

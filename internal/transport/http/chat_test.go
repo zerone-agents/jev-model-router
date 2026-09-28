@@ -3,11 +3,15 @@ package httptransport
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/zerone-agents/jev-model-router/internal/management"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
+	"github.com/zerone-agents/jev-model-router/internal/state"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -292,5 +296,47 @@ func TestEmptyChoicesDoNotResetIdle(t *testing.T) {
 	w := chat(handler(g, Limits{IdleTimeout: 5 * time.Millisecond}), true)
 	if !strings.Contains(w.Body.String(), "timeout") {
 		t.Fatal(w.Body.String())
+	}
+}
+
+type failSink struct{}
+
+func (failSink) Append(context.Context, routing.Record) error { return io.ErrClosedPipe }
+func TestRecordFailureDoesNotFailGeneration(t *testing.T) {
+	rec := &routing.Recorder{Sink: failSink{}, Timeout: time.Millisecond}
+	w := chat(handler(testGen{complete: func(context.Context) (routing.Completion, error) { return event(), nil }}, Limits{Recorder: rec}), false)
+	if w.Code != 200 || !rec.Degraded() {
+		t.Fatal("record error blocked generation or invisible")
+	}
+}
+
+func TestNoSensitivePersistence(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "records.sqlite")
+	store, e := state.Open(path, time.Now)
+	if e != nil {
+		t.Fatal(e)
+	}
+	rec := &routing.Recorder{Sink: store}
+	g := testGen{complete: func(context.Context) (routing.Completion, error) {
+		return routing.Completion{}, errors.New("UPSTREAM_SECRET_SENTINEL")
+	}}
+	s := snapshot()
+	s.Models[0].Capabilities.Images = true
+	service := management.New(testStore{s}, nil)
+	service.RecordsDegraded = rec.Degraded
+	h := NewHandler(service, testStore{s}, &routing.Planner{}, &routing.Executor{Generator: g}, func(string) (management.Principal, error) { return management.Principal{Role: "inference"}, nil }, Limits{Recorder: rec})
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(`{"model":"auto","messages":[{"role":"user","content":[{"type":"text","text":"TEXT_SENTINEL"},{"type":"image_url","image_url":{"url":"https://invalid/IMAGE_SENTINEL"}}]}],"max_completion_tokens":16}`)))
+	if strings.Contains(w.Body.String(), "SENTINEL") {
+		t.Fatal("error leaked")
+	}
+	page, e := store.ListRecords(context.Background(), "", 50)
+	if e != nil || len(page.Records) != 1 {
+		t.Fatal(e, page)
+	}
+	store.Close()
+	b, e := os.ReadFile(path)
+	if e != nil || strings.Contains(string(b), "SENTINEL") {
+		t.Fatal("sensitive persistence", e)
 	}
 }
