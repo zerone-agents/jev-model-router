@@ -8,6 +8,7 @@ import (
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"io"
+	"strings"
 	"sync"
 	"time"
 )
@@ -106,6 +107,10 @@ func (g *bifrostGenerator) Stream(ctx context.Context, t routing.Target, r routi
 		return nil, e
 	}
 	bc := schemas.NewBifrostContext(ctx, time.Time{})
+	// Inspect original usage presence: the pinned SDK otherwise invents a zero
+	// aggregate at stream completion. Raw frames stay inside this adapter.
+	bc.SetValue(schemas.BifrostContextKeyAllowPerRequestRawOverride, true)
+	bc.SetValue(schemas.BifrostContextKeySendBackRawResponse, true)
 	req, e := encode(bc, t, r)
 	if e != nil {
 		bc.Cancel()
@@ -122,11 +127,12 @@ func (g *bifrostGenerator) Stream(ctx context.Context, t routing.Target, r routi
 }
 
 type stream struct {
-	ctx      *schemas.BifrostContext
-	ch       chan *schemas.BifrostStreamChunk
-	release  func()
-	once     sync.Once
-	finished bool
+	ctx           *schemas.BifrostContext
+	ch            chan *schemas.BifrostStreamChunk
+	release       func()
+	once          sync.Once
+	finished      bool
+	reportedUsage bool
 }
 
 func (s *stream) Next(ctx context.Context) (routing.Event, error) {
@@ -149,7 +155,11 @@ func (s *stream) Next(ctx context.Context) (routing.Event, error) {
 		if chunk.BifrostChatResponse == nil {
 			return routing.Event{}, routing.Fail("upstream_error", "invalid stream event")
 		}
+		s.reportedUsage = s.reportedUsage || hasReportedUsage(chunk.BifrostChatResponse.ExtraFields.RawResponse)
 		out, e := completion(chunk.BifrostChatResponse)
+		if !s.reportedUsage {
+			out.Usage = nil
+		}
 		for _, c := range out.Choices {
 			if c.FinishReason != nil {
 				s.finished = true
@@ -163,7 +173,9 @@ func completion(in *schemas.BifrostChatResponse) (routing.Completion, error) {
 	if in == nil {
 		return routing.Completion{}, routing.Fail("upstream_error", "empty generation result")
 	}
-	b, e := json.Marshal(in)
+	safe := *in
+	safe.ExtraFields = schemas.BifrostResponseExtraFields{}
+	b, e := json.Marshal(&safe)
 	if e != nil {
 		return routing.Completion{}, routing.Fail("upstream_error", "invalid generation result")
 	}
@@ -216,4 +228,25 @@ func (quietLogger) SetLevel(schemas.LogLevel)              {}
 func (quietLogger) SetOutputType(schemas.LoggerOutputType) {}
 func (quietLogger) LogHTTPRequest(schemas.LogLevel, string) schemas.LogEventBuilder {
 	return schemas.NoopLogEvent
+}
+
+// Captured SSE payloads are consecutive JSON values separated by whitespace.
+// A genuine reported zero object is distinct from an absent or null usage.
+func hasReportedUsage(raw any) bool {
+	text, ok := raw.(string)
+	if !ok {
+		return false
+	}
+	decoder := json.NewDecoder(strings.NewReader(text))
+	for {
+		var frame struct {
+			Usage *json.RawMessage `json:"usage"`
+		}
+		if decoder.Decode(&frame) != nil {
+			return false
+		}
+		if frame.Usage != nil {
+			return true
+		}
+	}
 }

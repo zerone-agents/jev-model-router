@@ -102,3 +102,14 @@ func HasImages(r Request) bool {
 	}
 	return false
 }
+
+// RequiresStructuredOutput separates plain text from JSON output modes.
+func RequiresStructuredOutput(r Request) bool {
+	var format struct {
+		Type string `json:"type"`
+	}
+	if json.Unmarshal(r.Options["response_format"], &format) != nil {
+		return false
+	}
+	return format.Type == "json_object" || format.Type == "json_schema"
+}

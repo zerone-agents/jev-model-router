@@ -56,6 +56,19 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 	// Freeze all slices before any external decision call.
 	s.Models = append([]Model{}, s.Models...)
 	s.Providers = append([]Provider{}, s.Providers...)
+	if r.Model == "auto" {
+		enabled := false
+		for _, m := range s.Models {
+			if m.Enabled {
+				enabled = true
+				break
+			}
+		}
+		if !enabled {
+			return result, Fail("config_missing", "configure and enable a generation model")
+		}
+	}
+
 	estimate := p.Estimate
 	if estimate == nil {
 		estimate = EstimateContext
@@ -83,7 +96,7 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 		}
 		target := Target{Provider: provider, Model: m}
 		var e error
-		if HasImages(r) && !m.Capabilities.Images || len(r.Tools) > 0 && !m.Capabilities.Tools || r.Options["response_format"] != nil && !m.Capabilities.StructuredOutput {
+		if HasImages(r) && !m.Capabilities.Images || len(r.Tools) > 0 && !m.Capabilities.Tools || RequiresStructuredOutput(r) && !m.Capabilities.StructuredOutput {
 			e = Fail("unsupported_request", "model capabilities do not support request")
 		}
 		if e == nil && p.Check != nil {

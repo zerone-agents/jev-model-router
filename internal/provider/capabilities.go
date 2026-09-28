@@ -38,7 +38,7 @@ func Check(target routing.Target, r routing.Request) error {
 	if len(r.Tools) > 0 && !target.Model.Capabilities.Tools {
 		return routing.Fail("unsupported_request", "model does not support tools")
 	}
-	if r.Options["response_format"] != nil && !target.Model.Capabilities.StructuredOutput {
+	if routing.RequiresStructuredOutput(r) && !target.Model.Capabilities.StructuredOutput {
 		return routing.Fail("unsupported_request", "model does not support structured output")
 	}
 	ctx := schemas.NewBifrostContext(context.Background(), time.Time{})

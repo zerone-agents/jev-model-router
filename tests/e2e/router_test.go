@@ -252,3 +252,69 @@ func TestIdempotentCLIResponseLoss(t *testing.T) {
 		t.Fatal("replayed write changed result")
 	}
 }
+
+func TestStreamUsagePresenceAcrossAdapterAndHTTP(t *testing.T) {
+	for _, usage := range []string{"", `{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0}`, `{"prompt_tokens":7,"completion_tokens":2,"total_tokens":9}`} {
+		t.Run(fmt.Sprint(len(usage)), func(t *testing.T) {
+			i := newInstance(t)
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/event-stream")
+				fmt.Fprint(w, "data: {\"id\":\"c\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-4o-mini\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}\n\n")
+				if usage != "" {
+					fmt.Fprintf(w, "data: {\"id\":\"c\",\"choices\":[],\"usage\":%s}\n\n", usage)
+				}
+				fmt.Fprint(w, "data: [DONE]\n\n")
+			}))
+			defer up.Close()
+			i.put("providers.put", map[string]any{"id": "p", "base_url": up.URL + "/v1", "secret_ref": "env:TEST_PROVIDER_KEY"})
+			i.put("models.put", model("fast", true))
+			code, body := i.request("POST", "/v1/chat/completions", "inference-secret", `{"model":"fast","messages":[{"role":"user","content":"hi"}],"stream":true,"stream_options":{"include_usage":true}}`)
+			if code != 200 || !bytes.Contains(body, []byte("[DONE]")) {
+				t.Fatalf("%d %s", code, body)
+			}
+			observed := false
+			for _, line := range strings.Split(string(body), "\n") {
+				if !strings.HasPrefix(line, "data: {") {
+					continue
+				}
+				var event map[string]json.RawMessage
+				json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &event)
+				if u := event["usage"]; len(u) > 0 {
+					observed = true
+					if usage == "" {
+						t.Fatalf("invented usage: %s", u)
+					}
+					var a, b map[string]any
+					json.Unmarshal(u, &a)
+					json.Unmarshal([]byte(usage), &b)
+					for k, v := range b {
+						if a[k] != v {
+							t.Fatalf("changed usage: %s", u)
+						}
+					}
+				}
+			}
+			if usage != "" && !observed {
+				t.Fatal("lost reported usage")
+			}
+		})
+	}
+}
+func TestTextOutputWithTextOnlyModel(t *testing.T) {
+	i := newInstance(t)
+	i.provider()
+	m := model("text", true)
+	m["capabilities"].(map[string]any)["structured_output"] = false
+	i.put("models.put", m)
+	code, b := i.request("POST", "/v1/chat/completions", "inference-secret", `{"model":"auto","messages":[{"role":"user","content":"hi"}],"response_format":{"type":"text"}}`)
+	if code != 200 {
+		t.Fatalf("%d %s", code, b)
+	}
+}
+func TestEmptyInstanceReturnsConfigMissing(t *testing.T) {
+	i := newInstance(t)
+	code, b := i.request("POST", "/v1/chat/completions", "inference-secret", `{"model":"auto","messages":[{"role":"user","content":"hi"}]}`)
+	if code != 503 || !bytes.Contains(b, []byte("config_missing")) {
+		t.Fatalf("%d %s", code, b)
+	}
+}

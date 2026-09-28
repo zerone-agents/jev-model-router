@@ -87,3 +87,26 @@ func TestNoDecisionRetry(t *testing.T) {
 		t.Fatal("unsafe retry/error")
 	}
 }
+
+func TestDecisionIncludesOutputAndToolRequirements(t *testing.T) {
+	i := input()
+	i.Request.Options = map[string]json.RawMessage{"response_format": json.RawMessage(`{"type":"json_schema","json_schema":{"name":"result","schema":{"type":"object","properties":{"OUTPUT_SENTINEL":{"type":"string"}}}}}`), "tool_choice": json.RawMessage(`"required"`), "parallel_tool_calls": json.RawMessage(`false`), "max_completion_tokens": json.RawMessage(`128`)}
+	b, e := BuildState(i, DefaultBudget())
+	if e != nil {
+		t.Fatal(e)
+	}
+	for _, part := range []string{"OUTPUT_SENTINEL", `"tool_choice":"required"`, `"parallel_tool_calls":false`, `"max_completion_tokens":128`} {
+		if !bytes.Contains(b, []byte(part)) {
+			t.Fatalf("missing %s", part)
+		}
+	}
+}
+func TestOutputRequirementsConsumeRequiredBudget(t *testing.T) {
+	i := input()
+	format := map[string]any{"type": "json_schema", "json_schema": map[string]any{"name": "result", "schema": map[string]any{"description": strings.Repeat("x", 30000)}}}
+	raw, _ := json.Marshal(format)
+	i.Request.Options = map[string]json.RawMessage{"response_format": raw}
+	if _, e := BuildState(i, DefaultBudget()); e == nil {
+		t.Fatal("oversized required output schema accepted")
+	}
+}

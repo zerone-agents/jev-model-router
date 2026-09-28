@@ -103,3 +103,40 @@ func TestNoCandidateFitsContext(t *testing.T) {
 		t.Fatal("oversize selected")
 	}
 }
+
+func TestTextFormatDoesNotRequireStructuredOutput(t *testing.T) {
+	s, r := planFixture()
+	r.Model = "a"
+	r.Options = map[string]json.RawMessage{"response_format": json.RawMessage(`{"type":"text"}`)}
+	calls := 0
+	if _, e := counterPlanner(&calls).Plan(context.Background(), s, r); e != nil {
+		t.Fatal(e)
+	}
+}
+func TestUnconfiguredIsDistinctFromFilteredCandidates(t *testing.T) {
+	for _, mode := range []string{"empty", "disabled", "filtered"} {
+		s, r := planFixture()
+		switch mode {
+		case "empty":
+			s.Models = nil
+		case "disabled":
+			for i := range s.Models {
+				s.Models[i].Enabled = false
+			}
+		case "filtered":
+			for i := range s.Models {
+				s.Models[i].Capabilities.ContextLimit = 1
+			}
+		}
+		calls := 0
+		_, e := counterPlanner(&calls).Plan(context.Background(), s, r)
+		want := "config_missing"
+		if mode == "filtered" {
+			want = "no_candidates"
+		}
+		known, ok := e.(*Error)
+		if !ok || known.Code != want {
+			t.Fatalf("%s got %v want %s", mode, e, want)
+		}
+	}
+}

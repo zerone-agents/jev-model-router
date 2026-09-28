@@ -24,11 +24,12 @@ func normalize(p BudgetPolicy) BudgetPolicy {
 }
 
 type state struct {
-	Preference string            `json:"preference"`
-	Candidates []routing.Model   `json:"candidates"`
-	Messages   []routing.Message `json:"messages"`
-	Tools      []routing.Tool    `json:"tools,omitempty"`
-	Omitted    bool              `json:"history_omitted"`
+	Requirements map[string]json.RawMessage `json:"requirements,omitempty"`
+	Preference   string                     `json:"preference"`
+	Candidates   []routing.Model            `json:"candidates"`
+	Messages     []routing.Message          `json:"messages"`
+	Tools        []routing.Tool             `json:"tools,omitempty"`
+	Omitted      bool                       `json:"history_omitted"`
 }
 
 func clean(m routing.Message) routing.Message {
@@ -69,6 +70,13 @@ func BuildState(in routing.DecisionInput, p BudgetPolicy) (json.RawMessage, erro
 		groups[len(groups)-1] = append(groups[len(groups)-1], m)
 	}
 	s := state{Preference: in.Prompt, Candidates: in.Candidates, Messages: fixed, Tools: in.Request.Tools, Omitted: len(groups) > 1}
+	s.Requirements = map[string]json.RawMessage{}
+	for _, key := range []string{"response_format", "tool_choice", "parallel_tool_calls", "max_completion_tokens"} {
+		if v := in.Request.Options[key]; v != nil {
+			s.Requirements[key] = append(json.RawMessage{}, v...)
+		}
+	}
+
 	if len(groups) > 0 {
 		s.Messages = append(append([]routing.Message{}, fixed...), groups[len(groups)-1]...)
 	}

@@ -16,8 +16,12 @@
 
 Jev 原生协议依据 [API reference](https://docs.typesafe.ai/api)：state/questions，choice 最多 255 选项，响应为选择和概率/置信度，没有自由文本理由。fixtures 是文档形状的合成样例，非真实 API 结果。输入上限依据 [Models](https://docs.typesafe.ai/models)，上线前必须按配置模型复核；没有精确 tokenizer 证据时只提供有余量估算，不保证上游接受。
 
-生成参数需同时满足公布的 schema、模型能力声明和实际适配转换检查。此文件的 SDK 转换测试不是模型本身能力证明。端到端取消、首包/空闲超时、客户端背压及实际模型质量由后续任务验证。
+生成参数需同时满足公布的 schema、模型能力声明和实际适配转换检查。此文件的 SDK 转换测试不是模型本身能力证明。本地测试已覆盖端到端取消、首包/空闲超时和有界事件缓冲；真实慢读 socket 的完整跨 SDK 压力场景仍待补充，实际模型质量需另行付费评测。
 
 Jev 决策默认限制为 255 个候选、24,000 UTF-8 序列化字节（包含问题和选项），这是有余量的本地估算边界，不是精确 token 计数。保留全部候选、偏好、system/developer 指令、工具定义和最新 user 回合；较旧回合按完整组从近到远加入，溢出时标记省略。图片结构替换为 image_present，不保留 URL 或内联数据。必需部分超限直接失败，生成请求保持完整。
 
 生成容量预检使用 UTF-8 字节数、每张图片额外 8192 估算单位、256 协议余量，以及请求输出限额（未指定时预留 4096）。`context_exact=false` 明确表示估算；图片实际 token 依模型和尺寸而异，上游仍可能拒绝。该预检不会裁剪或修改输入。
+
+普通 `response_format.type=text` 不要求结构化输出能力，JSON 模式才要求。Jev 的必需输入同时包含输出格式/JSON Schema、tool_choice、parallel_tool_calls 和 max_completion_tokens，这些需求也占用决策预算。
+
+SSE usage 按上游实际提供情况返回：未报告时省略，明确报告为零则保留。适配器仅在内存中检查 SDK 提供的原始帧以识别 usage 存在性，公开响应和记录不包含 SDK 原始元数据。空库或没有启用模型时 auto 返回 config_missing/503；启用模型均不满足当前请求时返回 no_candidates/422。
