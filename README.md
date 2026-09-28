@@ -64,8 +64,7 @@ flowchart TD
 - [架构与目录边界](docs/architecture.md)
 - [Agent 管理契约](contracts/README.md)
 - [领域术语](CONTEXT.md)
-- [架构决策](docs/adr/0001-agent-first-shared-control.md)
 - [CLI 配套技能](skills/jev-router/SKILL.md)
 - [默认均衡提示词](templates/balanced.md)
 
-运行时的命令、参数和能力以实际发布的 CLI schema 为准；当前没有安装或运行指令。开发阶段的本地调研和过程规格保存在忽略目录，公开架构不依赖这些文件。
+运行时的命令、参数和能力以实际发布的 CLI schema 为准；当前没有安装或运行指令。开发阶段的本地调研、过程规格和 ADR 保存在忽略目录，公开架构不依赖这些文件。
