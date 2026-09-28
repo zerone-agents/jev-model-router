@@ -1,36 +1,30 @@
 ---
 name: jev-router
-description: Configure and inspect Jev Model Router through its Agent CLI. Use when managing providers, model descriptions, routing prompts, or investigating automatic and explicit model selection.
+description: Configure and inspect Jev Model Router through its CLI. Use when managing providers, model cards, routing preferences, connection tests, or automatic and explicit model selection.
 license: Apache-2.0
 metadata:
   protocols:
     - cli
-  status: design-stage
 ---
 
 # Jev Model Router
 
-This skill accompanies the product CLI. This repository currently contains the architecture skeleton, not an executable CLI. Do not claim that configuration or routing was performed without a working installation and a successful operation result.
+## Discover
 
-## Discover the installed contract
+Run `jev-router --help` and `jev-router --version` locally. Use `jev-router schema` against the target instance to discover available capabilities, then `jev-router schema <capability>` for its input, effects, role, examples and risk. Discovery requires the settings credential, resolved from the configured env/file reference. Keep credentials out of command arguments and output.
 
-Check whether `jev-router` is installed and read its help/version. If unavailable, report that the CLI is not installed or implemented; do not invent installation commands or substitute an unrelated executable.
+## Configure and verify
 
-Use the installed CLI's advertised capability discovery entrypoint to obtain schemas, examples, required scopes, risk, and result semantics. The proposed discovery command is `jev-router schema`; execute it only when supported by the installed version. Treat runtime schemas as the source of truth for command names and parameters.
+1. Read the relevant resource and version with `call <capability> --json <file|->`; simple reads also accept `--id`, `--cursor`, `--limit`.
+2. Prepare a complete replacement resource using its runtime schema. Store provider credentials as references. Give models task-oriented descriptions and explicit capability declarations. External ID `auto` is reserved, including for disabled models.
+3. Write with `--expected-version N --idempotency-key KEY`. On an unknown network outcome, retry the identical operation with the same key within 24 hours. A changed payload needs a new key; a version conflict needs a fresh read and a deliberate update.
+4. Create models disabled, run `models.test` with only their ID, then enable through `models.put` if authorized. The fixed test checks basic connectivity with `Reply OK.` and 16 output tokens; it does not prove all declared capabilities.
+5. Use `route.inspect` with a supported chat request to inspect selection. It generates no answer and changes no configuration; multiple candidates can invoke paid Jev. Read back saved resources and report the observed version and operation ID.
 
-## Choose the operation
+Machine results go to stdout; diagnostics go to stderr. A top-level successful `models.test` operation can contain `data.ok=false`; inspect both levels. Distinguish saved configuration, successful connectivity and successful generation.
 
-- To configure a provider or model, read the existing resource and configuration version, apply only the requested change, validate it, and use the advertised update capability. Use credential references; keep secret values out of model descriptions and output.
-- To change selection preferences, edit the routing prompt. The default is one balanced template; do not invent preset modes or task-to-model rules.
-- To investigate a selection, inspect eligible models, their descriptions and capabilities, then use route inspection if authorized for its declared cost and data destination. Inspection does not generate an answer, but may call a paid remote decision API.
-- To select a model explicitly, use an ID visible to the authenticated caller. An explicit choice still obeys capability and privacy constraints and does not authorize fallback to another model.
+## Routing boundaries
 
-Jev mode has no privacy routing guarantee. Privacy routing is optional with local Laya; a local-only session must not be switched to a cloud model to work around a failure. Changing a model description or routing prompt does not override those constraints.
+Edit `prompt` to adjust preferences; the default is one balanced template. `auto` evaluates each request independently. Explicit selection uses an enabled external model ID and still obeys compatibility and context limits. Failures do not trigger fallback or retries.
 
-## Mutate and verify
-
-Follow the operation's declared authorization and approval boundary. For writes, provide the expected configuration version and an idempotency key when the contract requires them. Reuse the same key for a retry of the same intended operation; an altered payload is a new operation.
-
-Read structured status and error fields. For a conflict, refresh state before preparing another change. For pending approval, follow the declared approval path; do not treat it as completion. Retry only when the result says it is retryable and the operation's effects are understood.
-
-After a successful change, read back the relevant resource/version and report the operation ID and observed result. Distinguish saved configuration, a routing decision, and successful generation; none implies the others.
+Jev mode offers no sensitive-data routing guarantee. Image fields are excluded from the decision call, but conversation text and tool content may go to Jev. Local Laya, privacy session locking, ArbiterOS and UI are future capabilities, not available in this version. Disabling a model affects new requests; it does not revoke an in-flight snapshot.
