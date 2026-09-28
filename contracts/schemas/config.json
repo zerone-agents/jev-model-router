@@ -1,0 +1,124 @@
+{
+  "provider": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+      },
+      "base_url": {
+        "type": "string",
+        "pattern": "^https?://[^\\s]+$",
+        "maxLength": 4096
+      },
+      "secret_ref": {
+        "type": "string",
+        "pattern": "^(env:[A-Za-z_][A-Za-z0-9_]*|file:/[^\\x00]+)$",
+        "maxLength": 4096
+      }
+    },
+    "required": [
+      "id",
+      "base_url",
+      "secret_ref"
+    ],
+    "additionalProperties": false
+  },
+  "model": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+        "not": {
+          "const": "auto"
+        }
+      },
+      "provider_id": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+      },
+      "upstream_name": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      },
+      "description": {
+        "type": "string",
+        "minLength": 0,
+        "maxLength": 4096
+      },
+      "location": {
+        "enum": [
+          "local",
+          "cloud"
+        ]
+      },
+      "enabled": {
+        "type": "boolean"
+      },
+      "capabilities": {
+        "type": "object",
+        "properties": {
+          "context_limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000000
+          },
+          "tools": {
+            "type": "boolean"
+          },
+          "images": {
+            "type": "boolean"
+          },
+          "structured_output": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "context_limit",
+          "tools",
+          "images",
+          "structured_output"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "id",
+      "provider_id",
+      "upstream_name",
+      "description",
+      "location",
+      "enabled",
+      "capabilities"
+    ],
+    "additionalProperties": false
+  },
+  "decision": {
+    "type": "object",
+    "properties": {
+      "base_url": {
+        "type": "string",
+        "pattern": "^https?://[^\\s]+$",
+        "maxLength": 4096
+      },
+      "model": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      },
+      "secret_ref": {
+        "type": "string",
+        "pattern": "^(env:[A-Za-z_][A-Za-z0-9_]*|file:/[^\\x00]+)$",
+        "maxLength": 4096
+      }
+    },
+    "required": [
+      "base_url",
+      "model",
+      "secret_ref"
+    ],
+    "additionalProperties": false
+  }
+}

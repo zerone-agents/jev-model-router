@@ -1,0 +1,76 @@
+{
+  "error_mapping": {
+    "invalid_request": {
+      "http_status": 400,
+      "exit_code": 2
+    },
+    "unauthorized": {
+      "http_status": 401,
+      "exit_code": 3
+    },
+    "forbidden": {
+      "http_status": 403,
+      "exit_code": 3
+    },
+    "not_found": {
+      "http_status": 404,
+      "exit_code": 4
+    },
+    "config_conflict": {
+      "http_status": 409,
+      "exit_code": 5
+    },
+    "idempotency_conflict": {
+      "http_status": 409,
+      "exit_code": 5
+    },
+    "config_missing": {
+      "http_status": 503,
+      "exit_code": 6
+    },
+    "no_candidates": {
+      "http_status": 422,
+      "exit_code": 6
+    },
+    "budget_exceeded": {
+      "http_status": 422,
+      "exit_code": 6
+    },
+    "unsupported_request": {
+      "http_status": 400,
+      "exit_code": 2
+    },
+    "invalid_decision": {
+      "http_status": 502,
+      "exit_code": 7
+    },
+    "upstream_error": {
+      "http_status": 502,
+      "exit_code": 7
+    },
+    "timeout": {
+      "http_status": 504,
+      "exit_code": 8
+    },
+    "cancelled": {
+      "http_status": 499,
+      "exit_code": 8
+    },
+    "storage_error": {
+      "http_status": 503,
+      "exit_code": 9
+    },
+    "internal_error": {
+      "http_status": 500,
+      "exit_code": 9
+    }
+  },
+  "retention": {
+    "idempotency_hours": 24,
+    "records_days": 7
+  },
+  "list_defaults": {
+    "default": 50,
+    "maximum": 200
+  }
+}

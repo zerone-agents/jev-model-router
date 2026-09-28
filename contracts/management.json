@@ -1,0 +1,930 @@
+[
+  {
+    "id": "status.get",
+    "description": "Read local instance readiness and degradation without paid requests",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object"
+    },
+    "side_effects": [],
+    "risk": "L0",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {}
+    ],
+    "write": false
+  },
+  {
+    "id": "providers.list",
+    "description": "List configured providers",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 256
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object"
+    },
+    "side_effects": [],
+    "risk": "L0",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {}
+    ],
+    "write": false
+  },
+  {
+    "id": "providers.get",
+    "description": "Read one providers",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object"
+    },
+    "side_effects": [],
+    "risk": "L0",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {
+        "id": "p"
+      }
+    ],
+    "write": false
+  },
+  {
+    "id": "providers.put",
+    "description": "Create or replace one resource after whole-config validation",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        },
+        "base_url": {
+          "type": "string",
+          "pattern": "^https?://[^\\s]+$",
+          "maxLength": 4096
+        },
+        "secret_ref": {
+          "type": "string",
+          "pattern": "^(env:[A-Za-z_][A-Za-z0-9_]*|file:/[^\\x00]+)$",
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "id",
+        "base_url",
+        "secret_ref"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object"
+    },
+    "side_effects": [
+      "config_write"
+    ],
+    "risk": "L2",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {
+        "id": "p",
+        "base_url": "https://example.com/v1",
+        "secret_ref": "env:PROVIDER_KEY"
+      }
+    ],
+    "write": true
+  },
+  {
+    "id": "providers.delete",
+    "description": "Delete one resource if unreferenced",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object"
+    },
+    "side_effects": [
+      "config_write"
+    ],
+    "risk": "L2",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {
+        "id": "p"
+      }
+    ],
+    "write": true
+  },
+  {
+    "id": "models.list",
+    "description": "List configured models",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 256
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object"
+    },
+    "side_effects": [],
+    "risk": "L0",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {}
+    ],
+    "write": false
+  },
+  {
+    "id": "models.get",
+    "description": "Read one models",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object"
+    },
+    "side_effects": [],
+    "risk": "L0",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {
+        "id": "fast"
+      }
+    ],
+    "write": false
+  },
+  {
+    "id": "models.put",
+    "description": "Create or replace one resource after whole-config validation",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+          "not": {
+            "const": "auto"
+          }
+        },
+        "provider_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        },
+        "upstream_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "description": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 4096
+        },
+        "location": {
+          "enum": [
+            "local",
+            "cloud"
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "capabilities": {
+          "type": "object",
+          "properties": {
+            "context_limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000000
+            },
+            "tools": {
+              "type": "boolean"
+            },
+            "images": {
+              "type": "boolean"
+            },
+            "structured_output": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "context_limit",
+            "tools",
+            "images",
+            "structured_output"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "provider_id",
+        "upstream_name",
+        "description",
+        "location",
+        "enabled",
+        "capabilities"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object"
+    },
+    "side_effects": [
+      "config_write"
+    ],
+    "risk": "L2",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {
+        "id": "fast",
+        "provider_id": "p",
+        "upstream_name": "gpt-4o-mini",
+        "description": "Fast general model",
+        "location": "cloud",
+        "enabled": false,
+        "capabilities": {
+          "context_limit": 8192,
+          "tools": true,
+          "images": true,
+          "structured_output": true
+        }
+      }
+    ],
+    "write": true
+  },
+  {
+    "id": "models.delete",
+    "description": "Delete one resource if unreferenced",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object"
+    },
+    "side_effects": [
+      "config_write"
+    ],
+    "risk": "L2",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {
+        "id": "fast"
+      }
+    ],
+    "write": true
+  },
+  {
+    "id": "decision.get",
+    "description": "Read decision backend configuration",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object"
+    },
+    "side_effects": [],
+    "risk": "L0",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {}
+    ],
+    "write": false
+  },
+  {
+    "id": "decision.put",
+    "description": "Configure Jev decision backend",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "base_url": {
+          "type": "string",
+          "pattern": "^https?://[^\\s]+$",
+          "maxLength": 4096
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "secret_ref": {
+          "type": "string",
+          "pattern": "^(env:[A-Za-z_][A-Za-z0-9_]*|file:/[^\\x00]+)$",
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "base_url",
+        "model",
+        "secret_ref"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object"
+    },
+    "side_effects": [
+      "config_write"
+    ],
+    "risk": "L2",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {
+        "base_url": "https://api.typesafe.ai",
+        "model": "jev-1.13.0",
+        "secret_ref": "env:JEV_KEY"
+      }
+    ],
+    "write": true
+  },
+  {
+    "id": "prompt.get",
+    "description": "Read current routing preference",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object"
+    },
+    "side_effects": [],
+    "risk": "L0",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {}
+    ],
+    "write": false
+  },
+  {
+    "id": "prompt.put",
+    "description": "Replace editable routing preference",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object"
+    },
+    "side_effects": [
+      "config_write"
+    ],
+    "risk": "L2",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {
+        "text": "Balance capability, speed and cost."
+      }
+    ],
+    "write": true
+  },
+  {
+    "id": "route.inspect",
+    "description": "Select without generation; may send text to Jev and incur cost",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "role": {
+                "enum": [
+                  "system",
+                  "developer",
+                  "user",
+                  "assistant",
+                  "tool"
+                ]
+              },
+              "content": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "minLength": 0,
+                    "maxLength": 1048576
+                  },
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "const": "text"
+                            },
+                            "text": {
+                              "type": "string",
+                              "minLength": 0,
+                              "maxLength": 1048576
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "text"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "const": "image_url"
+                            },
+                            "image_url": {
+                              "type": "object",
+                              "properties": {
+                                "url": {
+                                  "type": "string",
+                                  "pattern": "^(https://|data:image/(png|jpeg|webp|gif);base64,)",
+                                  "maxLength": 8388608
+                                },
+                                "detail": {
+                                  "enum": [
+                                    "auto",
+                                    "low",
+                                    "high"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "url"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "image_url"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "maxItems": 128,
+                    "minItems": 0
+                  }
+                ]
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "tool_call_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "tool_calls": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "type": {
+                      "const": "function"
+                    },
+                    "function": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "arguments": {
+                          "type": "string",
+                          "minLength": 0,
+                          "maxLength": 1048576
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "arguments"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "type",
+                    "function"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 128,
+                "minItems": 1
+              }
+            },
+            "required": [
+              "role"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 2048,
+          "minItems": 1
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "function"
+              },
+              "function": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 0,
+                    "maxLength": 4096
+                  },
+                  "parameters": {
+                    "type": "object"
+                  },
+                  "strict": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "name",
+                  "parameters"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "type",
+              "function"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 128,
+          "minItems": 1
+        },
+        "stream": {
+          "type": "boolean"
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "top_p": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "max_completion_tokens": {
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 10000000
+        },
+        "stop": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "maxItems": 4,
+              "minItems": 1
+            }
+          ]
+        },
+        "tool_choice": {
+          "oneOf": [
+            {
+              "enum": [
+                "auto",
+                "none",
+                "required"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "function"
+                },
+                "function": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "type",
+                "function"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "parallel_tool_calls": {
+          "type": "boolean"
+        },
+        "response_format": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "enum": [
+                    "text",
+                    "json_object"
+                  ]
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "json_schema"
+                },
+                "json_schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "description": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 4096
+                    },
+                    "schema": {
+                      "type": "object"
+                    },
+                    "strict": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "schema"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "type",
+                "json_schema"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "stream_options": {
+          "type": "object",
+          "properties": {
+            "include_usage": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "include_usage"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "model",
+        "messages"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object"
+    },
+    "side_effects": [
+      "external_request",
+      "potential_cost"
+    ],
+    "risk": "L2",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {
+        "model": "auto",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Explain this function"
+          }
+        ]
+      }
+    ],
+    "write": false
+  },
+  {
+    "id": "models.test",
+    "description": "Fixed minimal generation test, including disabled models; never enables the model",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+          "not": {
+            "const": "auto"
+          }
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object"
+    },
+    "side_effects": [
+      "external_request",
+      "potential_cost"
+    ],
+    "risk": "L2",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {
+        "id": "fast"
+      }
+    ],
+    "write": false
+  },
+  {
+    "id": "records.list",
+    "description": "Read safe bounded routing metadata",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 256
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object"
+    },
+    "side_effects": [],
+    "risk": "L0",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {}
+    ],
+    "write": false
+  }
+]
