@@ -1,0 +1,105 @@
+package routing
+
+import (
+	"context"
+	"encoding/json"
+	"testing"
+)
+
+type chooseFunc func(context.Context, DecisionConfig, DecisionInput) (Decision, error)
+
+func (f chooseFunc) Choose(c context.Context, d DecisionConfig, i DecisionInput) (Decision, error) {
+	return f(c, d, i)
+}
+func planFixture() (Snapshot, Request) {
+	return Snapshot{Version: 3, Prompt: "balanced", Decision: DecisionConfig{Model: "jev"}, Providers: []Provider{{ID: "p"}}, Models: []Model{{ID: "a", ProviderID: "p", Enabled: true, Capabilities: Capabilities{ContextLimit: 10000}}, {ID: "b", ProviderID: "p", Enabled: true, Capabilities: Capabilities{ContextLimit: 10000}}}}, Request{Model: "auto", Messages: []Message{{Role: "user", Content: json.RawMessage(`"hi"`)}}}
+}
+func counterPlanner(calls *int) *Planner {
+	return &Planner{Decider: chooseFunc(func(_ context.Context, _ DecisionConfig, in DecisionInput) (Decision, error) {
+		*calls++
+		return Decision{ModelID: in.Candidates[0].ID}, nil
+	})}
+}
+func TestExplicitSkipsJev(t *testing.T) {
+	s, r := planFixture()
+	r.Model = "b"
+	calls := 0
+	p, e := counterPlanner(&calls).Plan(context.Background(), s, r)
+	if e != nil || calls != 0 || p.Target.Model.ID != "b" || p.Path != "explicit" {
+		t.Fatalf("%+v %v", p, e)
+	}
+}
+func TestAutoZeroOneMany(t *testing.T) {
+	for n := 0; n < 3; n++ {
+		s, r := planFixture()
+		s.Models = s.Models[:n]
+		calls := 0
+		p, e := counterPlanner(&calls).Plan(context.Background(), s, r)
+		if n == 0 {
+			if e == nil {
+				t.Fatal("zero accepted")
+			}
+			continue
+		}
+		if e != nil || p.Target.Model.ID != "a" || calls != n-1 {
+			t.Fatalf("n=%d %+v %v", n, p, e)
+		}
+	}
+}
+func TestAutoDoesNotCache(t *testing.T) {
+	s, r := planFixture()
+	calls := 0
+	p := counterPlanner(&calls)
+	p.Plan(context.Background(), s, r)
+	p.Plan(context.Background(), s, r)
+	if calls != 2 {
+		t.Fatal(calls)
+	}
+}
+func TestDisabledExplicitRejected(t *testing.T) {
+	s, r := planFixture()
+	s.Models[0].Enabled = false
+	r.Model = "a"
+	calls := 0
+	if _, e := counterPlanner(&calls).Plan(context.Background(), s, r); e == nil || calls != 0 {
+		t.Fatal("disabled selected")
+	}
+}
+func TestSnapshotStableDuringDecision(t *testing.T) {
+	s, r := planFixture()
+	entered, release := make(chan struct{}), make(chan struct{})
+	p := Planner{Decider: chooseFunc(func(context.Context, DecisionConfig, DecisionInput) (Decision, error) {
+		close(entered)
+		<-release
+		return Decision{ModelID: "a"}, nil
+	})}
+	done := make(chan Plan)
+	go func() {
+		v, e := p.Plan(context.Background(), s, r)
+		if e != nil {
+			t.Error(e)
+		}
+		done <- v
+	}()
+	<-entered
+	s.Models[0].Enabled = false
+	s.Providers[0].BaseURL = "changed"
+	close(release)
+	old := <-done
+	if !old.Target.Model.Enabled || old.Target.Provider.BaseURL == "changed" {
+		t.Fatal("snapshot changed")
+	}
+	r.Model = "a"
+	if _, e := p.Plan(context.Background(), s, r); e == nil {
+		t.Fatal("new snapshot ignored")
+	}
+}
+func TestNoCandidateFitsContext(t *testing.T) {
+	s, r := planFixture()
+	calls := 0
+	p := counterPlanner(&calls)
+	p.Estimate = func(Model, Request) (int64, bool, error) { return 20000, false, nil }
+	if _, e := p.Plan(context.Background(), s, r); e == nil || calls != 0 {
+		t.Fatal("oversize selected")
+	}
+}
