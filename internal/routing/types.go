@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 )
@@ -38,6 +39,7 @@ type Snapshot struct {
 	Prompt    string         `json:"prompt"`
 }
 type Message struct {
+	Refusal    *string         `json:"refusal,omitempty"`
 	Role       string          `json:"role,omitempty"`
 	Content    json.RawMessage `json:"content,omitempty"`
 	Name       string          `json:"name,omitempty"`
@@ -117,8 +119,11 @@ func (r Request) MarshalJSON() ([]byte, error) {
 }
 
 type Usage struct {
-	InputTokens  int64 `json:"input_tokens"`
-	OutputTokens int64 `json:"output_tokens"`
+	TotalTokens   int64           `json:"total_tokens,omitempty"`
+	InputDetails  json.RawMessage `json:"input_details,omitempty"`
+	OutputDetails json.RawMessage `json:"output_details,omitempty"`
+	InputTokens   int64           `json:"input_tokens"`
+	OutputTokens  int64           `json:"output_tokens"`
 }
 type Error struct {
 	Code      string `json:"code"`
@@ -128,3 +133,30 @@ type Error struct {
 
 func (e *Error) Error() string        { return e.Code + ": " + e.Message }
 func Fail(code, message string) error { return &Error{Code: code, Message: message} }
+
+type Target struct {
+	Provider Provider `json:"-"`
+	Model    Model    `json:"-"`
+}
+type Completion struct {
+	ID      string   `json:"id"`
+	Created int64    `json:"created"`
+	Choices []Choice `json:"choices"`
+	Usage   *Usage   `json:"-"`
+}
+type Event = Completion
+type Delta = Message
+type Choice struct {
+	Index        int      `json:"index"`
+	Message      *Message `json:"message,omitempty"`
+	Delta        *Delta   `json:"delta,omitempty"`
+	FinishReason *string  `json:"finish_reason"`
+}
+type EventStream interface {
+	Next(context.Context) (Event, error)
+	Close() error
+}
+type Generator interface {
+	Complete(context.Context, Target, Request) (Completion, error)
+	Stream(context.Context, Target, Request) (EventStream, error)
+}
