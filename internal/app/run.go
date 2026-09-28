@@ -54,7 +54,7 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 	checks := management.Checks{Store: store, Planner: planner, Generator: gen, DecisionTimeout: cfg.DecisionTimeout, FirstEventTimeout: cfg.FirstEventTimeout}
 	checks.Register(service)
 	auth := func(h string) (management.Principal, error) { return Authenticate(h, creds) }
-	return httptransport.NewManagementHandler(service, auth), close, nil
+	return httptransport.NewHandler(service, store, planner, &routing.Executor{Generator: gen}, auth, httptransport.Limits{DecisionTimeout: cfg.DecisionTimeout, FirstEventTimeout: cfg.FirstEventTimeout, IdleTimeout: cfg.IdleTimeout, MaxBodyBytes: cfg.MaxBodyBytes, StreamBuffer: cfg.StreamBuffer}), close, nil
 }
 func Run(ctx context.Context, cfg Config) error {
 	h, close, e := Handler(cfg)

@@ -1,0 +1,96 @@
+package httptransport
+
+import (
+	"context"
+	"encoding/json"
+	"github.com/zerone-agents/jev-model-router/internal/routing"
+	"io"
+	"net/http"
+	"time"
+)
+
+func (s *server) chat(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, s.limits.MaxBodyBytes)
+	var req routing.Request
+	d := json.NewDecoder(r.Body)
+	if d.Decode(&req) != nil || d.Decode(new(any)) != io.EOF {
+		writeError(w, routing.Fail("invalid_request", "invalid chat body"))
+		return
+	}
+	cfg, e := s.store.Snapshot(r.Context())
+	if e != nil {
+		writeError(w, e)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), s.limits.DecisionTimeout)
+	plan, e := s.planner.Plan(ctx, cfg, req)
+	e = contextError(ctx, e)
+	cancel()
+	if e != nil {
+		writeError(w, e)
+		return
+	}
+	id := w.Header().Get("X-Request-ID")
+	if !req.Stream {
+		ctx, cancel := context.WithTimeout(r.Context(), s.limits.FirstEventTimeout)
+		defer cancel()
+		result, e := s.executor.Complete(ctx, plan, req)
+		e = contextError(ctx, e)
+		if e != nil {
+			writeError(w, e)
+			return
+		}
+		http.NewResponseController(w).SetWriteDeadline(time.Now().Add(s.limits.IdleTimeout))
+		WriteCompletion(w, result, plan.ModelID, id)
+		return
+	}
+	ctx, stop := context.WithCancelCause(r.Context())
+	defer stop(context.Canceled)
+	timer := time.AfterFunc(s.limits.FirstEventTimeout, func() { stop(context.DeadlineExceeded) })
+	defer timer.Stop()
+	stream, e := s.executor.Stream(ctx, plan, req)
+	if e != nil {
+		writeError(w, contextError(ctx, e))
+		return
+	}
+	buffer := bufferStream(ctx, stream, s.limits.StreamBuffer)
+	defer buffer.Close()
+	// Headers are committed only once a valid event is available. Errors after
+	// that point use an SSE error object and never a successful DONE marker.
+	var first routing.Event
+	for {
+		first, e = buffer.Next(ctx)
+		if e != nil {
+			writeError(w, contextError(ctx, e))
+			return
+		}
+		if validEvent(first) {
+			break
+		}
+	}
+	if !timer.Stop() {
+		writeError(w, routing.Fail("timeout", "first event timed out"))
+		return
+	}
+	writeStream(ctx, w, &prependStream{first: &first, rest: buffer}, plan.ModelID, id, s.limits.IdleTimeout)
+}
+func completionBody(result routing.Completion, model, kind string) map[string]any {
+	b := map[string]any{"id": result.ID, "object": kind, "created": result.Created, "model": model, "choices": result.Choices}
+	if result.Usage != nil {
+		u := result.Usage
+		usage := map[string]any{"prompt_tokens": u.InputTokens, "completion_tokens": u.OutputTokens, "total_tokens": u.TotalTokens}
+		if u.InputDetails != nil {
+			usage["prompt_tokens_details"] = u.InputDetails
+		}
+		if u.OutputDetails != nil {
+			usage["completion_tokens_details"] = u.OutputDetails
+		}
+		b["usage"] = usage
+	}
+	return b
+}
+func WriteCompletion(w http.ResponseWriter, result routing.Completion, modelID, requestID string) error {
+	w.Header().Set("X-Request-ID", requestID)
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(completionBody(result, modelID, "chat.completion"))
+}
