@@ -160,3 +160,16 @@ type Generator interface {
 	Complete(context.Context, Target, Request) (Completion, error)
 	Stream(context.Context, Target, Request) (EventStream, error)
 }
+
+type DecisionInput struct {
+	Prompt     string
+	Candidates []Model
+	Request    Request
+}
+type Decision struct {
+	ModelID string
+	Usage   *Usage
+}
+type Decider interface {
+	Choose(context.Context, DecisionConfig, DecisionInput) (Decision, error)
+}
