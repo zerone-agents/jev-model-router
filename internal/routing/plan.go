@@ -96,7 +96,7 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 		}
 		target := Target{Provider: provider, Model: m}
 		var e error
-		if HasImages(r) && !m.Capabilities.Images || len(r.Tools) > 0 && !m.Capabilities.Tools || RequiresStructuredOutput(r) && !m.Capabilities.StructuredOutput {
+		if HasImages(r) && !m.Capabilities.Images || RequiresTools(r) && !m.Capabilities.Tools || RequiresStructuredOutput(r) && !m.Capabilities.StructuredOutput {
 			e = Fail("unsupported_request", "model capabilities do not support request")
 		}
 		if e == nil && p.Check != nil {

@@ -140,3 +140,24 @@ func TestUnconfiguredIsDistinctFromFilteredCandidates(t *testing.T) {
 		}
 	}
 }
+
+func TestToolHistoryFiltersCandidates(t *testing.T) {
+	s, r := planFixture()
+	if err := json.Unmarshal([]byte(`{"model":"auto","messages":[{"role":"assistant","tool_calls":[{"id":"a","type":"function","function":{"name":"weather","arguments":"{}"}}]},{"role":"tool","tool_call_id":"a","content":"20 C"}]}`), &r); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	planner := counterPlanner(&calls)
+	for _, id := range []string{"auto", "a"} {
+		r.Model = id
+		if _, err := planner.Plan(context.Background(), s, r); err == nil {
+			t.Fatalf("%s accepted tool history without capability", id)
+		}
+	}
+	s.Models[1].Capabilities.Tools = true
+	r.Model = "auto"
+	plan, err := planner.Plan(context.Background(), s, r)
+	if err != nil || plan.ModelID != "b" || calls != 0 {
+		t.Fatalf("plan=%+v calls=%d err=%v", plan, calls, err)
+	}
+}

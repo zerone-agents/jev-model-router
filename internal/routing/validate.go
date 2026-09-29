@@ -114,3 +114,16 @@ func RequiresStructuredOutput(r Request) bool {
 	}
 	return format.Type == "json_object" || format.Type == "json_schema"
 }
+
+// RequiresTools includes historical tool use even when no new tools are offered.
+func RequiresTools(r Request) bool {
+	if len(r.Tools) > 0 {
+		return true
+	}
+	for _, message := range r.Messages {
+		if len(message.ToolCalls) > 0 || message.Role == "tool" {
+			return true
+		}
+	}
+	return false
+}

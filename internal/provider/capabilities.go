@@ -35,7 +35,7 @@ func Check(target routing.Target, r routing.Request) error {
 	if routing.HasImages(r) && !target.Model.Capabilities.Images {
 		return routing.Fail("unsupported_request", "model does not support images")
 	}
-	if len(r.Tools) > 0 && !target.Model.Capabilities.Tools {
+	if routing.RequiresTools(r) && !target.Model.Capabilities.Tools {
 		return routing.Fail("unsupported_request", "model does not support tools")
 	}
 	if routing.RequiresStructuredOutput(r) && !target.Model.Capabilities.StructuredOutput {

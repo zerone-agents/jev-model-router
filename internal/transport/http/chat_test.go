@@ -172,8 +172,8 @@ func TestClientCancel(t *testing.T) {
 			close(done)
 			return routing.Completion{}, c.Err()
 		}, stream: func(c context.Context) (routing.EventStream, error) {
-			close(entered)
 			return &testStream{next: func(c context.Context) (routing.Event, error) {
+				close(entered)
 				<-c.Done()
 				close(done)
 				return routing.Event{}, c.Err()
@@ -338,5 +338,28 @@ func TestNoSensitivePersistence(t *testing.T) {
 	b, e := os.ReadFile(path)
 	if e != nil || strings.Contains(string(b), "SENTINEL") {
 		t.Fatal("sensitive persistence", e)
+	}
+}
+
+func TestCancelledBeforeFirstReadClosesSource(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	closed := make(chan struct{})
+	source := &testStream{next: func(context.Context) (routing.Event, error) {
+		t.Error("read started after cancellation")
+		return routing.Event{}, context.Canceled
+	}, close: func() { close(closed) }}
+	buffer := bufferStream(ctx, source, 1)
+	if _, err := buffer.Next(ctx); err == nil {
+		t.Fatal("cancelled stream accepted")
+	}
+	buffer.Close()
+	select {
+	case <-closed:
+	default:
+		t.Fatal("source not closed")
+	}
+	// Wait for the pump to exit so the no-read assertion is observed.
+	for range buffer.ch {
 	}
 }

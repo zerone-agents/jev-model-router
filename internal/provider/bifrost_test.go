@@ -173,3 +173,16 @@ func TestToolHistoryRoundTrip(t *testing.T) {
 		})
 	}
 }
+
+func TestToolHistoryRequiresToolCapability(t *testing.T) {
+	r := req(t, `{"model":"fast","messages":[{"role":"assistant","tool_calls":[{"id":"a","type":"function","function":{"name":"weather","arguments":"{}"}}]},{"role":"tool","tool_call_id":"a","content":"20 C"}]}`)
+	target := target("http://unused")
+	target.Model.Capabilities.Tools = false
+	if err := Check(target, r); err == nil {
+		t.Fatal("tool history accepted without tools capability")
+	}
+	target.Model.Capabilities.Tools = true
+	if err := Check(target, r); err != nil {
+		t.Fatal(err)
+	}
+}
