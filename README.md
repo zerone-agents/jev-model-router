@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md)
 
 A lightweight model routing gateway for agents. It uses Jev's native choice capability to select models based on the task and editable model cards, with OpenAI Chat Completions-compatible JSON/SSE, a management CLI, and a companion SKILL.
 
-The first release implements a single-instance Go gateway with SQLite, explicit and automatic model selection, and an OpenAI-compatible generation adapter. Local Laya, sensitive-session locking, ArbiterOS, PostgreSQL, and a UI are planned for later phases. Small-sample routing and Agent diagnostic baselines are recorded in the [acceptance summary](docs/acceptance/2026-09-29.md); production-wide quality and economic benefits remain unverified. No AgentUse certification is claimed.
+The first release implements a single-instance Go gateway with SQLite, explicit and automatic model selection, and an OpenAI-compatible generation adapter. Local Laya, sensitive-session locking, ArbiterOS and PostgreSQL are planned for later phases. Small-sample routing and Agent diagnostic baselines are recorded in the [acceptance summary](docs/acceptance/2026-09-29.md); production-wide quality and economic benefits remain unverified. No AgentUse certification is claimed.
 
 ## Getting started
 
@@ -17,6 +17,20 @@ go build -o /tmp/jev-router ./cmd/jev-router
 ```
 
 The default listener is `127.0.0.1:8080`, and the database is `.data/router.sqlite`. Use `serve --config conf.json` and environment overrides as described in [startup configuration](docs/configuration.md). Two distinct credentials must be available at startup.
+
+## Management UI
+
+```sh
+/tmp/jev-router serve
+# In another terminal
+/tmp/jev-router dashboard
+# Headless environment: print the address without probing or opening a browser
+/tmp/jev-router dashboard --no-open
+```
+
+The UI is served at `/dashboard/` by the same Go binary. Use `dashboard --url https://router.example.com` for a remote instance. This command never starts the server or passes credentials to the browser. Enter the settings credential on the page; it stays in page memory and must be entered again after refresh. Remote connections require HTTPS.
+
+The English/Chinese UI shows instance status, models, the routing prompt and routing records. It edits model descriptions and the prompt through the existing management API, preserving version conflicts and explicit same-key retries. Configure providers, model mappings and capabilities through the CLI. See [UI development and boundaries](web/README.md).
 
 ## Agent configuration workflow
 
@@ -80,7 +94,7 @@ flowchart TD
 ├── tests/        # Black-box end-to-end tests
 ├── evals/        # Explicitly invoked paid evaluation tooling and synthetic data
 ├── services/     # Future local Laya service
-├── web/          # Future UI
+├── web/          # Embedded bilingual management UI
 └── docs/         # Architecture, configuration, compatibility, and contributor conventions
 ```
 

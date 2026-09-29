@@ -27,4 +27,11 @@ Machine results go to stdout; diagnostics go to stderr. A top-level successful `
 
 Edit `prompt` to adjust preferences; the default is one balanced template. `auto` evaluates each request independently. Explicit selection uses an enabled external model ID and still obeys compatibility and context limits. Failures do not trigger fallback or retries.
 
-Jev mode offers no sensitive-data routing guarantee. Image fields are excluded from the decision call, but conversation text and tool content may go to Jev. Local Laya, privacy session locking, ArbiterOS and UI are future capabilities, not available in this version. Disabling a model affects new requests; it does not revoke an in-flight snapshot.
+Jev mode offers no sensitive-data routing guarantee. Image fields are excluded from the decision call, but conversation text and tool content may go to Jev. Local Laya, privacy session locking, ArbiterOS are future capabilities, not available in this version. Disabling a model affects new requests; it does not revoke an in-flight snapshot.
+
+
+## Human dashboard
+
+When the user wants the management page, run `jev-router dashboard` against the running instance; use `--url` for an HTTP(S) root address or `--no-open` to return its URL without network access or a browser. It does not start the server. `serve` provides `/dashboard/` with embedded assets.
+
+The user enters the settings credential in the browser. Never add it to a URL or browser-opening command. The page keeps it only in memory, so refresh requires reconnecting; remote use requires HTTPS. The UI reads status, models, prompt and records, and edits descriptions and the prompt. Continue to use runtime schema and CLI for other management operations.

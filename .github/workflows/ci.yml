@@ -36,3 +36,28 @@ jobs:
       - run: go test -race ./... -count=1
       - run: go vet ./...
       - run: go build -o /tmp/jev-router ./cmd/jev-router
+  dashboard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.0'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.1'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm --prefix web ci
+      - run: npm --prefix web run typecheck
+      - run: npm --prefix web test
+      - run: npm --prefix web run build
+      - name: Check embedded assets match source
+        run: |
+          if [ -n "$(git status --porcelain --untracked-files=all -- web/dist)" ]; then
+            git status --short -- web/dist
+            exit 1
+          fi
+      - run: cd web && npx playwright install --with-deps chromium
+      - run: npm --prefix web run test:e2e
