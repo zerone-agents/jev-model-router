@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Zerone">
+  <rect x="3" y="3" width="58" height="58" rx="17" fill="#D96F4F"/>
+  <rect
+    x="3.75"
+    y="3.75"
+    width="56.5"
+    height="56.5"
+    rx="16.25"
+    fill="none"
+    stroke="#B9573B"
+    stroke-width="1.5"
+  />
+  <polygon points="14,31 18,27 31,40 27,44" fill="#FFF9F5"/>
+  <polygon points="27,40 31,44 51,24 47,20" fill="#FFF9F5"/>
+  <circle cx="16" cy="29" r="5" fill="#FFF9F5"/>
+  <circle cx="29" cy="42" r="5" fill="#FFF9F5"/>
+  <circle cx="49" cy="22" r="5" fill="#FFF9F5"/>
+  <circle cx="16" cy="29" r="2" fill="#D96F4F"/>
+  <circle cx="29" cy="42" r="2" fill="#D96F4F"/>
+  <circle cx="49" cy="22" r="2" fill="#D96F4F"/>
+</svg>
