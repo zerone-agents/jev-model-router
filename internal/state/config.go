@@ -10,7 +10,6 @@ import (
 	"github.com/zerone-agents/jev-model-router/contracts"
 	"github.com/zerone-agents/jev-model-router/internal/management"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
-	"time"
 )
 
 type queryer interface {
@@ -68,7 +67,8 @@ func snapshot(ctx context.Context, q queryer) (routing.Snapshot, error) {
 	return s, nil
 }
 func (s *Store) Apply(ctx context.Context, principal string, c management.Call, validate func(routing.Snapshot) error) (management.Result, error) {
-	if c.ExpectedVersion == nil || c.IdempotencyKey == "" || len(c.IdempotencyKey) > 128 {
+	envelope, _ := json.Marshal(c)
+	if contracts.Validate("write_envelope", envelope) != nil {
 		return management.Result{}, routing.Fail("invalid_request", "expected_version and idempotency_key required")
 	}
 	v, e := contracts.Decode(c.Input)
@@ -132,7 +132,7 @@ func (s *Store) Apply(ctx context.Context, principal string, c management.Call, 
 	if _, e = tx.ExecContext(ctx, `DELETE FROM idempotency WHERE expires_ns<=?`, s.now().UnixNano()); e != nil {
 		return r, storageError()
 	}
-	if _, e = tx.ExecContext(ctx, `INSERT INTO idempotency(principal,key,digest,result,expires_ns) VALUES(?,?,?,?,?)`, principal, c.IdempotencyKey, digest, string(encoded), s.now().Add(24*time.Hour).UnixNano()); e != nil {
+	if _, e = tx.ExecContext(ctx, `INSERT INTO idempotency(principal,key,digest,result,expires_ns) VALUES(?,?,?,?,?)`, principal, c.IdempotencyKey, digest, string(encoded), s.now().Add(contracts.IdempotencyTTL()).UnixNano()); e != nil {
 		return r, storageError()
 	}
 	if e = tx.Commit(); e != nil {

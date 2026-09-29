@@ -25,3 +25,5 @@ Jev 决策默认限制为 255 个候选、24,000 UTF-8 序列化字节（包含�
 普通 `response_format.type=text` 不要求结构化输出能力，JSON 模式才要求。Jev 的必需输入同时包含输出格式/JSON Schema、tool_choice、parallel_tool_calls 和 max_completion_tokens，这些需求也占用决策预算。
 
 SSE usage 按上游实际提供情况返回：未报告时省略，明确报告为零则保留。适配器仅在内存中检查 SDK 提供的原始帧以识别 usage 存在性，公开响应和记录不包含 SDK 原始元数据。空库或没有启用模型时 auto 返回 config_missing/503；启用模型均不满足当前请求时返回 no_candidates/422。
+
+历史 assistant 工具调用允许 content:null 与省略 content 的等价表示；适配器附加的历史 tool_calls.index 不影响语义比较，非流式工具调用响应不输出该索引。流式 delta 保留 index；调用ID、函数名、参数字符串、消息顺序和工具结果仍必须完整保留。完整工具回合由跨 Bifrost/HTTP 的端到端测试覆盖。

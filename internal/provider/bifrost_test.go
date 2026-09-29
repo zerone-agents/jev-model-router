@@ -151,3 +151,25 @@ func TestCancelClosesStream(t *testing.T) {
 		t.Fatal("slow cancel")
 	}
 }
+
+func TestToolHistoryRoundTrip(t *testing.T) {
+	for _, content := range []string{`,"content":null`, ``} {
+		t.Run(content, func(t *testing.T) {
+			r := req(t, `{"model":"fast","messages":[{"role":"user","content":"weather"},{"role":"assistant"`+content+`,"tool_calls":[{"id":"a","type":"function","function":{"name":"weather","arguments":"{\"city\":\"北京\"}"}},{"id":"b","type":"function","function":{"name":"weather","arguments":"{\"city\":\"上海\"}"}}]},{"role":"tool","tool_call_id":"a","content":"20 C"},{"role":"tool","tool_call_id":"b","content":"25 C"}],"tools":[{"type":"function","function":{"name":"weather","parameters":{"type":"object","properties":{"city":{"type":"string"}}}}}]}`)
+			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, q *http.Request) {
+				var body struct{ Messages []routing.Message }
+				if json.NewDecoder(q.Body).Decode(&body) != nil {
+					t.Error("decode failed")
+				}
+				if len(body.Messages) != 4 || body.Messages[1].ToolCalls[1].Function.Arguments != `{"city":"上海"}` || body.Messages[3].ToolCallID != "b" || string(body.Messages[3].Content) != `"25 C"` {
+					t.Errorf("history changed: %+v", body)
+				}
+				fmt.Fprint(w, success)
+			}))
+			defer s.Close()
+			if _, e := generator(t).Complete(context.Background(), target(s.URL), r); e != nil {
+				t.Fatal(e)
+			}
+		})
+	}
+}

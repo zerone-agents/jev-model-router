@@ -30,3 +30,29 @@ func TestCatalogSchemasAndExamples(t *testing.T) {
 		}
 	}
 }
+
+func TestDiscoveredCallSchemasValidateRequests(t *testing.T) {
+	for _, c := range Catalog() {
+		schema := compile(c.Call.Schema)
+		for _, example := range c.Examples {
+			input, e := Decode(example)
+			if e != nil {
+				t.Fatal(e)
+			}
+			request := map[string]any{"input": input}
+			if c.Write {
+				request["expected_version"] = 1
+				request["idempotency_key"] = "operation"
+			}
+			if e = schema.Validate(request); e != nil {
+				t.Fatalf("%s complete request: %v", c.ID, e)
+			}
+			if c.Write {
+				delete(request, "idempotency_key")
+				if schema.Validate(request) == nil {
+					t.Fatalf("%s accepts missing idempotency key", c.ID)
+				}
+			}
+		}
+	}
+}

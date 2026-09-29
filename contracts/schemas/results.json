@@ -72,5 +72,25 @@
   "list_defaults": {
     "default": 50,
     "maximum": 200
+  },
+  "idempotency": {
+    "required_for_writes": true,
+    "scope": "authenticated identity and key",
+    "request_identity": [
+      "capability_id",
+      "expected_version",
+      "canonical input"
+    ],
+    "replay_before_version_check": true,
+    "success_only": true,
+    "validation_failure_consumes_key": false,
+    "same_key_different_request": "idempotency_conflict",
+    "after_expiry": "Replay is not guaranteed; the current configuration version is checked.",
+    "retry": "On an unknown write outcome, retry the identical request with the same key within the validity window. Do not automatically retry route.inspect or models.test."
+  },
+  "versioning": {
+    "scope": "global configuration",
+    "conflict": "config_conflict",
+    "recovery": "Read the current resource and version, then deliberately prepare a new operation; never overwrite automatically."
   }
 }

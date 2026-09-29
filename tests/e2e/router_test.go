@@ -318,3 +318,67 @@ func TestEmptyInstanceReturnsConfigMissing(t *testing.T) {
 		t.Fatalf("%d %s", code, b)
 	}
 }
+
+func TestInspectTimeoutAfterDecisionHeaders(t *testing.T) {
+	i := newInstance(t)
+	i.provider()
+	i.put("models.put", model("a", true))
+	i.put("models.put", model("b", true))
+	var calls atomic.Int32
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		w.(http.Flusher).Flush()
+		<-r.Context().Done()
+	}))
+	defer up.Close()
+	i.put("decision.put", map[string]any{"base_url": up.URL, "model": "jev", "secret_ref": "env:TEST_PROVIDER_KEY"})
+	i.server.Close()
+	i.close()
+	i.cfg.DecisionTimeout = 30 * time.Millisecond
+	i.start()
+	r := i.call("route.inspect", map[string]any{"model": "auto", "messages": []map[string]string{{"role": "user", "content": "hi"}}}, 0, "")
+	if r.OK || r.Error == nil || r.Error.Code != "timeout" || calls.Load() != 1 {
+		t.Fatalf("%+v calls=%d", r.Error, calls.Load())
+	}
+}
+
+func TestCompleteToolRoundThroughRouter(t *testing.T) {
+	i := newInstance(t)
+	var calls atomic.Int32
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct{ Messages []map[string]any }
+		if json.NewDecoder(r.Body).Decode(&body) != nil {
+			t.Error("bad input")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if calls.Add(1) == 1 {
+			fmt.Fprint(w, `{"id":"c","object":"chat.completion","created":1,"model":"gpt-4o-mini","choices":[{"index":0,"message":{"role":"assistant","content":null,"tool_calls":[{"id":"call_weather","type":"function","function":{"name":"weather","arguments":"{\"city\":\"北京\"}"}}]},"finish_reason":"tool_calls"}]}`)
+			return
+		}
+		if len(body.Messages) != 3 || body.Messages[2]["tool_call_id"] != "call_weather" || body.Messages[2]["content"] != "20 C" {
+			t.Errorf("tool result changed: %+v", body)
+		}
+		fmt.Fprint(w, `{"id":"d","object":"chat.completion","created":1,"model":"gpt-4o-mini","choices":[{"index":0,"message":{"role":"assistant","content":"It is 20 C."},"finish_reason":"stop"}]}`)
+	}))
+	defer up.Close()
+	i.put("providers.put", map[string]any{"id": "p", "base_url": up.URL + "/v1", "secret_ref": "env:TEST_PROVIDER_KEY"})
+	i.put("models.put", model("tools", true))
+	request := map[string]any{"model": "auto", "messages": []any{map[string]any{"role": "user", "content": "weather in Beijing"}}, "tools": []any{map[string]any{"type": "function", "function": map[string]any{"name": "weather", "parameters": map[string]any{"type": "object", "properties": map[string]any{"city": map[string]string{"type": "string"}}}}}}}
+	code, first := i.request("POST", "/v1/chat/completions", "inference-secret", string(mustJSON(request)))
+	if code != 200 {
+		t.Fatalf("first: %d %s", code, first)
+	}
+	var result struct {
+		Choices []struct{ Message map[string]any }
+	}
+	if json.Unmarshal(first, &result) != nil || len(result.Choices) != 1 {
+		t.Fatal(string(first))
+	}
+	request["messages"] = append(request["messages"].([]any), result.Choices[0].Message, map[string]any{"role": "tool", "tool_call_id": "call_weather", "content": "20 C"})
+	code, second := i.request("POST", "/v1/chat/completions", "inference-secret", string(mustJSON(request)))
+	if code != 200 || !bytes.Contains(second, []byte("It is 20 C.")) || calls.Load() != 2 {
+		t.Fatalf("second: %d %s calls=%d", code, second, calls.Load())
+	}
+}

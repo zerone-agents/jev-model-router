@@ -9,12 +9,20 @@ import (
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
 	"io"
 	"sync"
+	"time"
 )
 
 //go:embed management.json schemas/*.json
 var files embed.FS
 
+type CallContract struct {
+	Method   string          `json:"method"`
+	Path     string          `json:"path"`
+	Schema   json.RawMessage `json:"schema"`
+	Protocol json.RawMessage `json:"protocol"`
+}
 type Capability struct {
+	Call         CallContract      `json:"call"`
 	ID           string            `json:"id"`
 	Description  string            `json:"description"`
 	Role         string            `json:"role"`
@@ -30,6 +38,7 @@ type Capability struct {
 var once sync.Once
 var caps []Capability
 var validators map[string]*jsonschema.Schema
+var idempotencyHours int
 
 func initSchemas() {
 	b, e := files.ReadFile("management.json")
@@ -39,7 +48,28 @@ func initSchemas() {
 	if e = json.Unmarshal(b, &caps); e != nil {
 		panic(e)
 	}
+	rules, err := files.ReadFile("schemas/results.json")
+	if err != nil {
+		panic(err)
+	}
+	var protocol map[string]any
+	if err = json.Unmarshal(rules, &protocol); err != nil {
+		panic(err)
+	}
+	idempotencyHours = int(protocol["retention"].(map[string]any)["idempotency_hours"].(float64))
+	protocol["idempotency"].(map[string]any)["valid_for_hours"] = idempotencyHours
+	encodedProtocol, _ := json.Marshal(protocol)
+	for i := range caps {
+		schema := callSchema(caps[i].Write)
+		props := schema["properties"].(map[string]any)
+		props["input"] = caps[i].InputSchema
+		props["capability_id"] = map[string]any{"const": caps[i].ID}
+		body, _ := json.Marshal(schema)
+		caps[i].Call = CallContract{Method: "POST", Path: "/admin/v1/call/" + caps[i].ID, Schema: body, Protocol: encodedProtocol}
+	}
 	validators = map[string]*jsonschema.Schema{}
+	envelope, _ := json.Marshal(callSchema(true))
+	validators["write_envelope"] = compile(envelope)
 	for _, c := range caps {
 		validators[c.ID] = compile(c.InputSchema)
 	}
@@ -111,4 +141,25 @@ func ErrorMapping(code string) Mapping {
 		return m
 	}
 	return v.Errors["internal_error"]
+}
+
+// callSchema is shared by discovery and the write boundary. Business input
+// validation still runs after successful-replay lookup in Store.Apply.
+func callSchema(write bool) map[string]any {
+	b, e := files.ReadFile("schemas/call.json")
+	if e != nil {
+		panic(e)
+	}
+	var schema map[string]any
+	if e = json.Unmarshal(b, &schema); e != nil {
+		panic(e)
+	}
+	if write {
+		schema["required"] = []string{"input", "expected_version", "idempotency_key"}
+	}
+	return schema
+}
+func IdempotencyTTL() time.Duration {
+	once.Do(initSchemas)
+	return time.Duration(idempotencyHours) * time.Hour
 }

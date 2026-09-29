@@ -183,6 +183,15 @@ func completion(in *schemas.BifrostChatResponse) (routing.Completion, error) {
 	if json.Unmarshal(b, &out) != nil {
 		return out, routing.Fail("upstream_error", "invalid generation result")
 	}
+	// Historical assistant tool calls use array order; index belongs only to
+	// streaming deltas. Strip the SDK-added index from complete messages.
+	for _, choice := range out.Choices {
+		if choice.Message != nil {
+			for i := range choice.Message.ToolCalls {
+				choice.Message.ToolCalls[i].Index = nil
+			}
+		}
+	}
 	if in.Usage != nil {
 		u := in.Usage
 		out.Usage = &routing.Usage{InputTokens: int64(u.PromptTokens), OutputTokens: int64(u.CompletionTokens), TotalTokens: int64(u.TotalTokens)}

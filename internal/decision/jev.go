@@ -51,13 +51,7 @@ func (j *jev) Choose(ctx context.Context, c routing.DecisionConfig, in routing.D
 	req.Header.Set("Content-Type", "application/json")
 	resp, e := j.client.Do(req)
 	if e != nil {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return zero, routing.Fail("timeout", "decision timed out")
-		}
-		if ctx.Err() != nil {
-			return zero, routing.Fail("cancelled", "decision cancelled")
-		}
-		return zero, routing.Fail("upstream_error", "decision transport failed")
+		return zero, decisionIOError(ctx, e)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -65,7 +59,7 @@ func (j *jev) Choose(ctx context.Context, c routing.DecisionConfig, in routing.D
 	}
 	b, e := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if e != nil {
-		return zero, routing.Fail("upstream_error", "decision response interrupted")
+		return zero, decisionIOError(ctx, e)
 	}
 	var out struct {
 		Answers map[string]struct{ Type, Choice string }
@@ -83,4 +77,14 @@ func (j *jev) Choose(ctx context.Context, c routing.DecisionConfig, in routing.D
 		}
 	}
 	return zero, routing.Fail("invalid_decision", "decision selected an unknown candidate")
+}
+
+func decisionIOError(ctx context.Context, err error) error {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(err, context.DeadlineExceeded) {
+		return routing.Fail("timeout", "decision timed out")
+	}
+	if ctx.Err() != nil || errors.Is(err, context.Canceled) {
+		return routing.Fail("cancelled", "decision cancelled")
+	}
+	return routing.Fail("upstream_error", "decision transport failed")
 }

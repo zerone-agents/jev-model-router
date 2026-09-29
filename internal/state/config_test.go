@@ -3,12 +3,15 @@ package state_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"github.com/zerone-agents/jev-model-router/contracts"
 	"github.com/zerone-agents/jev-model-router/internal/management"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"github.com/zerone-agents/jev-model-router/internal/state"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -206,4 +209,25 @@ func TestCrashHelper(t *testing.T) {
 		t.Fatal(e)
 	}
 	os.Exit(0)
+}
+
+func TestPromptUnicodeSchemaMatchesSave(t *testing.T) {
+	s := open(t)
+	for _, n := range []int{6000, 16384, 16385} {
+		before := snap(t, s)
+		text := strings.Repeat("中", n)
+		body, _ := json.Marshal(map[string]string{"text": text})
+		schemaErr := contracts.Validate("prompt.put", body)
+		_, saveErr := s.Apply(context.Background(), "settings", management.Call{CapabilityID: "prompt.put", Input: body, ExpectedVersion: &before.Version, IdempotencyKey: fmt.Sprint(n)}, nil)
+		if (schemaErr == nil) != (saveErr == nil) {
+			t.Fatalf("%d chars: schema=%v save=%v", n, schemaErr, saveErr)
+		}
+		after := snap(t, s)
+		if n <= 16384 && (saveErr != nil || after.Prompt != text) {
+			t.Fatal("valid Unicode prompt rejected")
+		}
+		if n > 16384 && (saveErr == nil || after.Version != before.Version) {
+			t.Fatal("oversize prompt modified config")
+		}
+	}
 }

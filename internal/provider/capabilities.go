@@ -53,6 +53,8 @@ func Check(target routing.Target, r routing.Request) error {
 	var a, b map[string]any
 	json.Unmarshal(before, &a)
 	json.Unmarshal(after, &b)
+	normalizeToolHistory(a)
+	normalizeToolHistory(b)
 	delete(a, "model")
 	delete(a, "stream")
 	for k, v := range a {
@@ -61,4 +63,29 @@ func Check(target routing.Target, r routing.Request) error {
 		}
 	}
 	return nil
+}
+
+// The pinned adapter adds stream indexes to historical calls and omits null
+// assistant content. These representations carry the same tool-turn semantics.
+// All call IDs, argument strings, ordering and tool result contents still compare.
+func normalizeToolHistory(request map[string]any) {
+	messages, _ := request["messages"].([]any)
+	for _, v := range messages {
+		m, ok := v.(map[string]any)
+		if !ok || m["role"] != "assistant" {
+			continue
+		}
+		calls, _ := m["tool_calls"].([]any)
+		if len(calls) == 0 {
+			continue
+		}
+		if m["content"] == nil {
+			delete(m, "content")
+		}
+		for _, c := range calls {
+			if call, ok := c.(map[string]any); ok {
+				delete(call, "index")
+			}
+		}
+	}
 }

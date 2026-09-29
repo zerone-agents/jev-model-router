@@ -30,7 +30,8 @@ func ValidateSnapshot(s Snapshot) error {
 			return Fail("invalid_request", "invalid decision configuration")
 		}
 	}
-	if len(s.Prompt) == 0 || len(s.Prompt) > 16384 {
+	prompt, _ := json.Marshal(map[string]string{"text": s.Prompt})
+	if contracts.Validate("prompt.put", prompt) != nil {
 		return Fail("invalid_request", "invalid routing prompt")
 	}
 	return nil
