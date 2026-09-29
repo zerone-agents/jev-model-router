@@ -65,11 +65,23 @@ export function createManagementClient(
     } catch {
       throw new APIError("invalid_response", response.status);
     }
-    if (!response.ok || !value.ok)
+    if (
+      !value ||
+      typeof value !== "object" ||
+      Array.isArray(value) ||
+      typeof value.ok !== "boolean" ||
+      value.ok !== response.ok ||
+      (value.ok && (value.data === null || value.data === undefined)) ||
+      (!value.ok && typeof value.error?.code !== "string")
+    )
+      throw new APIError("invalid_response", response.status);
+    if (!value.ok)
       throw new APIError(
-        value.error?.code || "request_failed",
+        value.error!.code,
         response.status,
-        value.meta?.operation_id,
+        typeof value.meta?.operation_id === "string"
+          ? value.meta.operation_id
+          : undefined,
       );
     return value;
   }

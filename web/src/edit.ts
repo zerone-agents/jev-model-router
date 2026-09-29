@@ -43,6 +43,16 @@ export class WriteAttempt {
         this.write.capability,
         JSON.parse(this.write.serialized),
       );
+      const receipt = result.data as { version?: unknown } | null;
+      const expected = JSON.parse(this.write.serialized).expected_version;
+      if (
+        !receipt ||
+        typeof receipt.version !== "number" ||
+        !Number.isSafeInteger(receipt.version) ||
+        receipt.version <= expected
+      ) {
+        throw new APIError("invalid_response");
+      }
       this.state = "saved";
       return result;
     } catch (e) {

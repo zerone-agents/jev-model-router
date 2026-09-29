@@ -133,11 +133,12 @@ export function Models(
   const { lang } = props;
   const [cursors, setCursors] = useState([""]);
   const [selected, setSelected] = useState("");
+  const [listRevision, setListRevision] = useState(0);
   const { data, error, loading } = useRead<{
     items: Model[];
     next_cursor: string;
     version: number;
-  }>(props, "models.list", { cursor: cursors.at(-1), limit: 20 });
+  }>(props, "models.list", { cursor: cursors.at(-1), limit: 20 }, listRevision);
   return (
     <>
       <PageTitle
@@ -164,6 +165,7 @@ export function Models(
               ) {
                 props.onDirty(false);
                 setSelected("");
+                setListRevision((value) => value + 1);
               }
             }}
           >

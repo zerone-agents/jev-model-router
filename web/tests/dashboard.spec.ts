@@ -227,3 +227,19 @@ test("Chinese editor, keyboard focus, narrow screen and failure state", async ({
     fullPage: true,
   });
 });
+
+test("returning from a saved model refreshes the registry", async ({
+  page,
+}) => {
+  await login(page);
+  await page.getByRole("button", { name: "Models", exact: true }).click();
+  await page.getByRole("button", { name: /flash Enabled/ }).click();
+  await page.getByLabel("Model description").fill("Fresh registry description");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByRole("status")).toContainText("Saved");
+  page.on("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "All models" }).click();
+  await expect(
+    page.getByRole("button", { name: /flash Enabled/ }),
+  ).toContainText("Fresh registry description");
+});

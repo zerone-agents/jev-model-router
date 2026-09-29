@@ -59,20 +59,42 @@ it("prevents simultaneous sends and retry at expiry", async () => {
 it("conflict remains distinct from unknown outcome", async () => {
   const c = createManagementClient(
     "x",
-    vi
-      .fn()
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            ok: false,
-            error: { code: "config_conflict" },
-            meta: {},
-          }),
-          { status: 409 },
-        ),
+    vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: false,
+          error: { code: "config_conflict" },
+          meta: {},
+        }),
+        { status: 409 },
       ),
+    ),
   );
   const a = new WriteAttempt(prepareWrite("prompt.put", {}, 1, "k"));
   await expect(a.send(c)).rejects.toMatchObject({ code: "config_conflict" });
   expect(a.state).toBe("conflict");
+});
+
+it.each([
+  null,
+  {},
+  { ok: true, data: null },
+  { ok: true, data: {} },
+  { ok: true, data: { version: 0 } },
+  { ok: true, data: { version: "2" } },
+  { ok: false },
+  { ok: false, error: { code: "unknown_remote_error" } },
+])("retains unknown request for malformed write response %j", async (reply) => {
+  const client = createManagementClient(
+    "x",
+    vi.fn().mockResolvedValue(new Response(JSON.stringify(reply))),
+  );
+  const job = new WriteAttempt(
+    prepareWrite("prompt.put", { text: "change" }, 1, "same-key"),
+  );
+  await expect(job.send(client)).rejects.toMatchObject({
+    code: "invalid_response",
+  });
+  expect(job.state).toBe("unknown");
+  expect(JSON.parse(job.write.serialized).idempotency_key).toBe("same-key");
 });
