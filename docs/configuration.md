@@ -25,6 +25,14 @@
 
 CLI `--url` 优先于 `JEV_ROUTER_URL`，未设置时使用启动配置的 listen 地址。配置文件只供启动和 CLI 连接凭证引用；providers/models/decision/prompt 通过管理 API 保存。Jev base_url 为根地址（例如 `https://api.typesafe.ai`），生成 provider base_url 为兼容前缀（例如 `https://api.openai.com/v1`）。
 
+官方 Jev 配置使用 `https://api.typesafe.ai` 根地址和固定模型版本 `jev-1.13.0`。适配器追加 `/v1/systemone`，因此不要在决策 base_url 中再次填写 `/v1`。将以下 JSON 作为 `decision.put` 的输入，并由运行环境注入密钥：
+
+```json
+{"base_url":"https://api.typesafe.ai","model":"jev-1.13.0","secret_ref":"env:TYPESAFE_API_KEY"}
+```
+
+参见 [TypeSafe 官方 API 文档](https://docs.typesafe.ai/api)与[模型版本](https://docs.typesafe.ai/models)。生成供应商继续使用各自的 OpenAI 兼容前缀，与决策后端配置独立。
+
 JSON 示例：
 
 ```json

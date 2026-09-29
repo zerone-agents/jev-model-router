@@ -186,3 +186,50 @@ func TestToolHistoryRequiresToolCapability(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestCompatibleBaseURLPath(t *testing.T) {
+	for _, prefix := range []string{"/v1", "/compatible-mode/v1", "/custom/api/"} {
+		for _, streaming := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/stream=%t", prefix, streaming), func(t *testing.T) {
+				want := strings.TrimRight(prefix, "/") + "/chat/completions"
+				s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path != want {
+						t.Errorf("path=%q want=%q", r.URL.Path, want)
+						http.NotFound(w, r)
+						return
+					}
+					if streaming {
+						w.Header().Set("Content-Type", "text/event-stream")
+						fmt.Fprint(w, "data: {\"id\":\"c\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"gpt-4o-mini\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"OK\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n")
+						return
+					}
+					fmt.Fprint(w, success)
+				}))
+				defer s.Close()
+				g := generator(t)
+				if !streaming {
+					if _, err := g.Complete(context.Background(), target(s.URL+prefix), TestRequest()); err != nil {
+						t.Fatal(err)
+					}
+					return
+				}
+				r := TestRequest()
+				r.Stream = true
+				stream, err := g.Stream(context.Background(), target(s.URL+prefix), r)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer stream.Close()
+				for {
+					_, err = stream.Next(context.Background())
+					if err == io.EOF {
+						break
+					}
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+			})
+		}
+	}
+}

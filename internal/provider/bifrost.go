@@ -223,7 +223,14 @@ func (a fixedAccount) GetKeysForProvider(context.Context, schemas.ModelProvider)
 	return []schemas.Key{{ID: "selected", Value: *schemas.NewSecretVar(a.key), Models: schemas.WhiteList{"*"}, Weight: 1}}, nil
 }
 func (a fixedAccount) GetConfigForProvider(schemas.ModelProvider) (*schemas.ProviderConfig, error) {
-	return &schemas.ProviderConfig{NetworkConfig: schemas.NetworkConfig{BaseURL: a.url, MaxRetries: 0, DefaultRequestTimeoutInSeconds: 300}, ConcurrencyAndBufferSize: schemas.ConcurrencyAndBufferSize{Concurrency: 8, BufferSize: 8}}, nil
+	// Provider BaseURL already includes the compatible API prefix.
+	return &schemas.ProviderConfig{CustomProviderConfig: &schemas.CustomProviderConfig{
+		BaseProviderType: schemas.OpenAI,
+		RequestPathOverrides: map[schemas.RequestType]string{
+			schemas.ChatCompletionRequest:       "/chat/completions",
+			schemas.ChatCompletionStreamRequest: "/chat/completions",
+		},
+	}, NetworkConfig: schemas.NetworkConfig{BaseURL: a.url, MaxRetries: 0, DefaultRequestTimeoutInSeconds: 300}, ConcurrencyAndBufferSize: schemas.ConcurrencyAndBufferSize{Concurrency: 8, BufferSize: 8}}, nil
 }
 
 type quietLogger struct{}
