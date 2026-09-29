@@ -1,0 +1,132 @@
+[
+  {
+    "case_id": "holdout-simple-1",
+    "class": "simple",
+    "request": {
+      "model": "auto",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Return only the integer sum of 24, 18 and 7."
+        }
+      ],
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      }
+    },
+    "acceptable_model_ids": [
+      "qwen3.8-flash"
+    ],
+    "quality_criteria": "Selection preference only; Direct bounded transformation or retrieval",
+    "expected": "49"
+  },
+  {
+    "case_id": "holdout-simple-2",
+    "class": "simple",
+    "request": {
+      "model": "auto",
+      "messages": [
+        {
+          "role": "user",
+          "content": "从“订单号 Q-802，数量 4，收件人陈林”提取订单号和数量，返回 JSON。"
+        }
+      ],
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      },
+      "response_format": {
+        "type": "json_schema",
+        "json_schema": {
+          "name": "order",
+          "strict": true,
+          "schema": {
+            "type": "object",
+            "properties": {
+              "order_id": {
+                "type": "string"
+              },
+              "quantity": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "order_id",
+              "quantity"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "acceptable_model_ids": [
+      "qwen3.8-flash"
+    ],
+    "quality_criteria": "Selection preference only; Direct bounded transformation or retrieval",
+    "expected": {
+      "order_id": "Q-802",
+      "quantity": 4
+    }
+  },
+  {
+    "case_id": "holdout-complex-3",
+    "class": "complex",
+    "request": {
+      "model": "auto",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Review this event-processing design: consumers acknowledge offsets before committing database effects; a separate process deduplicates event IDs with a 24-hour TTL; replay can occur after 7 days; producers reuse IDs across tenants. Find independent data-loss and duplication traces and redesign the transaction/idempotency boundaries with recovery tests."
+        }
+      ],
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      }
+    },
+    "acceptable_model_ids": [
+      "qwen3.8-max"
+    ],
+    "quality_criteria": "Selection preference only; Multi-constraint synthesis, proof or correctness analysis",
+    "rubric": [
+      "Explains ack-before-commit crash leading to permanent loss.",
+      "Explains replay beyond24h dedup TTL leading to duplicate effects.",
+      "Scopes event identity by tenant to avoid false deduplication/cross-tenant loss.",
+      "Commits idempotency receipt and DB effects atomically, with uniqueness or equivalent concurrency protection.",
+      "Commits/acknowledges broker offset only after durable effects; handles crash between DB commit and ack by safe replay.",
+      "Defines retention covering replay window, or durable version/ledger semantics; no unsupported universal exactly-once claim.",
+      "Provides concrete recovery/concurrent-duplicate tests and handles external effects with an outbox or clearly states transactional DB-only scope."
+    ]
+  },
+  {
+    "case_id": "holdout-complex-4",
+    "class": "complex",
+    "request": {
+      "model": "auto",
+      "messages": [
+        {
+          "role": "user",
+          "content": "设计一个流式代理的取消与背压状态机：上游已发送响应头但尚未发送正文，下游可能中途断开，缓冲队列已满时也可能收到超时；要求不泄漏goroutine、不重复关闭、不在失败后发送成功结束标记。逐条列出竞争条件及可执行测试策略。"
+        }
+      ],
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      }
+    },
+    "acceptable_model_ids": [
+      "qwen3.8-max"
+    ],
+    "quality_criteria": "Selection preference only; Multi-constraint synthesis, proof or correctness analysis",
+    "rubric": [
+      "Distinguishes upstream headers from meaningful first event; header-only stall has timeout.",
+      "Models one-way lifecycle and exactly one success/error/cancel terminal winner; never successful DONE after failure wins.",
+      "Propagates downstream disconnect/cancellation upstream and unblocks reads.",
+      "Makes full-queue producer sends and consumer waits cancellation-aware; resource ownership avoids double close.",
+      "Handles competing timeout/first event and queue-full/cancel races with explicit synchronization or state ownership.",
+      "Has bounded backpressure and actual network-read interruption/closure so cancellation does not leave goroutines behind.",
+      "Provides executable test strategies for stalled-body, disconnect, queue-full cancellation, terminal races and leak checks; states timeout/reset semantics."
+    ]
+  }
+]
