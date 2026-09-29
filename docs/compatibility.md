@@ -27,3 +27,9 @@ Jev 决策默认限制为 255 个候选、24,000 UTF-8 序列化字节（包含�
 SSE usage 按上游实际提供情况返回：未报告时省略，明确报告为零则保留。适配器仅在内存中检查 SDK 提供的原始帧以识别 usage 存在性，公开响应和记录不包含 SDK 原始元数据。空库或没有启用模型时 auto 返回 config_missing/503；启用模型均不满足当前请求时返回 no_candidates/422。
 
 历史 assistant 工具调用允许 content:null 与省略 content 的等价表示；适配器附加的历史 tool_calls.index 不影响语义比较，非流式工具调用响应不输出该索引。流式 delta 保留 index；调用ID、函数名、参数字符串、消息顺序和工具结果仍必须完整保留。完整工具回合由跨 Bifrost/HTTP 的端到端测试覆盖。
+
+## 真实端点冒烟验证
+
+已使用官方 Jev `jev-1.13.0` 和阿里云 `qwen3.8-flash` / `qwen3.8-max` 验证多候选选模到生成及记录查询的闭环。两个生成模型均验证了 JSON、SSE、`tool_choice=auto` 工具调用和省略顶层 tools 的工具历史续写。供应商 base_url 包含完整兼容前缀，适配器仅追加 `/chat/completions`，JSON 与 SSE 路径均有严格回归测试。
+
+本次阿里云 thinking 模式组合拒绝 `tool_choice=required`；网关明确返回失败，不静默修改参数。生成输出可能因 token 上限返回 `finish_reason=length`，HTTP 成功不代表任务质量通过。以上只是已测组合的冒烟结果，不承诺全部模型、字段组合或稳定性能；真实图片、流式工具增量及供应商取消/超时仍需专项验证。
