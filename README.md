@@ -84,7 +84,13 @@ flowchart TD
 
 ## 开发验证
 
+CI 并行运行测试与 lint。Lint 使用固定版本的 golangci-lint，启用 govet、staticcheck、unused，并要求所有 Go 文件符合 gofmt。
+
 ```sh
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
+golangci-lint run ./...
+# 应无输出；有输出时用 gofmt -w 修正对应文件
+git ls-files -z '*.go' | xargs -0 gofmt -l
 go test ./... -count=1
 go test -race ./... -count=1
 go vet ./...

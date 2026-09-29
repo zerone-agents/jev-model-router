@@ -109,7 +109,7 @@ func Run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 			if len(simple) > 0 {
 				return bad()
 			}
-			var reader io.Reader = in
+			reader := in
 			var handle *os.File
 			if *file != "-" {
 				handle, e = os.Open(*file)

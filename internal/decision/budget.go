@@ -40,9 +40,10 @@ func clean(m routing.Message) routing.Message {
 	if json.Unmarshal(m.Content, &parts) == nil && parts != nil {
 		out := []map[string]string{}
 		for _, p := range parts {
-			if p.Type == "text" {
+			switch p.Type {
+			case "text":
 				out = append(out, map[string]string{"type": "text", "text": p.Text})
-			} else if p.Type == "image_url" {
+			case "image_url":
 				out = append(out, map[string]string{"type": "image_present"})
 			}
 		}

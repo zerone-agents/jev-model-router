@@ -39,7 +39,7 @@ func request(ctx context.Context, base, method, path string, token []byte, body 
 	}
 	defer resp.Body.Close()
 	b, e = io.ReadAll(io.LimitReader(resp.Body, (16<<20)+1))
-	if e != nil || len(b) > 16<<20 || json.Unmarshal(b, &result) != nil || (result.OK == false && result.Error == nil) {
+	if e != nil || len(b) > 16<<20 || json.Unmarshal(b, &result) != nil || (!result.OK && result.Error == nil) {
 		return result, routing.Fail("upstream_error", "invalid instance response")
 	}
 	return result, nil
