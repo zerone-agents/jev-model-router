@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "properties": {
+    "input": {},
+    "capability_id": {"type": "string", "description": "Optional; must match the capability in the URL."},
+    "expected_version": {"type": "integer", "minimum": 1, "description": "Required for writes. Use the current global configuration version; a stale version fails without mutation."},
+    "idempotency_key": {"type": "string", "minLength": 1, "maxLength": 128, "description": "Required for writes. Reuse for an identical operation after an unknown response; a changed operation requires a new key."}
+  },
+  "required": ["input"],
+  "additionalProperties": false
+}

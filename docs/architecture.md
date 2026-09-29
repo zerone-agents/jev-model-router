@@ -1,6 +1,6 @@
 # 架构
 
-本文记录当前产品决策与实现边界。仓库处于目录骨架阶段；下面的入口、契约和调用路径是待实现目标。
+本文记录当前产品决策与实现边界。第一阶段的 Go/SQLite/CLI/Jev 路径已经实现；以下涉及第二阶段的内容仍是设计目标。
 
 第一阶段由 [Issue #1](https://github.com/zerone-agents/jev-model-router/issues/1) 追踪，仅实现 Jev 单实例路由、CLI/SKILL 和 SQLite。本文中的 Laya、敏感会话锁定、UI 与 PostgreSQL 属于 [第二阶段 #2](https://github.com/zerone-agents/jev-model-router/issues/2)，不是首版能力。
 
@@ -22,7 +22,7 @@ flowchart TD
     B --> G[本地模型 / 云端 API]
 ```
 
-CLI 和管理 HTTP handler 调用同一管理服务；服务负责认证、权限、版本检查、审计及写入。首版运行中的网关拥有可变状态；CLI 通过管理 API 访问该实例，不另开 SQLite 写入通道。CLI 的启动/帮助等进程操作例外，不执行模型配置业务。
+CLI 和管理 HTTP handler 调用同一管理服务；服务负责认证、权限、版本检查及写入，HTTP 层负责认证；路由记录是尽力元数据，不是审计日志。首版运行中的网关拥有可变状态；CLI 通过管理 API 访问该实例，不另开 SQLite 写入通道。CLI 的启动/帮助等进程操作例外，不执行模型配置业务。
 
 UI 只调用管理 API；API 是 CLI 与 UI 共享的内部传输边界，不要求首版同时交付 MCP。管理 API 与推理 API 可在同一 Go 进程服务，但使用不同路径和权限范围。
 
@@ -50,7 +50,7 @@ web/                     简单管理 UI
 docs/adr/                本地架构决策记录（Git 忽略）
 ```
 
-首版采用一个 Go module；当前不为目录预建空 Go package、泛用接口或多个 module。SDK 与存储依赖在首次实现时锁定。目录说明用于明确职责，后续由实际实现替换或缩短。
+首版采用一个 Go module；当前不为目录预建空 Go package、泛用接口或多个 module。SDK 与存储依赖已锁定在 go.mod/go.sum；实际兼容范围见 compatibility.md。
 
 ## 核心边界
 

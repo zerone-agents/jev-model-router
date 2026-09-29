@@ -1,0 +1,1 @@
+{"model":"jev-1.13.0","state":{"messages":[{"role":"user","content":"Explain a short function"}]},"questions":{"model":{"type":"choice","instructions":"Choose the best eligible model using the balanced preference.","criteria":{"m0":"Fast general model","m1":"Specialist coding model"}}}}

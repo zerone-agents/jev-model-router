@@ -1,6 +1,6 @@
 # 管理能力契约
 
-当前是契约设计边界，尚无已发布 schema 或能力发现端点。首次实现时在本目录建立机器可读契约，CLI、管理 HTTP 和 UI 使用同一版本。
+机器契约在 `management.json` 和 `schemas/` 中，服务端校验与实例能力发现使用同一来源。`GET /admin/v1/schema`、`GET /admin/v1/schema/{capability}` 和 `POST /admin/v1/call/{capability}` 均要求 settings 凭证。UI 尚未实现。
 
 ## 最小能力集合
 
@@ -19,11 +19,11 @@
 
 配置按资源修改，保存前校验完整配置，成功即发布全局新版本，不自动发起网络检查。写入携带 `expected_version` 与幂等键，成功修改、版本递增和幂等结果在同一事务提交；成功结果保留 24 小时并可跨重启重放。命中成功记录先于版本检查；校验失败不占用幂等键，修正重试仍检查版本。版本冲突与幂等冲突分别使用 `config_conflict`、`idempotency_conflict`。
 
-CLI 的 `--help` 离线可用，`schema` 发现实例实际能力；复杂输入支持 JSON 文件或 stdin，结果默认 JSON、日志走 stderr，不弹交互确认，不隐藏重试。当前这些约定仍为待实现契约。
+CLI 的 `--help` 离线可用，`schema` 发现实例实际能力；复杂输入支持 JSON 文件或 stdin，结果默认 JSON、日志走 stderr，不弹交互确认，不隐藏重试。这些行为已由 CLI/HTTP 及端到端测试覆盖。
 
 ## 模型 ID 约束
 
-`auto` 是自动路由入口的保留对外 ID，生成模型无论是否启用均不得使用。模型创建及任何涉及对外 ID 的配置变更，必须由机器 schema 声明并由服务端校验拒绝，失败不改变配置或版本。此限制不针对上游模型名称。实现时覆盖创建、ID 变更、启用/禁用状态和模型列表无冲突的验证；当前尚无机器 schema 或运行测试。
+`auto` 是自动路由入口的保留对外 ID，生成模型无论是否启用均不得使用。模型创建及任何涉及对外 ID 的配置变更，必须由机器 schema 声明并由服务端校验拒绝，失败不改变配置或版本。此限制不针对上游模型名称。机器 schema、服务端事务校验及运行测试覆盖保留名；首版 ID 稳定，put 按 ID 创建或完整替换，不提供 rename。
 
 ## 每项契约必须描述
 
@@ -38,8 +38,18 @@ CLI 的 `--help` 离线可用，`schema` 发现实例实际能力；复杂输入
 
 ## 响应约定
 
-管理结果使用 `ok`、`data` 或 `error`、`warnings`、`meta`，其中 meta 包含 operation ID、timestamp 和 schema version；事件含 operation ID、timestamp、stage、status。CLI 将结构化错误映射到稳定非零退出码，并在契约中公布映射。
+管理结果使用 `ok`、`data` 或 `error`、`warnings`、`meta`，其中 meta 包含 operation ID、timestamp 和 schema version；首版为同步管理能力，未暴露异步事件协议。CLI 将结构化错误映射到稳定非零退出码，并在契约中公布映射。
 
 这些约定只用于管理能力。`/v1/chat/completions` 保持其 JSON/SSE 格式，`/v1/models` 保持模型列表格式。公共模型列表不携带供应商凭证与管理元数据。
 
 参考：[AgentUse 0.2.0 协议页面](https://www.zerone.run/zh/protocol)。本目录不表示已获得协议认证。
+
+## 请求与输出 schema
+
+call body 为 `{"input":{...},"expected_version":1,"idempotency_key":"operation-key"}`；读操作只需 input。能力的 input_schema 验证 input，output_schema 描述成功响应的 data。写入返回 version/resource；models.test 的 data.ok 表示探测结果，顶层 ok 表示管理操作是否完成。错误和退出码在 schemas/results.json 中。
+
+风险为声明给调用方的元数据，不是内置审批引擎。settings 是可信管理员，客户端按用户授权决定是否执行。schema/status 不产生上游调用，route.inspect/models.test 的外发与费用在能力描述中列出。
+
+每项运行时能力包含 `call.method`、`call.path`、完整 `call.schema` 和 `call.protocol`。调用信封由 schemas/call.json 定义并用于写入边界校验；能力 input_schema 嵌入 call.schema.input。call.protocol 公布全局版本冲突恢复、成功幂等重放顺序/身份范围/24小时期限、失败不占键及通用 HTTP/CLI 错误映射。幂等期限与服务端过期计算来自同一 results.json 定义。仅查询单项 schema 也能获取完整调用与重试规则。
+
+提示词长度统一按 JSON Schema maxLength 的 Unicode 字符数计算（上限16384），保存整个配置时复用 prompt.put 校验。Jev 的序列化字节预算独立计算：可以保存的提示词仍可能使多候选决策超限，此时明确返回 budget_exceeded。
