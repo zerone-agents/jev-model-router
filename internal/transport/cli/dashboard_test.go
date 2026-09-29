@@ -55,7 +55,7 @@ func TestDashboardProbeRejectsRedirects(t *testing.T) {
 		if r.Header.Get("Authorization") != "" {
 			t.Error("credential sent")
 		}
-		http.Redirect(w, r, "/elsewhere", 302)
+		http.Redirect(w, r, "/elsewhere", http.StatusFound)
 	}))
 	defer s.Close()
 	if probeDashboard(context.Background(), s.URL) == nil {

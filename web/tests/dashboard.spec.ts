@@ -180,3 +180,50 @@ test("desktop visual evidence and authentication boundaries", async ({
   expect((await request.get("/v1/models")).status()).toBe(401);
   expect((await request.get("/admin/v1/schema")).status()).toBe(401);
 });
+
+test("Chinese editor, keyboard focus, narrow screen and failure state", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/dashboard/");
+  await page.getByLabel("Settings credential").focus();
+  await page.keyboard.type("ui-test-settings");
+  await page.keyboard.press("Tab");
+  await expect(
+    page.getByRole("button", { name: "Connect to instance", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("heading", { name: "A clear view of your router." }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Switch language" }).click();
+  await page.getByRole("button", { name: "打开导航" }).click();
+  await page.getByRole("button", { name: "路由提示词", exact: true }).click();
+  await expect(page.getByLabel("提示词内容")).toBeVisible();
+  await page.screenshot({
+    path: "test-results/mobile-prompt-zh.png",
+    fullPage: true,
+  });
+  await page.route("**/admin/v1/call/prompt.put", (route) =>
+    route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: false,
+        error: { code: "invalid_request", message: "private details" },
+        meta: {},
+      }),
+    }),
+  );
+  await page.getByLabel("提示词内容").fill("测试偏好");
+  await page.getByRole("button", { name: "保存修改" }).click();
+  await expect(page.getByRole("alert")).toContainText("输入不符合实例契约");
+  await expect(page.getByText("private details")).toHaveCount(0);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(390);
+  await page.screenshot({
+    path: "test-results/mobile-error-zh.png",
+    fullPage: true,
+  });
+});
