@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md)
 
 A lightweight model routing gateway for agents. It uses Jev's native choice capability to select models based on the task and editable model cards, with OpenAI Chat Completions-compatible JSON/SSE, a management CLI, and a companion SKILL.
 
-The first release implements a single-instance Go gateway with SQLite, explicit and automatic model selection, and an OpenAI-compatible generation adapter. Local Laya, sensitive-session locking, ArbiterOS, PostgreSQL, and a UI are planned for later phases. Paid evaluations against real models have not yet established a quality baseline. No AgentUse certification is claimed.
+The first release implements a single-instance Go gateway with SQLite, explicit and automatic model selection, and an OpenAI-compatible generation adapter. Local Laya, sensitive-session locking, ArbiterOS, PostgreSQL, and a UI are planned for later phases. Small-sample routing and Agent diagnostic baselines are recorded in the [acceptance summary](docs/acceptance/2026-09-29.md); production-wide quality and economic benefits remain unverified. No AgentUse certification is claimed.
 
 ## Getting started
 

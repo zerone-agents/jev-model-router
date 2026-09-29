@@ -12,11 +12,13 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"time"
 )
 
 type evalCase struct {
+	Class      string         `json:"class,omitempty"`
 	ID         string         `json:"case_id"`
 	Request    map[string]any `json:"request"`
 	Acceptable []string       `json:"acceptable_model_ids"`
@@ -32,17 +34,22 @@ type prices struct {
 	Models   map[string]*price `json:"models"`
 }
 type metric struct {
-	CaseID           string `json:"case_id"`
-	ModelID          string `json:"model_id,omitempty"`
-	Acceptable       bool   `json:"acceptable_selection"`
-	Quality          string `json:"quality"`
-	Outcome          string `json:"outcome"`
-	DecisionMillis   int64  `json:"decision_ms"`
-	GenerationMillis int64  `json:"generation_ms"`
-	DecisionUsage    *usage `json:"decision_usage"`
-	GenerationUsage  *usage `json:"generation_usage"`
-	DecisionCost     any    `json:"decision_cost"`
-	GenerationCost   any    `json:"generation_cost"`
+	Repeat           int      `json:"repeat"`
+	Class            string   `json:"class,omitempty"`
+	ConfigVersion    int64    `json:"config_version,omitempty"`
+	Path             string   `json:"path,omitempty"`
+	CandidateIDs     []string `json:"candidate_ids,omitempty"`
+	CaseID           string   `json:"case_id"`
+	ModelID          string   `json:"model_id,omitempty"`
+	Acceptable       bool     `json:"acceptable_selection"`
+	Quality          string   `json:"quality"`
+	Outcome          string   `json:"outcome"`
+	DecisionMillis   int64    `json:"decision_ms"`
+	GenerationMillis int64    `json:"generation_ms"`
+	DecisionUsage    *usage   `json:"decision_usage"`
+	GenerationUsage  *usage   `json:"generation_usage"`
+	DecisionCost     any      `json:"decision_cost"`
+	GenerationCost   any      `json:"generation_cost"`
 }
 
 func cost(u *usage, p *price) any {
@@ -82,19 +89,31 @@ func main() {
 		os.Exit(1)
 	}
 }
-func run() error {
-	cases := flag.String("cases", "evals/cases.jsonl", "synthetic dataset")
-	mode := flag.String("mode", "auto", "auto or fixed")
-	model := flag.String("model", "", "fixed external model ID")
-	output := flag.String("output", "", "new metrics JSONL file")
-	priceFile := flag.String("prices", "", "optional per-million-token prices JSON")
-	paid := flag.Bool("allow-paid", false, "authorize potentially paid calls")
-	flag.Parse()
+func run() error { return runArgs(os.Args[1:]) }
+func runArgs(args []string) error {
+	flags := flag.NewFlagSet("evals", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	cases := flags.String("cases", "evals/cases.jsonl", "synthetic dataset")
+	mode := flags.String("mode", "auto", "inspect, auto or fixed")
+	model := flags.String("model", "", "fixed external model ID")
+	output := flags.String("output", "", "new metrics JSONL file")
+	priceFile := flags.String("prices", "", "optional per-million-token prices JSON")
+	paid := flags.Bool("allow-paid", false, "authorize potentially paid calls")
+	repeat := flags.Int("repeat", 1, "inspection repetitions (inspect mode only)")
+	if e := flags.Parse(args); e != nil {
+		if errors.Is(e, flag.ErrHelp) {
+			return nil
+		}
+		return e
+	}
 	if !*paid {
 		return errors.New("explicit --allow-paid authorization required")
 	}
-	if (*mode != "auto" && *mode != "fixed") || (*mode == "fixed" && *model == "") || *output == "" {
+	if (*mode != "inspect" && *mode != "auto" && *mode != "fixed") || (*mode == "fixed" && *model == "") || *output == "" {
 		return errors.New("provide valid mode, model if fixed, and output")
+	}
+	if *repeat < 1 || (*mode != "inspect" && *repeat != 1) {
+		return errors.New("repeat must be positive and requires inspect mode")
 	}
 	base := os.Getenv("JEV_ROUTER_URL")
 	if base == "" {
@@ -102,7 +121,7 @@ func run() error {
 	}
 	inference := os.Getenv("JEV_ROUTER_INFERENCE_TOKEN")
 	settings := os.Getenv("JEV_ROUTER_SETTINGS_TOKEN")
-	if inference == "" || (*mode == "auto" && settings == "") {
+	if (*mode != "inspect" && inference == "") || (*mode != "fixed" && settings == "") {
 		return errors.New("required role credentials missing")
 	}
 	var pricing prices
@@ -139,58 +158,75 @@ func run() error {
 	defer out.Close()
 	client := &http.Client{Timeout: 2 * time.Minute, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	enc := json.NewEncoder(out)
-	for _, c := range list {
-		m := metric{CaseID: c.ID, ModelID: *model, Quality: "unknown", Outcome: "error", DecisionCost: "unknown", GenerationCost: "unknown"}
-		if *mode == "auto" {
-			c.Request["model"] = "auto"
-			var result struct {
-				OK   bool
-				Data struct {
-					ModelID string `json:"model_id"`
-					Usage   *usage `json:"decision_usage"`
+	for repetition := 1; repetition <= *repeat; repetition++ {
+		for _, c := range list {
+			m := metric{Repeat: repetition, Class: c.Class, CaseID: c.ID, ModelID: *model, Quality: "unknown", Outcome: "error", DecisionCost: "unknown", GenerationCost: "unknown"}
+			if *mode != "fixed" {
+				c.Request["model"] = "auto"
+				var result struct {
+					OK   bool
+					Data struct {
+						ModelID       string   `json:"model_id"`
+						ConfigVersion int64    `json:"config_version"`
+						Path          string   `json:"path"`
+						CandidateIDs  []string `json:"candidate_ids"`
+						Usage         *usage   `json:"decision_usage"`
+					}
 				}
+				start := time.Now()
+				e = post(context.Background(), client, base, "/admin/v1/call/route.inspect", settings, map[string]any{"input": c.Request}, &result)
+				m.DecisionMillis = time.Since(start).Milliseconds()
+				if e != nil || !result.OK || result.Data.ModelID == "" || !slices.Contains(result.Data.CandidateIDs, result.Data.ModelID) {
+					if e = enc.Encode(m); e != nil {
+						return e
+					}
+					continue
+				}
+				m.ModelID = result.Data.ModelID
+				m.ConfigVersion = result.Data.ConfigVersion
+				m.Path = result.Data.Path
+				m.CandidateIDs = result.Data.CandidateIDs
+				m.DecisionUsage = result.Data.Usage
+				m.DecisionCost = cost(m.DecisionUsage, pricing.Decision)
+			} else {
+				m.DecisionCost = 0
 			}
-			start := time.Now()
-			e = post(context.Background(), client, base, "/admin/v1/call/route.inspect", settings, map[string]any{"input": c.Request}, &result)
-			m.DecisionMillis = time.Since(start).Milliseconds()
-			if e != nil || !result.OK {
+			if *mode == "inspect" {
+				m.Outcome = "success"
+				m.Acceptable = slices.Contains(c.Acceptable, m.ModelID)
+				m.GenerationCost = 0
 				if e = enc.Encode(m); e != nil {
 					return e
 				}
 				continue
 			}
-			m.ModelID = result.Data.ModelID
-			m.DecisionUsage = result.Data.Usage
-			m.DecisionCost = cost(m.DecisionUsage, pricing.Decision)
-		} else {
-			m.DecisionCost = 0
-		}
-		c.Request["model"] = m.ModelID
-		c.Request["stream"] = false
-		delete(c.Request, "stream_options")
-		var result struct {
-			Usage *struct {
-				Prompt     int64 `json:"prompt_tokens"`
-				Completion int64 `json:"completion_tokens"`
-			}
-		}
-		start := time.Now()
-		e = post(context.Background(), client, base, "/v1/chat/completions", inference, c.Request, &result)
-		m.GenerationMillis = time.Since(start).Milliseconds()
-		if e == nil {
-			m.Outcome = "success"
-			if result.Usage != nil {
-				m.GenerationUsage = &usage{result.Usage.Prompt, result.Usage.Completion}
-			}
-			for _, id := range c.Acceptable {
-				if id == m.ModelID {
-					m.Acceptable = true
+			c.Request["model"] = m.ModelID
+			c.Request["stream"] = false
+			delete(c.Request, "stream_options")
+			var result struct {
+				Usage *struct {
+					Prompt     int64 `json:"prompt_tokens"`
+					Completion int64 `json:"completion_tokens"`
 				}
 			}
-		}
-		m.GenerationCost = cost(m.GenerationUsage, pricing.Models[m.ModelID])
-		if e = enc.Encode(m); e != nil {
-			return e
+			start := time.Now()
+			e = post(context.Background(), client, base, "/v1/chat/completions", inference, c.Request, &result)
+			m.GenerationMillis = time.Since(start).Milliseconds()
+			if e == nil {
+				m.Outcome = "success"
+				if result.Usage != nil {
+					m.GenerationUsage = &usage{result.Usage.Prompt, result.Usage.Completion}
+				}
+				for _, id := range c.Acceptable {
+					if id == m.ModelID {
+						m.Acceptable = true
+					}
+				}
+			}
+			m.GenerationCost = cost(m.GenerationUsage, pricing.Models[m.ModelID])
+			if e = enc.Encode(m); e != nil {
+				return e
+			}
 		}
 	}
 	return nil

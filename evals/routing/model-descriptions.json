@@ -1,0 +1,4 @@
+{
+  "qwen3.8-flash": "Fast, lower-cost general-purpose model with lower capability than Max. Prefer for routine transformations, extraction, translation, straightforward code, and simple tool steps when sufficient.",
+  "qwen3.8-max": "Higher-capability, higher-cost general-purpose model that may be slower than Flash. Prefer for difficult reasoning, complex coding, multi-constraint planning, nuanced instruction following, and tasks requiring deep correctness analysis when the added capability justifies the cost and potential latency."
+}
