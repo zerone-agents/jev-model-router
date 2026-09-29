@@ -4,7 +4,7 @@
 
 面向 Agent 的轻量模型路由网关。以 Jev 原生 choice 根据任务和可编辑模型卡选模，提供 OpenAI Chat Completions 兼容 JSON/SSE、管理 CLI 与配套 SKILL。
 
-首版已实现 Go 单实例 + SQLite、显式/自动选模和 OpenAI 兼容生成适配。本地 Laya、敏感会话锁定、ArbiterOS、PostgreSQL 与 UI 属于后续阶段。尚未完成真实模型付费质量基线，未声明 AgentUse 认证。
+首版已实现 Go 单实例 + SQLite、显式/自动选模和 OpenAI 兼容生成适配。本地 Laya、敏感会话锁定、ArbiterOS、PostgreSQL 与 UI 属于后续阶段。已建立小规模选模与Agent诊断基线，详见[验收摘要](docs/acceptance/2026-09-29.zh-CN.md)；生产全场景质量与经济收益仍未验证。未声明 AgentUse 认证。
 
 ## 启动
 
