@@ -59,6 +59,7 @@ func initSchemas() {
 	}
 	idempotencyHours = int(protocol["retention"].(map[string]any)["idempotency_hours"].(float64))
 	protocol["idempotency"].(map[string]any)["valid_for_hours"] = idempotencyHours
+	protocol["session"] = SessionPolicy()
 	encodedProtocol, _ := json.Marshal(protocol)
 	for i := range caps {
 		schema := callSchema(caps[i].Write)
@@ -71,6 +72,9 @@ func initSchemas() {
 	validators = map[string]*jsonschema.Schema{}
 	envelope, _ := json.Marshal(callSchema(true))
 	validators["write_envelope"] = compile(envelope)
+	policy := SessionLimits()
+	validators["session.login"] = compile(policy.InputSchema)
+	validators["session.logout"] = compile(policy.InputSchema)
 	for _, c := range caps {
 		validators[c.ID] = compile(c.InputSchema)
 	}
