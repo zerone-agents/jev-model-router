@@ -14,7 +14,7 @@ cd jev-model-router/quickstart
 cp .env.example .env
 ```
 
-编辑 `.env`：分别运行两次 `openssl rand -hex 32`，为 `JEV_ROUTER_SETTINGS_TOKEN` 和 `JEV_ROUTER_INFERENCE_TOKEN` 设置**不同的**随机凭证。配置生成供应商和 TypeSafe 时填入相应 API Key。`.env` 已被 Git 和镜像构建忽略，请妥善保管。更多供应商的环境变量需要同时添加到 Compose 和 `.env`。
+编辑 `.env`：分别运行两次 `openssl rand -hex 32`，为 `JEV_ROUTER_SETTINGS_TOKEN` 和 `JEV_ROUTER_INFERENCE_TOKEN` 设置**不同的**随机凭证。配置生成供应商和 TypeSafe 时填入相应 API Key。`.env` 已被 Git 和镜像构建忽略，请妥善保管。选择外部环境变量引用时，更多供应商的变量需要同时添加到 Compose 和 `.env`；下方托管凭证方式可省去每个供应商的这一步。
 
 ```sh
 docker compose up -d
@@ -25,7 +25,6 @@ docker compose ps
 
 默认仅绑定本机。远程访问需要配置 HTTPS 反向代理并明确调整网络绑定；非 loopback 地址的管理 UI 要求 HTTPS。
 
-
 ## 远程管理 API Key（v0.1.1 之后的功能）
 
 需要包含托管凭证功能的服务端与 CLI；v0.1.1 不接受 `api_key`。正式版本包含此功能前，请使用下方源码构建方式。用 `openssl rand -hex 32` 生成一次主密钥，填入云端私有 `.env` 的 `JEV_ROUTER_ENCRYPTION_KEY`（执行 `chmod 600 .env`），然后重建一次容器。主密钥需与 SQLite 分开备份；丢失后无法恢复已存储的供应商密钥。不要提交主密钥，也不要分享包含密钥值的 Compose 渲染结果。
@@ -33,7 +32,6 @@ docker compose ps
 此后通过本地 CLI 的私有 JSON 文件或 stdin 添加、更换供应商 API Key。输入包含 `id`、`base_url` 和只写的 `api_key`，替代 `secret_ref`。后续供应商密钥变更无需修改 Compose 或重启。决策后端继续使用 `TYPESAFE_API_KEY`；现有供应商的 `env:`/`file:` 引用也继续支持。
 
 详见[远程 CLI 操作](../docs/cli-installation.zh-CN.md#托管供应商密钥)与[加密及恢复说明](../docs/configuration.md#managed-provider-credentials)。远程提交密钥要求 HTTPS，也可经 SSH 隧道使用回环 HTTP。反向代理终止 TLS 后应通过私有网络转发至容器。接口不返回明文密钥。旧密文版本会保留供在途请求使用；删除供应商不会清除历史密文及备份。尚未实现主密钥轮换，直接改值会导致存在托管记录的实例启动失败。
-
 
 ## 配置模型
 

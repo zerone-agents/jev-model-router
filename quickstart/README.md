@@ -14,7 +14,7 @@ cd jev-model-router/quickstart
 cp .env.example .env
 ```
 
-Edit `.env`: set **two different** random values for `JEV_ROUTER_SETTINGS_TOKEN` and `JEV_ROUTER_INFERENCE_TOKEN` (run `openssl rand -hex 32` twice). Add your generation provider key and TypeSafe key when configuring those services. Keep `.env` private; it is ignored by Git and excluded from image builds. For more providers, explicitly add their environment variables to Compose as well as `.env`.
+Edit `.env`: set **two different** random values for `JEV_ROUTER_SETTINGS_TOKEN` and `JEV_ROUTER_INFERENCE_TOKEN` (run `openssl rand -hex 32` twice). Add your generation provider key and TypeSafe key when configuring those services. Keep `.env` private; it is ignored by Git and excluded from image builds. When using external environment references for more providers, explicitly add their variables to Compose as well as `.env`. Managed credentials below avoid this per-provider step.
 
 ```sh
 docker compose up -d
@@ -53,7 +53,6 @@ docker compose exec -T router jev-router call providers.put \
 Follow the [companion SKILL](../skills/jev-router/SKILL.md) to create a disabled model, test it, and enable it. Multiple-candidate `auto` also needs `decision.put`, using `https://api.typesafe.ai`, `jev-1.13.0`, and `env:TYPESAFE_API_KEY`. Configuration remains managed through the shared API; `.env` does not create model resources. Model connection tests and routing checks may call paid services.
 
 Inside the container, `localhost` is the container itself. Use a reachable upstream hostname, not the host machine's loopback address. After changing environment keys, recreate the service with `docker compose up -d`.
-
 
 ## Remotely managed API keys (after v0.1.1)
 

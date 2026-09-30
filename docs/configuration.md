@@ -8,6 +8,7 @@
 | database | .data/router.sqlite |
 | settings_token_ref | env:JEV_ROUTER_SETTINGS_TOKEN |
 | inference_token_ref | env:JEV_ROUTER_INFERENCE_TOKEN |
+| encryption_key_ref | 空（仅使用外部凭证时无需设置） |
 | decision_timeout | 10s |
 | first_event_timeout | 60s |
 | idle_timeout | 60s |
@@ -18,7 +19,7 @@
 
 以上是通过本地边界测试的首版默认值，不代表真实模型延迟承诺。时长接受 Go duration 字符串；数值限额必须为正。
 
-两种 Token 必须存在且不同。凭证引用支持 `env:NAME` 或 `file:/absolute/path`；文件末尾换行会去除。settings 是可信管理员，能改变生成请求目的地；不应交给不可信用户。密钥不存 SQL，不回显于状态或错误。
+两种 Token 必须存在且不同。凭证引用支持 `env:NAME` 或 `file:/absolute/path`；文件末尾换行会去除。settings 是可信管理员，能改变生成请求目的地；不应交给不可信用户。这两种认证 Token 不存 SQL。供应商密钥可以使用外部引用，或按下方托管模式加密保存到 SQL；均不以明文回显于状态或错误。
 
 普通禁用只影响新请求，紧急停止需要停止实例或撤销上游密钥。默认仅监听本机，暴露到网络时由部署方提供适当的 TLS 边界。
 

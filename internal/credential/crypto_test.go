@@ -49,7 +49,8 @@ func TestCipherRejectsCorruptionAndIdentitySwap(t *testing.T) {
 func TestDigestBindsPayload(t *testing.T) {
 	c, _ := New(strings.Repeat("ab", 32))
 	d, _ := New(strings.Repeat("cd", 32))
-	if c.Digest([]byte("a")) != c.Digest([]byte("a")) || c.Digest([]byte("a")) == c.Digest([]byte("b")) || c.Digest([]byte("a")) == d.Digest([]byte("a")) {
+	first := c.Digest([]byte("a"))
+	if first != c.Digest([]byte("a")) || c.Digest([]byte("a")) == c.Digest([]byte("b")) || c.Digest([]byte("a")) == d.Digest([]byte("a")) {
 		t.Fatal("digest does not bind key and input")
 	}
 }
