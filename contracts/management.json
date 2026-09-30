@@ -167,11 +167,19 @@
             "secret_ref"
           ],
           "additionalProperties": false
+        },
+        "api_key_masked": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "First four characters plus ***; credentials of eight characters or fewer are fully masked. Null when unavailable. Never contains the complete credential."
         }
       },
       "required": [
         "version",
-        "resource"
+        "resource",
+        "api_key_masked"
       ],
       "additionalProperties": false
     },

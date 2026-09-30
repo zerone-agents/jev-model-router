@@ -24,6 +24,7 @@ type Service struct {
 	mu              sync.RWMutex
 	handlers        map[string]Handler
 	RecordsDegraded func() bool
+	ResolveSecret   func(string) ([]byte, error)
 }
 
 func New(store ConfigStore, validate func(routing.Snapshot) error) *Service {
@@ -115,7 +116,19 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 	case "providers.get":
 		for _, p := range cfg.Providers {
 			if p.ID == input.ID {
-				resource = p
+				var masked any
+				if s.ResolveSecret != nil {
+					if key, err := s.ResolveSecret(p.SecretRef); err == nil && len(key) > 0 {
+						prefix := []rune(string(key))
+						// Keep short credentials fully masked.
+						if len(prefix) > 8 {
+							masked = string(prefix[:4]) + "***"
+						} else {
+							masked = "***"
+						}
+					}
+				}
+				return Success(map[string]any{"version": cfg.Version, "resource": p, "api_key_masked": masked}, time.Now()), nil
 			}
 		}
 	case "models.get":

@@ -12,6 +12,7 @@ import type { Model, Resource } from "./pages";
 type Snapshot = { version: number; text: string; model?: Model };
 type Props = PageProps & {
   canEdit: boolean;
+  canReadProvider?: boolean;
   onDirty: (value: boolean) => void;
 };
 export function PromptEditor(props: Props) {
@@ -178,6 +179,13 @@ function Editor(props: Props & { initial: Snapshot }) {
               </span>
             ))}
           </div>
+          {props.canReadProvider && (
+            <ProviderDetails
+              {...props}
+              key={snapshot.model.provider_id}
+              providerId={snapshot.model.provider_id}
+            />
+          )}
           <p className="read-only">
             {text(
               lang,
@@ -280,5 +288,40 @@ function Editor(props: Props & { initial: Snapshot }) {
         </div>
       </div>
     </section>
+  );
+}
+
+function ProviderDetails(props: PageProps & { providerId: string }) {
+  const state = useRead<{
+    resource: { base_url: string };
+    api_key_masked?: string | null;
+  }>(props, "providers.get", { id: props.providerId });
+  if (state.loading) return <Loading />;
+  if (state.error) return <ErrorBox error={state.error} lang={props.lang} />;
+  if (!state.data) return null;
+  return (
+    <div className="provider-details">
+      <label htmlFor="provider-endpoint">Endpoint</label>
+      <input
+        id="provider-endpoint"
+        readOnly
+        value={state.data.resource.base_url}
+      />
+      <label htmlFor="provider-key">API Key</label>
+      <input
+        id="provider-key"
+        readOnly
+        value={
+          state.data.api_key_masked ?? text(props.lang, "Unavailable", "不可用")
+        }
+      />
+      <small>
+        {text(
+          props.lang,
+          "Read only. Only a masked key is returned by the server.",
+          "只读。服务端仅返回脱敏后的密钥。",
+        )}
+      </small>
+    </div>
   );
 }

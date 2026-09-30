@@ -321,6 +321,7 @@ export function App() {
                           {...props}
                           id={id}
                           canEdit={can("models.put")}
+                          canReadProvider={can("providers.get")}
                           onDirty={setDirty}
                         />
                       ) : (

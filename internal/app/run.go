@@ -79,6 +79,7 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 		}
 		return nil
 	})
+	service.ResolveSecret = resolve
 	planner := &routing.Planner{Decider: decision.New(nil, resolve, decision.DefaultBudget()), Check: provider.Check}
 	checks := management.Checks{Store: store, Planner: planner, Generator: gen, DecisionTimeout: cfg.DecisionTimeout, FirstEventTimeout: cfg.FirstEventTimeout}
 	checks.Register(service)

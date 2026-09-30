@@ -718,3 +718,16 @@ pre {
     animation: none !important;
   }
 }
+
+.provider-details {
+  display: grid;
+  gap: 10px;
+  margin-block: 24px;
+}
+.provider-details input {
+  width: 100%;
+  background: #faf9f5;
+}
+.provider-details small {
+  color: #706b65;
+}
