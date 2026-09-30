@@ -211,3 +211,57 @@ it("requests enabled-first pages, shows tags, and resets pagination on refresh",
     }),
   );
 });
+
+it("searches while typing and expands and highlights matching descriptions", async () => {
+  const user = (await import("@testing-library/user-event")).default.setup();
+  const fetcher = vi.fn(
+    async (_url, init) =>
+      new Response(
+        JSON.stringify({
+          ok: true,
+          meta: {},
+          data: {
+            version: 1,
+            total: 1,
+            next_cursor: "",
+            items: [
+              {
+                id: "m",
+                enabled: true,
+                description: "A very long description ending with NEEDLE",
+                provider_id: "p",
+                upstream_name: "u",
+                capabilities: {},
+              },
+            ],
+          },
+        }),
+      ),
+  );
+  render(
+    <Models
+      client={createManagementClient("x", fetcher)}
+      lang="en"
+      onError={() => {}}
+      canEdit={false}
+      onDirty={() => {}}
+    />,
+  );
+  await screen.findByText("A very long description ending with NEEDLE");
+  await user.type(
+    screen.getByRole("searchbox", { name: "Search models" }),
+    "needle",
+  );
+  await waitFor(() =>
+    expect(JSON.parse(fetcher.mock.calls.at(-1)![1].body).input).toMatchObject({
+      query: "needle",
+      offset: 0,
+      language: "en",
+    }),
+  );
+  const hit = await screen.findByText("NEEDLE");
+  expect(hit.tagName).toBe("MARK");
+  expect(hit.closest("p")).toHaveClass("search-expanded");
+  await user.clear(screen.getByRole("searchbox", { name: "Search models" }));
+  await waitFor(() => expect(document.querySelector("mark")).toBeNull());
+});

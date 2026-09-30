@@ -92,3 +92,25 @@ func TestModelListOffset(t *testing.T) {
 		t.Fatal("accepted mixed pagination modes")
 	}
 }
+
+func TestModelSearchBeforePagination(t *testing.T) {
+	service := management.New(&memoryStore{s: routing.Snapshot{Models: []routing.Model{
+		{ID: "first", Description: "ordinary"},
+		{ID: "second", ProviderID: "vendor", UpstreamName: "upstream", Description: "Long tail NEEDLE", Enabled: true, Capabilities: routing.Capabilities{Tools: true}},
+	}}}, nil)
+	for _, query := range []string{"needle", "vendor / upstream", "Tools", "Enabled", "second"} {
+		input, _ := json.Marshal(map[string]any{"query": query, "limit": 1})
+		r, e := service.Execute(context.Background(), "settings", management.Call{CapabilityID: "models.list", Input: input})
+		if e != nil {
+			t.Fatal(e)
+		}
+		var data struct {
+			Total int             `json:"total"`
+			Items []routing.Model `json:"items"`
+		}
+		json.Unmarshal(r.Data, &data)
+		if data.Total != 1 || len(data.Items) != 1 || data.Items[0].ID != "second" {
+			t.Fatalf("query %q: %s", query, r.Data)
+		}
+	}
+}

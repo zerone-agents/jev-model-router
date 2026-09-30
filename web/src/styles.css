@@ -848,3 +848,38 @@ pre {
     min-width: 28px;
   }
 }
+
+.model-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.model-list-actions input,
+.model-list-actions button {
+  height: 40px;
+  padding-block: 0;
+}
+.model-list-actions input {
+  width: 220px;
+  min-width: 0;
+  margin: 0;
+}
+.model-copy mark {
+  background: #f2dfb6;
+  color: inherit;
+  border-radius: 2px;
+  padding: 0;
+}
+.model-copy p.search-expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+}
+@media (max-width: 760px) {
+  .model-list-actions {
+    width: 100%;
+  }
+  .model-list-actions input {
+    flex: 1;
+    width: 0;
+  }
+}

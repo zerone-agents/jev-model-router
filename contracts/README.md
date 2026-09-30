@@ -65,3 +65,5 @@ call body 为 `{"input":{...},"expected_version":1,"idempotency_key":"operation-
 ## 模型列表排序
 
 `models.list` 默认按 ID 升序，传入 `sort: "enabled_first"` 时先列启用模型，再列禁用模型，组内按 ID 升序。排序在分页前执行；翻页时保持 sort 不变，并原样传入 next_cursor。也可传入从 0 开始的 `offset` 直接跳页，不可与非空 cursor 同时使用；响应包含模型总数 `total`。Dashboard 默认每页 20 条，可选择 10/50/100 条，采用启用优先排序。配置变更后刷新列表，重新从第一页读取。
+
+`models.list` 支持 `query` 实时筛选：忽略大小写、去除首尾空白，按字面子串匹配模型 ID、描述、供应商 / 上游名称、位置和可见状态/能力标签。`language` 为 `en`（默认）或 `zh`，决定标签文案。筛选先于排序和分页，`total` 为匹配总数；搜索变化后从第一页读取。
