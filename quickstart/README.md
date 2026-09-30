@@ -54,6 +54,15 @@ Follow the [companion SKILL](../skills/jev-router/SKILL.md) to create a disabled
 
 Inside the container, `localhost` is the container itself. Use a reachable upstream hostname, not the host machine's loopback address. After changing environment keys, recreate the service with `docker compose up -d`.
 
+
+## Remotely managed API keys (after v0.1.1)
+
+Use a server and CLI build containing managed-credential support; v0.1.1 rejects `api_key`. Until a release includes it, use the source-build override. Generate one master key with `openssl rand -hex 32` and place it in `JEV_ROUTER_ENCRYPTION_KEY` in the server's private `.env` (`chmod 600 .env`). Recreate the container once. Back up this master key separately from SQLite; losing it makes stored provider keys unrecoverable. Never commit it or share rendered Compose configuration containing its value.
+
+After that setup, add or replace provider API keys through the remote CLI using a protected JSON file or stdin. The input has `id`, `base_url`, and write-only `api_key` instead of `secret_ref`. No Compose edit or restart is needed for subsequent provider-key changes. Keep `TYPESAFE_API_KEY` for decision-backend credentials. Existing `env:`/`file:` provider references remain supported.
+
+See [remote CLI instructions](../docs/cli-installation.md#managed-provider-keys) and [encryption and recovery](../docs/configuration.md#managed-provider-credentials). Remote secret submission requires HTTPS; loopback HTTP also works through an SSH tunnel. The reverse proxy must terminate TLS before forwarding privately to the container. Managed keys are never returned in plaintext. Old encrypted revisions are retained for in-flight requests; deleting a provider does not erase historical ciphertext/backups. Master-key rotation is not implemented: changing its value prevents startup with existing managed records.
+
 ## Build from source
 
 ```sh

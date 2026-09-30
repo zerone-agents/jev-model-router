@@ -55,3 +55,9 @@ call body 为 `{"input":{...},"expected_version":1,"idempotency_key":"operation-
 提示词长度统一按 JSON Schema maxLength 的 Unicode 字符数计算（上限16384），保存整个配置时复用 prompt.put 校验。Jev 的序列化字节预算独立计算：可以保存的提示词仍可能使多候选决策超限，此时明确返回 budget_exceeded。
 
 供应商详情 `providers.get` 返回只读 endpoint 和 `api_key_masked`：密钥超过 8 个字符时仅显示前 4 个字符及 `***`，短密钥全部打码，无法解析时返回 null。完整密钥不会进入管理响应，脱敏字段不参与配置写入。
+
+## 托管供应商凭证
+
+`providers.put` 的 `api_key` 与 `secret_ref` 二选一。`api_key` 只写，限非空 UTF-8、16384 字节以内且不含 CR/LF/NUL；schema 的 maxLength 同时限制字符数，共享运行时校验执行更严格的字节上限。写入需要服务端部署主密钥；密钥、供应商配置、全局版本与脱敏幂等结果同事务提交。响应仅含不可变的 `managed:<revision-id>` 引用，读取保持前缀脱敏；解析失败返回 null 和 `provider_credential_unavailable` 警告。引用必须属于同一供应商，不能用于决策后端。
+
+内联密钥写入使用主密钥派生的 HMAC 摘要识别幂等请求；SQL、回执和配置快照均不保存明文。缺失密钥或不可解密返回通用 `config_missing`，不降级为明文。更换供应商 Key 不改变已捕获请求的凭证版本。历史密文保留，删除不代表物理擦除或紧急撤销。CLI 拒绝非回环 HTTP 提交内联密钥且不跟随重定向；HTTPS 反向代理由部署方配置。

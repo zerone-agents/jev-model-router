@@ -7,6 +7,8 @@ services:
     environment:
       JEV_ROUTER_SETTINGS_TOKEN: ${JEV_ROUTER_SETTINGS_TOKEN:?Set a unique settings token in .env}
       JEV_ROUTER_INFERENCE_TOKEN: ${JEV_ROUTER_INFERENCE_TOKEN:?Set a different inference token in .env}
+      JEV_ROUTER_ENCRYPTION_KEY_REF: env:JEV_ROUTER_ENCRYPTION_KEY
+      JEV_ROUTER_ENCRYPTION_KEY: ${JEV_ROUTER_ENCRYPTION_KEY:-}
       PROVIDER_API_KEY: ${PROVIDER_API_KEY:-}
       TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
     volumes:
