@@ -75,7 +75,7 @@ docker compose down                 # stop; retain the SQLite volume
 
 ## Publishing (maintainers)
 
-The Release workflow builds Linux amd64/arm64 images. Configure repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` with push access to `zeroneai/jev-model-router`. A `v*` version tag publishes a versioned image; stable releases also update `latest`. Manual dispatch publishes `latest` from the selected ref. PR runs build without publishing. First publication requires these credentials and an explicit release action; adding this workflow alone does not publish an image.
+The Release workflow builds Linux amd64/arm64 images. Set the required Actions variable `DOCKERHUB_IMAGE` to `zeroneai/jev-model-router` (namespace/repository, without a registry host or tag). Configure repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` with push access to `zeroneai/jev-model-router`. A `v*` version tag publishes a versioned image; stable releases also update `latest`. Manual dispatch publishes `latest` from the selected ref. PR runs build without publishing. First publication requires these credentials and an explicit release action; adding this workflow alone does not publish an image.
 
 ## Huawei Cloud SWR mirror
 
@@ -89,6 +89,7 @@ Maintainers: use the same repository variable/secret names as Agent Hub:
 
 | Kind | Name | Value |
 | --- | --- | --- |
+| Variable | `DOCKERHUB_IMAGE` | Docker Hub namespace/repository, e.g. `zeroneai/jev-model-router` |
 | Variable | `REGISTRY_HOST` | SWR host, e.g. `swr.cn-east-3.myhuaweicloud.com` |
 | Variable | `REGISTRY_IMAGE` | Full untagged image path, e.g. `swr.cn-east-3.myhuaweicloud.com/zerone/jev-model-router` |
 | Secret | `DOCKER_REGISTRY_USER` | SWR login username |

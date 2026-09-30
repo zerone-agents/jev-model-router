@@ -75,7 +75,7 @@ docker compose down                 # 停止，保留 SQLite 卷
 
 ## 镜像发布（维护者）
 
-Release 工作流构建 Linux amd64/arm64 镜像。需配置具有 `zeroneai/jev-model-router` 推送权限的仓库 secrets：`DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN`。推送 `v*` 版本标签会发布版本镜像，正式版本同时更新 `latest`；手动触发会从所选 ref 发布 `latest`。PR 仅构建、不发布。首次发布需要配置凭证并明确执行发布操作，添加工作流本身不会发布镜像。
+Release 工作流构建 Linux amd64/arm64 镜像。必填 Actions Variable `DOCKERHUB_IMAGE` 设为 `zeroneai/jev-model-router`（namespace/repository，不带 registry host 或标签）。需配置具有 `zeroneai/jev-model-router` 推送权限的仓库 secrets：`DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN`。推送 `v*` 版本标签会发布版本镜像，正式版本同时更新 `latest`；手动触发会从所选 ref 发布 `latest`。PR 仅构建、不发布。首次发布需要配置凭证并明确执行发布操作，添加工作流本身不会发布镜像。
 
 ## 华为云 SWR 镜像
 
@@ -89,6 +89,7 @@ ROUTER_IMAGE=swr.cn-east-3.myhuaweicloud.com/zerone/jev-model-router:latest
 
 | 类型 | 名称 | 值 |
 | --- | --- | --- |
+| Variable | `DOCKERHUB_IMAGE` | Docker Hub namespace/repository，如 `zeroneai/jev-model-router` |
 | Variable | `REGISTRY_HOST` | SWR 域名，如 `swr.cn-east-3.myhuaweicloud.com` |
 | Variable | `REGISTRY_IMAGE` | 不带标签的完整镜像路径，如 `swr.cn-east-3.myhuaweicloud.com/zerone/jev-model-router` |
 | Secret | `DOCKER_REGISTRY_USER` | SWR 登录用户名 |
