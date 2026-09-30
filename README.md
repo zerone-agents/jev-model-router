@@ -10,6 +10,10 @@ The first release implements a single-instance Go gateway with SQLite, explicit 
 
 Recommended: deploy the prebuilt Docker Hub image with [Docker Compose Quickstart](quickstart/README.md). It includes persistent SQLite and the management UI; no local Go or Node installation is needed.
 
+### Local CLI
+
+To manage a remote Compose instance, download the CLI from GitHub Releases. See [CLI installation and remote access](docs/cli-installation.md).
+
 ### Run from source
 
 Requires Go 1.27.0. The SQLite driver does not require CGO.
