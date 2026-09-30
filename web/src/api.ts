@@ -130,15 +130,18 @@ export function createManagementClient(
           : {}),
       },
       body: body ? JSON.stringify(body) : undefined,
-      signal: AbortSignal.any([
-        controller.signal,
-        AbortSignal.timeout(15000),
-        ...(signal ? [signal] : []),
-      ]),
+      signal: AbortSignal.any([controller.signal, ...(signal ? [signal] : [])]),
     });
   return {
     schema: (signal?: AbortSignal) =>
-      call<Capability[]>("/admin/v1/schema", undefined, signal),
+      call<Capability[]>(
+        "/admin/v1/schema",
+        undefined,
+        AbortSignal.any([
+          AbortSignal.timeout(15000),
+          ...(signal ? [signal] : []),
+        ]),
+      ),
     call: <T>(
       capability: string,
       envelope: CallEnvelope,

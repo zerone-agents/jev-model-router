@@ -58,3 +58,28 @@ describe("management client", () => {
     expect(secureOrigin(new URL("https://example.com"))).toBe(true);
   });
 });
+
+it("does not impose the restoration timeout on model probes", async () => {
+  vi.useFakeTimers();
+  const timeout = vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+    const c = new AbortController();
+    setTimeout(() => c.abort(), ms);
+    return c.signal;
+  });
+  let requestSignal!: AbortSignal;
+  const fetcher = vi.fn(
+    async (_input: RequestInfo | URL, init?: RequestInit) => {
+      requestSignal = init!.signal!;
+      return new Response(JSON.stringify({ ok: true, data: {}, meta: {} }));
+    },
+  );
+  const client = createManagementClient("csrf", fetcher);
+  await client.call("models.test", { input: { id: "model" } });
+  // Model probes follow the server's generation deadline, not the 15s restore deadline.
+  await vi.advanceTimersByTimeAsync(15001);
+  expect(requestSignal.aborted).toBe(false);
+  client.dispose();
+  expect(requestSignal.aborted).toBe(true);
+  timeout.mockRestore();
+  vi.useRealTimers();
+});
