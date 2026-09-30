@@ -51,7 +51,7 @@ first_event_timeout 覆盖流建立到首个有效 SSE 事件，非流式及固�
 
 普通模式先执行最多 5 秒、无凭证且不跟随重定向的 HTML 可达检查，再通过系统浏览器打开；失败以 JSON 返回错误及有效地址供手动打开。`--no-open` 仅返回 JSON 地址，不执行探测，不启动服务。该命令不需要 settings 凭证。
 
-浏览器单独输入 settings 凭证，仅在页面内存保存。刷新或断开连接后需重新输入；不写入 URL 或浏览器存储。UI 只访问同源 API，远程使用必须部署 HTTPS，本机 loopback HTTP 例外。UI 不管理账号、密钥或启动参数。
+浏览器单独输入 Settings 凭证并交换为固定 24 小时的 HttpOnly 会话，刷新或同凭证重启后可恢复；显式注销在服务端撤销当前请求会话。认证材料不写入 URL 或 Web Storage。UI 只访问同源 API，远程使用需部署 HTTPS 并配置公开 Origin，本机回环 HTTP 例外。UI 不管理账号、密钥或启动参数；完整生命周期与恢复规则见下方 Dashboard sessions。
 
 ## Docker Compose
 

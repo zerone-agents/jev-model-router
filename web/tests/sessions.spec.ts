@@ -177,3 +177,45 @@ test("dashboard refresh restores HttpOnly session without persistent credentials
   expect((await cookie(context)).value).toBe(c.value);
   expect((await auth(page, "status")).status).toBe(401);
 });
+
+test("stale management session offers explicit recovery and preserves dirty drafts", async ({
+  page,
+  context,
+}) => {
+  await page.goto("/dashboard/");
+  await page.getByLabel("Settings credential").fill("ui-test-settings");
+  await page
+    .getByRole("button", { name: "Connect to instance", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "A clear view of your router." }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Routing prompt", exact: true })
+    .click();
+  const draft = page.getByLabel("Prompt content");
+  await draft.fill("Unsubmitted cross-tab draft");
+  const tab = await context.newPage();
+  await tab.goto("/dashboard/");
+  await auth(tab, "login");
+  const s1 = (await cookie(context)).value;
+  let writes = 0;
+  page.on("request", (r) => {
+    if (r.url().endsWith("/call/prompt.put")) writes++;
+  });
+  await page.getByRole("button", { name: "Save changes" }).click();
+  const restore = page.getByRole("button", { name: "Restore current session" });
+  await expect(restore).toBeVisible();
+  await expect(draft).toHaveValue("Unsubmitted cross-tab draft");
+  expect(writes).toBe(1);
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await restore.click();
+  await expect(draft).toHaveValue("Unsubmitted cross-tab draft");
+  page.once("dialog", (dialog) => dialog.accept());
+  await restore.click();
+  await expect(
+    page.getByRole("heading", { name: "A clear view of your router." }),
+  ).toBeVisible();
+  expect(writes).toBe(1);
+  await assertUsable(tab, context, s1);
+});

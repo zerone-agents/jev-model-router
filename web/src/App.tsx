@@ -44,6 +44,7 @@ export function App() {
   const [page, setPage] = useState<Page>("overview");
   const [token, setToken] = useState("");
   const [error, setError] = useState<unknown>();
+  const [logoutFailed, setLogoutFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [restoring, setRestoring] = useState(true);
   const [restoreFailed, setRestoreFailed] = useState(false);
@@ -59,6 +60,7 @@ export function App() {
     setBusy(false);
     dirty.current = false;
     setMobile(false);
+    setLogoutFailed(false);
     setError(undefined);
   }, [session]);
   const restore = useCallback(async () => {
@@ -111,6 +113,7 @@ export function App() {
       await session.logout();
       disconnect();
     } catch (e) {
+      setLogoutFailed(true);
       setError(e);
     } finally {
       setBusy(false);
@@ -126,10 +129,11 @@ export function App() {
     (e: unknown) => {
       if (
         e instanceof APIError &&
-        e.status === 401 &&
+        (e.status === 401 || e.status === 403) &&
         session.client === client
       ) {
-        disconnect();
+        if (e.status === 401) disconnect();
+        else setLogoutFailed(false);
         setError(e);
       }
     },
@@ -376,13 +380,15 @@ export function App() {
             </div>
             {error != null && (
               <div className="notice" role="status">
-                <p>
-                  {text(
-                    lang,
-                    "Logout was not confirmed. Retry, or restore the current session if it changed.",
-                    "未能确认注销。请重试；若会话已变化，请恢复当前会话。",
-                  )}
-                </p>
+                {logoutFailed && (
+                  <p>
+                    {text(
+                      lang,
+                      "Logout was not confirmed. Retry, or restore the current session if it changed.",
+                      "未能确认注销。请重试；若会话已变化，请恢复当前会话。",
+                    )}
+                  </p>
+                )}
                 <ErrorBox error={error} lang={lang} />
                 <button
                   disabled={busy}

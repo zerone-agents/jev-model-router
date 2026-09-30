@@ -9,6 +9,7 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
@@ -60,10 +61,11 @@ func NormalizeDashboardOrigin(value string) (string, error) {
 		port = ""
 	}
 	if strings.Contains(host, ":") {
-		if net.ParseIP(host) == nil {
+		ip, err := netip.ParseAddr(host)
+		if err != nil {
 			return bad()
 		}
-		host = "[" + host + "]"
+		host = "[" + ip.String() + "]"
 	}
 	if port != "" {
 		host += ":" + port

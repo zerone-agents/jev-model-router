@@ -151,7 +151,11 @@ export function createManagementClient(
         "/admin/v1/call/" + encodeURIComponent(capability),
         envelope,
         signal,
-      ),
+      ).catch((e: unknown) => {
+        if (e instanceof APIError && e.status === 403)
+          throw new APIError("session_changed", 403, e.operationId);
+        throw e;
+      }),
     dispose: () => {
       csrf = "";
       controller.abort();

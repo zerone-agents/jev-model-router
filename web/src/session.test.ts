@@ -122,3 +122,21 @@ it("a late error from an old client cannot dispose the current session", async (
   s.expire(old!);
   expect(s.client).not.toBeNull();
 });
+
+it("resolves a truncated successful login through status before another login", async () => {
+  const calls: string[] = [];
+  const f = vi.fn(async (input: RequestInfo | URL) => {
+    const path = String(input);
+    calls.push(path);
+    if (calls.length === 1)
+      return new Response('{"ok":true,"data":', { status: 200 });
+    return reply(path.endsWith("schema") ? [] : info);
+  });
+  const s = new Session(f);
+  await expect(s.connect("secret")).rejects.toMatchObject({
+    code: "invalid_response",
+    status: 200,
+  });
+  await s.connect("secret");
+  expect(calls[1]).toBe("/admin/v1/session");
+});

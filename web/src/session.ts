@@ -71,7 +71,10 @@ export class Session {
         token = "";
         return await this.attach(info, generation);
       } catch (e) {
-        if (e instanceof APIError && (e.status === 0 || e.status >= 500))
+        if (
+          e instanceof APIError &&
+          (e.status === 0 || e.status >= 500 || e.code === "invalid_response")
+        )
           this.uncertain = true;
         if (generation !== this.generation) return false;
         throw e;

@@ -194,3 +194,35 @@ func TestSessionOriginPolicy(t *testing.T) {
 		t.Fatal("unconfigured remote", w.Code)
 	}
 }
+
+func TestSessionEquivalentIPv6Origins(t *testing.T) {
+	got, err := NormalizeDashboardOrigin("http://[0:0:0:0:0:0:0:1]:8080")
+	if err != nil || got != "http://[::1]:8080" {
+		t.Fatalf("%q %v", got, err)
+	}
+	_, h := sessionHTTPFixture(t, "http://[0:0:0:0:0:0:0:1]:8080")
+	r := httptest.NewRequest("POST", "http://[::1]:8080/admin/v1/session/login", strings.NewReader("{}"))
+	r.Header.Set("Origin", "http://[::1]:8080")
+	r.Header.Set("Authorization", "Bearer settings")
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+}
+
+func TestSessionMappedIPv6OriginNormalization(t *testing.T) {
+	a, err := NormalizeDashboardOrigin("http://[::ffff:7f00:1]:8080")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := NormalizeDashboardOrigin(a)
+	if err != nil || a != b {
+		t.Fatalf("normalization not stable: %q -> %q (%v)", a, b, err)
+	}
+	c, err := NormalizeDashboardOrigin("http://[::ffff:127.0.0.1]:8080")
+	if err != nil || a != c {
+		t.Fatalf("equivalent addresses differ: %q / %q", a, c)
+	}
+}
