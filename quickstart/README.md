@@ -76,3 +76,22 @@ docker compose down                 # stop; retain the SQLite volume
 ## Publishing (maintainers)
 
 The Release workflow builds Linux amd64/arm64 images. Configure repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` with push access to `zeroneai/jev-model-router`. A `v*` version tag publishes a versioned image; stable releases also update `latest`. Manual dispatch publishes `latest` from the selected ref. PR runs build without publishing. First publication requires these credentials and an explicit release action; adding this workflow alone does not publish an image.
+
+## Huawei Cloud SWR mirror
+
+When Docker Hub is difficult to reach, set `ROUTER_IMAGE` in `.env` to the published SWR image, then run `docker compose pull && docker compose up -d`. Example target (availability depends on the maintainers' configured registry and first publication):
+
+```dotenv
+ROUTER_IMAGE=swr.cn-east-3.myhuaweicloud.com/zerone/jev-model-router:latest
+```
+
+Maintainers: use the same repository variable/secret names as Agent Hub:
+
+| Kind | Name | Value |
+| --- | --- | --- |
+| Variable | `REGISTRY_HOST` | SWR host, e.g. `swr.cn-east-3.myhuaweicloud.com` |
+| Variable | `REGISTRY_IMAGE` | Full untagged image path, e.g. `swr.cn-east-3.myhuaweicloud.com/zerone/jev-model-router` |
+| Secret | `DOCKER_REGISTRY_USER` | SWR login username |
+| Secret | `DOCKER_REGISTRY_PASSWORD` | SWR login password |
+
+With these configured, Release pushes the same build and version/latest tags to both Docker Hub and SWR. Without both SWR variables it publishes only to Docker Hub; partial or mismatched configuration fails. Registry authentication or push failures fail the release; verify both registries before announcing availability. PR builds never log in or publish. A private SWR repository requires users to authenticate; make the mirror public for an unauthenticated quickstart.

@@ -76,3 +76,22 @@ docker compose down                 # 停止，保留 SQLite 卷
 ## 镜像发布（维护者）
 
 Release 工作流构建 Linux amd64/arm64 镜像。需配置具有 `zeroneai/jev-model-router` 推送权限的仓库 secrets：`DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN`。推送 `v*` 版本标签会发布版本镜像，正式版本同时更新 `latest`；手动触发会从所选 ref 发布 `latest`。PR 仅构建、不发布。首次发布需要配置凭证并明确执行发布操作，添加工作流本身不会发布镜像。
+
+## 华为云 SWR 镜像
+
+Docker Hub 访问困难时，在 `.env` 中将 `ROUTER_IMAGE` 改为已发布的 SWR 镜像，再运行 `docker compose pull && docker compose up -d`。目标示例（实际可用性取决于维护者配置的地址和首次发布）：
+
+```dotenv
+ROUTER_IMAGE=swr.cn-east-3.myhuaweicloud.com/zerone/jev-model-router:latest
+```
+
+维护者沿用 Agent Hub 的仓库变量及 secret 名称：
+
+| 类型 | 名称 | 值 |
+| --- | --- | --- |
+| Variable | `REGISTRY_HOST` | SWR 域名，如 `swr.cn-east-3.myhuaweicloud.com` |
+| Variable | `REGISTRY_IMAGE` | 不带标签的完整镜像路径，如 `swr.cn-east-3.myhuaweicloud.com/zerone/jev-model-router` |
+| Secret | `DOCKER_REGISTRY_USER` | SWR 登录用户名 |
+| Secret | `DOCKER_REGISTRY_PASSWORD` | SWR 登录密码 |
+
+配置完整后，Release 将同一次构建及相同版本/latest 标签推送到 Docker Hub 和 SWR。两项 SWR 变量均未配置时只发布 Docker Hub；配置不完整或地址不匹配会报错。任一仓库认证或推送失败都会导致发布失败，宣布可用前需核实两个仓库。PR 构建不登录、不发布。私有 SWR 仓库要求用户认证；无需登录的 Quickstart 应使用公开镜像。
