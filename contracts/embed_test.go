@@ -56,3 +56,24 @@ func TestDiscoveredCallSchemasValidateRequests(t *testing.T) {
 		}
 	}
 }
+
+func TestChatAndInspectionOutputLimitContracts(t *testing.T) {
+	for _, fields := range []struct {
+		json  string
+		valid bool
+	}{
+		{`"max_tokens":16`, true},
+		{`"max_completion_tokens":10000000`, true},
+		{`"max_tokens":1024,"max_completion_tokens":1024`, false},
+		{`"max_tokens":null`, false},
+		{`"max_tokens":15`, false},
+		{`"max_tokens":10000001`, false},
+	} {
+		body := json.RawMessage(`{"model":"auto","messages":[{"role":"user","content":"hi"}],` + fields.json + `}`)
+		for _, id := range []string{"chat", "route.inspect"} {
+			if valid := Validate(id, body) == nil; valid != fields.valid {
+				t.Fatalf("%s %s: valid=%t", id, body, valid)
+			}
+		}
+	}
+}

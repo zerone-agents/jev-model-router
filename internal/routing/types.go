@@ -3,7 +3,7 @@ package routing
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"github.com/zerone-agents/jev-model-router/contracts"
 )
 
 type Provider struct {
@@ -97,8 +97,22 @@ func (r *Request) UnmarshalJSON(b []byte) error {
 			r.Options[k] = v
 		}
 		if e != nil {
-			return fmt.Errorf("invalid %s", k)
+			return Fail("invalid_request", "invalid chat field: "+k)
 		}
+	}
+	// Retain raw input for validation, but expose one output limit internally.
+	if value, ok := r.Options["max_tokens"]; ok && r.Options["max_completion_tokens"] == nil {
+		r.Options["max_completion_tokens"] = value
+		delete(r.Options, "max_tokens")
+	}
+	// JSON Schema integers also include 1024.0 and 1.024e3. Canonicalize their
+	// numeric representation for the adapter's integer decoder without rounding.
+	if value := r.Options["max_completion_tokens"]; value != nil && contracts.ValidChatOutputLimit(value) {
+		var number float64
+		if err := json.Unmarshal(value, &number); err != nil {
+			return err
+		}
+		r.Options["max_completion_tokens"], _ = json.Marshal(int64(number))
 	}
 	return nil
 }
