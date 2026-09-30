@@ -64,6 +64,10 @@ jobs:
         with:
           context: .
           platforms: linux/amd64,linux/arm64
+          # Match Agent Hub's provenance opt-out and use Docker media types for SWR.
+          provenance: false
+          sbom: false
+          outputs: type=image,oci-mediatypes=false
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
