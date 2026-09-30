@@ -13,6 +13,7 @@ permissions:
   contents: read
 jobs:
   image:
+    if: github.event_name != 'pull_request'
     needs: smoke
     runs-on: ubuntu-latest
     steps:
@@ -54,16 +55,19 @@ jobs:
         id: meta
         with:
           images: |
-            ${{ github.event_name == 'pull_request' && 'jev-model-router-ci' || vars.DOCKERHUB_IMAGE }}
+            ${{ vars.DOCKERHUB_IMAGE }}
             ${{ vars.REGISTRY_IMAGE }}
           tags: |
             type=semver,pattern={{version}}
             type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' || (startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-')) }}
-            type=ref,event=pr
       - uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
+          # Match Agent Hub's provenance opt-out and use Docker media types for SWR.
+          provenance: false
+          sbom: false
+          outputs: type=image,oci-mediatypes=false
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
