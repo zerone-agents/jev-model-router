@@ -133,7 +133,7 @@ test("real API read, edit, conflict, retry, language, disconnect and refresh", a
   await page.getByRole("button", { name: "切换语言" }).click();
   await login(page);
   await page.reload();
-  await expect(page.getByLabel("Settings credential")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "A clear view of your router." })).toBeVisible();
 });
 test("mobile navigation and visual evidence", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -178,7 +178,7 @@ test("desktop visual evidence and authentication boundaries", async ({
   ).toBeVisible();
   await page.screenshot({ path: "test-results/desktop-models.png" });
   expect((await request.get("/v1/models")).status()).toBe(401);
-  expect((await request.get("/admin/v1/schema")).status()).toBe(401);
+  expect((await request.get("/admin/v1/schema", {headers:{"X-Jev-Session":"1"}})).status()).toBe(401);
 });
 
 test("Chinese editor, keyboard focus, narrow screen and failure state", async ({
