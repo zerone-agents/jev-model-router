@@ -6,7 +6,11 @@
 
 首版已实现 Go 单实例 + SQLite、显式/自动选模和 OpenAI 兼容生成适配。本地 Laya、敏感会话锁定、ArbiterOS 与 PostgreSQL 属于后续阶段。已建立小规模选模与Agent诊断基线，详见[验收摘要](docs/acceptance/2026-09-29.zh-CN.md)；生产全场景质量与经济收益仍未验证。未声明 AgentUse 认证。
 
-## 启动
+## 快速开始
+
+推荐通过 [Docker Compose 快速开始](quickstart/README.zh-CN.md)部署 Docker Hub 预构建镜像，包含 SQLite 持久化和管理 UI，无需本地安装 Go 或 Node。
+
+### 从源码运行
 
 需要 Go 1.27.0；SQLite 驱动无需 CGO。
 

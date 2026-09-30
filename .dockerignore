@@ -1,0 +1,17 @@
+.git
+.github
+.agents
+.codex
+.superpowers
+.env
+.env.*
+**/.env
+**/.env.*
+.data
+**/*.sqlite*
+docs
+quickstart
+web/node_modules
+web/dist
+web/test-results
+web/playwright-report

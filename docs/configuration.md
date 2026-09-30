@@ -51,3 +51,9 @@ first_event_timeout 覆盖流建立到首个有效 SSE 事件，非流式及固�
 普通模式先执行最多 5 秒、无凭证且不跟随重定向的 HTML 可达检查，再通过系统浏览器打开；失败以 JSON 返回错误及有效地址供手动打开。`--no-open` 仅返回 JSON 地址，不执行探测，不启动服务。该命令不需要 settings 凭证。
 
 浏览器单独输入 settings 凭证，仅在页面内存保存。刷新或断开连接后需重新输入；不写入 URL 或浏览器存储。UI 只访问同源 API，远程使用必须部署 HTTPS，本机 loopback HTTP 例外。UI 不管理账号、密钥或启动参数。
+
+## Docker Compose
+
+推荐部署入口见 [Quickstart](../quickstart/README.zh-CN.md)。镜像内监听 `0.0.0.0:8080`，数据库为 `/data/router.sqlite`，Compose 默认仅发布宿主机 `127.0.0.1:8080`，并用命名卷保存数据。镜像以 UID/GID 10001 运行；使用自定义 bind mount 时需确保该用户可写入数据库目录。
+
+通过 `docker compose exec -T router jev-router …` 使用容器内 CLI，无需在宿主机安装 Go。JSON 文件通过 `--json -` 和 stdin 传入，宿主机路径不会自动出现在容器中。Compose 的 `.env` 仅为插值提供值；新增密钥引用对应的环境变量须显式注入服务。文件型引用需额外挂载文件并使用容器内绝对路径。
