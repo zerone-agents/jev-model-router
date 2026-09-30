@@ -140,3 +140,35 @@ it("resolves a truncated successful login through status before another login", 
   await s.connect("secret");
   expect(calls[1]).toBe("/admin/v1/session");
 });
+
+it.each(["html", "unexpected-code"])(
+  "retains logout retry state after an unconfirmed 401 (%s)",
+  async (kind) => {
+    let attempts = 0;
+    const f = vi.fn(async (input: RequestInfo | URL) => {
+      const path = String(input);
+      if (path.endsWith("logout")) {
+        attempts++;
+        if (attempts === 1)
+          return kind === "html"
+            ? new Response("<html>Proxy authentication required</html>", {
+                status: 401,
+              })
+            : failure("proxy_auth_required", 401);
+        return reply({ revoked: true });
+      }
+      return reply(path.endsWith("schema") ? [] : info);
+    });
+    const s = new Session(f);
+    await s.connect("secret");
+    const client = s.client;
+    await expect(s.logout()).rejects.toMatchObject({
+      code: kind === "html" ? "invalid_response" : "proxy_auth_required",
+      status: 401,
+    });
+    expect(s.client).toBe(client);
+    await s.logout();
+    expect(s.client).toBeNull();
+    expect(attempts).toBe(2);
+  },
+);

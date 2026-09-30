@@ -219,3 +219,31 @@ test("stale management session offers explicit recovery and preserves dirty draf
   expect(writes).toBe(1);
   await assertUsable(tab, context, s1);
 });
+
+test("proxy HTML 401 does not claim logout or discard the retry session", async ({
+  page,
+}) => {
+  await page.goto("/dashboard/");
+  await page.getByLabel("Settings credential").fill("ui-test-settings");
+  await page
+    .getByRole("button", { name: "Connect to instance", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "A clear view of your router." }),
+  ).toBeVisible();
+  await page.route("**/admin/v1/session/logout", (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: "text/html",
+      body: "<html>Proxy authentication required</html>",
+    }),
+  );
+  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await expect(page.getByText(/Logout was not confirmed/)).toBeVisible();
+  await expect(page.getByLabel("Settings credential")).toHaveCount(0);
+  expect((await auth(page, "status")).status).toBe(200);
+  await page.unroute("**/admin/v1/session/logout");
+  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await expect(page.getByLabel("Settings credential")).toBeVisible();
+  expect((await auth(page, "status")).status).toBe(401);
+});

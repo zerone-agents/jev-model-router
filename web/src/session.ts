@@ -109,7 +109,12 @@ export class Session {
       } catch (e) {
         if (e instanceof APIError && e.status === 403)
           throw new APIError("session_changed", 403);
-        if (!(e instanceof APIError && e.status === 401)) throw e;
+        if (!(
+          e instanceof APIError &&
+          e.status === 401 &&
+          e.code === "unauthorized"
+        ))
+          throw e;
       }
       if (generation === this.generation) this.dispose();
     });
