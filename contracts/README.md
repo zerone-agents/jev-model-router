@@ -61,3 +61,9 @@ call body 为 `{"input":{...},"expected_version":1,"idempotency_key":"operation-
 `providers.put` 的 `api_key` 与 `secret_ref` 二选一。`api_key` 只写，限非空 UTF-8、16384 字节以内且不含 CR/LF/NUL；schema 的 maxLength 同时限制字符数，共享运行时校验执行更严格的字节上限。写入需要服务端部署主密钥；密钥、供应商配置、全局版本与脱敏幂等结果同事务提交。响应仅含不可变的 `managed:<revision-id>` 引用，读取保持前缀脱敏；解析失败返回 null 和 `provider_credential_unavailable` 警告。引用必须属于同一供应商，不能用于决策后端。
 
 内联密钥写入使用主密钥派生的 HMAC 摘要识别幂等请求；SQL、回执和配置快照均不保存明文。缺失密钥或不可解密返回通用 `config_missing`，不降级为明文。更换供应商 Key 不改变已捕获请求的凭证版本。历史密文保留，删除不代表物理擦除或紧急撤销。CLI 拒绝非回环 HTTP 提交内联密钥且不跟随重定向；HTTPS 反向代理由部署方配置。
+
+## 模型列表排序
+
+`models.list` 默认按 ID 升序，传入 `sort: "enabled_first"` 时先列启用模型，再列禁用模型，组内按 ID 升序。排序在分页前执行；翻页时保持 sort 不变，并原样传入 next_cursor。也可传入从 0 开始的 `offset` 直接跳页，不可与非空 cursor 同时使用；响应包含模型总数 `total`。Dashboard 默认每页 20 条，可选择 10/50/100 条，采用启用优先排序。配置变更后刷新列表，重新从第一页读取。
+
+`models.list` 支持 `query` 实时筛选：忽略大小写、去除首尾空白，按字面子串匹配模型 ID、描述、供应商 / 上游名称、位置和可见状态/能力标签。`language` 为 `en`（默认）或 `zh`，决定标签文案。筛选先于排序和分页，`total` 为匹配总数；搜索变化后从第一页读取。

@@ -139,3 +139,129 @@ it.each([false, true])(
     confirm.mockRestore();
   },
 );
+
+it("requests enabled-first pages, shows tags, and resets pagination on refresh", async () => {
+  const user = (await import("@testing-library/user-event")).default.setup();
+  const fetcher = vi.fn(async (_url, init) => {
+    const { input } = JSON.parse(init.body);
+    const second = Boolean(input.offset);
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        meta: {},
+        data: {
+          version: 1,
+          total: 21,
+          next_cursor: second ? "" : "0:z",
+          items: [
+            {
+              id: second ? "a-disabled" : "z-enabled",
+              enabled: !second,
+              location: "cloud",
+              description: "test model",
+              provider_id: "p",
+              upstream_name: "m",
+              capabilities: {
+                tools: true,
+                images: false,
+                structured_output: true,
+              },
+            },
+          ],
+        },
+      }),
+    );
+  });
+  render(
+    <Models
+      client={createManagementClient("x", fetcher)}
+      lang="en"
+      onError={() => {}}
+      canEdit={false}
+      onDirty={() => {}}
+    />,
+  );
+  await screen.findByText("z-enabled");
+  expect(screen.getByText("Tools")).toBeInTheDocument();
+  expect(screen.getByText("Structured output")).toBeInTheDocument();
+  expect(screen.queryByText("Images")).toBeNull();
+  expect(JSON.parse(fetcher.mock.calls[0][1].body).input).toEqual({
+    offset: 0,
+    limit: 20,
+    sort: "enabled_first",
+  });
+  await user.click(screen.getByRole("button", { name: "Page 2" }));
+  await screen.findByText("a-disabled");
+  expect(screen.getByText("Disabled")).toHaveClass("disabled");
+  expect(screen.getByRole("button", { name: "Page 2" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "Refresh" }));
+  await screen.findByText("z-enabled");
+  expect(screen.getByRole("button", { name: "Page 1" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await user.click(screen.getByRole("button", { name: "Models per page" }));
+  await user.click(screen.getByRole("menuitemradio", { name: "50 / page" }));
+  await waitFor(() =>
+    expect(JSON.parse(fetcher.mock.calls.at(-1)![1].body).input).toEqual({
+      offset: 0,
+      limit: 50,
+      sort: "enabled_first",
+    }),
+  );
+});
+
+it("searches while typing and expands and highlights matching descriptions", async () => {
+  const user = (await import("@testing-library/user-event")).default.setup();
+  const fetcher = vi.fn(
+    async (_url, init) =>
+      new Response(
+        JSON.stringify({
+          ok: true,
+          meta: {},
+          data: {
+            version: 1,
+            total: 1,
+            next_cursor: "",
+            items: [
+              {
+                id: "m",
+                enabled: true,
+                description: "A very long description ending with NEEDLE",
+                provider_id: "p",
+                upstream_name: "u",
+                capabilities: {},
+              },
+            ],
+          },
+        }),
+      ),
+  );
+  render(
+    <Models
+      client={createManagementClient("x", fetcher)}
+      lang="en"
+      onError={() => {}}
+      canEdit={false}
+      onDirty={() => {}}
+    />,
+  );
+  await screen.findByText("A very long description ending with NEEDLE");
+  await user.type(
+    screen.getByRole("searchbox", { name: "Search models" }),
+    "needle",
+  );
+  await waitFor(() =>
+    expect(JSON.parse(fetcher.mock.calls.at(-1)![1].body).input).toMatchObject({
+      query: "needle",
+      offset: 0,
+      language: "en",
+    }),
+  );
+  const hit = await screen.findByText("NEEDLE");
+  expect(hit.tagName).toBe("MARK");
+  expect(hit.closest("p")).toHaveClass("search-expanded");
+  await user.clear(screen.getByRole("searchbox", { name: "Search models" }));
+  await waitFor(() => expect(document.querySelector("mark")).toBeNull());
+});

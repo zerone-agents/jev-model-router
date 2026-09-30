@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useId, useState } from "react";
 import { APIError, type Client } from "./api";
 import { text, type Lang } from "./i18n";
 export type PageProps = {
@@ -134,24 +134,207 @@ export function Empty({ title, detail }: { title: string; detail: string }) {
 export function Pager({
   next,
   back,
+  page,
   onNext,
   onBack,
   lang,
 }: {
   next: string;
   back: boolean;
+  page?: number;
   onNext: () => void;
   onBack: () => void;
   lang: Lang;
 }) {
   return (
     <div className="pager">
+      {page !== undefined && (
+        <span>{text(lang, `Page ${page}`, `第 ${page} 页`)}</span>
+      )}
       <button disabled={!back} onClick={onBack}>
         {text(lang, "Previous", "上一页")}
       </button>
       <button disabled={!next} onClick={onNext}>
         {text(lang, "Next", "下一页")}
       </button>
+    </div>
+  );
+}
+
+export function NumberedPager({
+  lang,
+  total,
+  page,
+  pageSize,
+  onPage,
+  onPageSize,
+}: {
+  lang: Lang;
+  total: number;
+  page: number;
+  pageSize: number;
+  onPage: (page: number) => void;
+  onPageSize: (size: number) => void;
+}) {
+  const count = Math.max(1, Math.ceil(total / pageSize));
+  const start = Math.max(1, Math.min(page - 2, count - 4));
+  const visible = [
+    ...new Set([
+      1,
+      ...Array.from({ length: Math.min(5, count) }, (_, i) => start + i),
+      count,
+    ]),
+  ].sort((a, b) => a - b);
+  return (
+    <nav
+      className="numbered-pager"
+      aria-label={text(lang, "Model pagination", "模型分页")}
+    >
+      <span className="pagination-total">
+        {text(lang, `${total} models`, `共 ${total} 个模型`)}
+      </span>
+      <div className="page-numbers">
+        <button
+          aria-label={text(lang, "Previous", "上一页")}
+          disabled={page <= 1}
+          onClick={() => onPage(page - 1)}
+        >
+          ‹
+        </button>
+        {visible.map((value, index) => (
+          <Fragment key={value}>
+            {index > 0 && value - visible[index - 1] > 1 && (
+              <span className="page-ellipsis" aria-hidden="true">
+                ···
+              </span>
+            )}
+            <button
+              aria-label={text(lang, `Page ${value}`, `第 ${value} 页`)}
+              aria-current={page === value ? "page" : undefined}
+              onClick={() => onPage(value)}
+            >
+              {value}
+            </button>
+          </Fragment>
+        ))}
+        <button
+          aria-label={text(lang, "Next", "下一页")}
+          disabled={page >= count}
+          onClick={() => onPage(page + 1)}
+        >
+          ›
+        </button>
+      </div>
+      <PageSizePicker lang={lang} value={pageSize} onChange={onPageSize} />
+    </nav>
+  );
+}
+
+function PageSizePicker({
+  lang,
+  value,
+  onChange,
+}: {
+  lang: Lang;
+  value: number;
+  onChange: (size: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const options = useRef<(HTMLButtonElement | null)[]>([]);
+  const id = useId();
+  const sizes = [10, 20, 50, 100];
+  useEffect(() => {
+    if (!open) return;
+    options.current[sizes.indexOf(value)]?.focus();
+    const close = (event: PointerEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [open, value]);
+  return (
+    <div
+      className="page-size-picker"
+      ref={root}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+      }}
+    >
+      <button
+        ref={trigger}
+        className="page-size-trigger"
+        aria-label={text(lang, "Models per page", "每页模型数")}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? id : undefined}
+        onClick={() => setOpen(!open)}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            setOpen(true);
+          }
+        }}
+      >
+        {text(lang, `${value} / page`, `${value} 条 / 页`)}
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          aria-hidden="true"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          id={id}
+          className="page-size-menu"
+          role="menu"
+          aria-label={text(lang, "Models per page", "每页模型数")}
+        >
+          {sizes.map((size, index) => (
+            <button
+              key={size}
+              ref={(node) => {
+                options.current[index] = node;
+              }}
+              role="menuitemradio"
+              aria-checked={value === size}
+              tabIndex={-1}
+              onClick={() => {
+                setOpen(false);
+                trigger.current?.focus();
+                onChange(size);
+              }}
+              onKeyDown={(event) => {
+                let next = index;
+                if (event.key === "ArrowDown")
+                  next = (index + 1) % sizes.length;
+                else if (event.key === "ArrowUp")
+                  next = (index + sizes.length - 1) % sizes.length;
+                else if (event.key === "Home") next = 0;
+                else if (event.key === "End") next = sizes.length - 1;
+                else if (event.key === "Escape") {
+                  event.preventDefault();
+                  setOpen(false);
+                  trigger.current?.focus();
+                  return;
+                } else return;
+                event.preventDefault();
+                options.current[next]?.focus();
+              }}
+            >
+              {text(lang, `${size} / page`, `${size} 条 / 页`)}
+              <span aria-hidden="true">{value === size ? "✓" : ""}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

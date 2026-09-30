@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ErrorBox,
   Loading,
@@ -16,7 +16,21 @@ type Props = PageProps & {
   onDirty: (value: boolean) => void;
 };
 export function PromptEditor(props: Props) {
-  const state = useRead<{ text: string; version: number }>(props, "prompt.get");
+  const [refresh, setRefresh] = useState(0);
+  const [dirty, setDirty] = useState(false);
+  const onDirty = useCallback(
+    (value: boolean) => {
+      setDirty(value);
+      props.onDirty(value);
+    },
+    [props.onDirty],
+  );
+  const state = useRead<{ text: string; version: number }>(
+    props,
+    "prompt.get",
+    {},
+    refresh,
+  );
   return (
     <>
       <PageTitle
@@ -26,13 +40,31 @@ export function PromptEditor(props: Props) {
           "One balanced template. Your routing preferences.",
           "一份均衡模板，表达你的选模偏好。",
         )}
-      />
+      >
+        <button
+          disabled={state.loading || dirty}
+          title={
+            dirty
+              ? text(
+                  props.lang,
+                  "Save your changes before refreshing.",
+                  "请先保存修改再刷新。",
+                )
+              : undefined
+          }
+          onClick={() => setRefresh((value) => value + 1)}
+        >
+          {text(props.lang, "Refresh", "刷新")}
+        </button>
+      </PageTitle>
       {state.loading ? (
         <Loading />
       ) : state.error ? (
         <ErrorBox error={state.error} lang={props.lang} />
       ) : (
-        state.data && <Editor {...props} initial={state.data} />
+        state.data && (
+          <Editor {...props} onDirty={onDirty} initial={state.data} />
+        )
       )}
     </>
   );
