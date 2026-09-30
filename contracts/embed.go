@@ -10,6 +10,7 @@ import (
 	"io"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 //go:embed management.json schemas/*.json
@@ -107,6 +108,16 @@ func Validate(id string, input json.RawMessage) error {
 	v, e := Decode(input)
 	if e != nil {
 		return e
+	}
+	if id == "providers.put" {
+		if !utf8.Valid(input) {
+			return errors.New("invalid UTF-8 input")
+		}
+		if obj, ok := v.(map[string]any); ok {
+			if key, ok := obj["api_key"].(string); ok && len(key) > 16384 {
+				return errors.New("credential exceeds 16384 UTF-8 bytes")
+			}
+		}
 	}
 	if e = s.Validate(v); e != nil {
 		return fmt.Errorf("input does not match %s schema", id)

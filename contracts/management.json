@@ -88,7 +88,7 @@
               },
               "secret_ref": {
                 "type": "string",
-                "pattern": "^(env:[A-Za-z_][A-Za-z0-9_]*|file:/[^\\x00]+)$",
+                "pattern": "^(env:[A-Za-z_][A-Za-z0-9_]*|file:/[^\\x00]+|managed:[a-f0-9]{32})$",
                 "maxLength": 4096
               }
             },
@@ -157,7 +157,7 @@
             },
             "secret_ref": {
               "type": "string",
-              "pattern": "^(env:[A-Za-z_][A-Za-z0-9_]*|file:/[^\\x00]+)$",
+              "pattern": "^(env:[A-Za-z_][A-Za-z0-9_]*|file:/[^\\x00]+|managed:[a-f0-9]{32})$",
               "maxLength": 4096
             }
           },
@@ -195,7 +195,7 @@
   },
   {
     "id": "providers.put",
-    "description": "Create or replace one resource after whole-config validation",
+    "description": "Create or replace a provider atomically; supply exactly one of api_key (encrypted at rest) or secret_ref. Managed references must belong to this provider. No connection test is performed.",
     "role": "settings",
     "input_schema": {
       "type": "object",
@@ -211,16 +211,35 @@
         },
         "secret_ref": {
           "type": "string",
-          "pattern": "^(env:[A-Za-z_][A-Za-z0-9_]*|file:/[^\\x00]+)$",
+          "pattern": "^(env:[A-Za-z_][A-Za-z0-9_]*|file:/[^\\x00]+|managed:[a-f0-9]{32})$",
           "maxLength": 4096
+        },
+        "api_key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384,
+          "pattern": "^[^\\r\\n\\x00]+$",
+          "writeOnly": true,
+          "description": "Write-only credential, at most 16384 UTF-8 bytes. Requires a configured encryption key. Never returned; remote CLI submission requires HTTPS (loopback HTTP allowed)."
         }
       },
       "required": [
         "id",
-        "base_url",
-        "secret_ref"
+        "base_url"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "api_key"
+          ]
+        },
+        {
+          "required": [
+            "secret_ref"
+          ]
+        }
+      ]
     },
     "output_schema": {
       "type": "object",
@@ -243,7 +262,7 @@
             },
             "secret_ref": {
               "type": "string",
-              "pattern": "^(env:[A-Za-z_][A-Za-z0-9_]*|file:/[^\\x00]+)$",
+              "pattern": "^(env:[A-Za-z_][A-Za-z0-9_]*|file:/[^\\x00]+|managed:[a-f0-9]{32})$",
               "maxLength": 4096
             }
           },
@@ -271,6 +290,11 @@
         "id": "p",
         "base_url": "https://example.com/v1",
         "secret_ref": "env:PROVIDER_KEY"
+      },
+      {
+        "id": "cloud",
+        "base_url": "https://example.com/v1",
+        "api_key": "example-only-credential"
       }
     ],
     "write": true

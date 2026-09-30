@@ -13,7 +13,7 @@
       },
       "secret_ref": {
         "type": "string",
-        "pattern": "^(env:[A-Za-z_][A-Za-z0-9_]*|file:/[^\\x00]+)$",
+        "pattern": "^(env:[A-Za-z_][A-Za-z0-9_]*|file:/[^\\x00]+|managed:[a-f0-9]{32})$",
         "maxLength": 4096
       }
     },
@@ -120,5 +120,49 @@
       "secret_ref"
     ],
     "additionalProperties": false
+  },
+  "provider_write": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+      },
+      "base_url": {
+        "type": "string",
+        "pattern": "^https?://[^\\s]+$",
+        "maxLength": 4096
+      },
+      "secret_ref": {
+        "type": "string",
+        "pattern": "^(env:[A-Za-z_][A-Za-z0-9_]*|file:/[^\\x00]+|managed:[a-f0-9]{32})$",
+        "maxLength": 4096
+      },
+      "api_key": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 16384,
+        "pattern": "^[^\\r\\n\\x00]+$",
+        "writeOnly": true,
+        "description": "Write-only credential, at most 16384 UTF-8 bytes. Requires a configured encryption key. Never returned; remote CLI submission requires HTTPS (loopback HTTP allowed)."
+      }
+    },
+    "required": [
+      "id",
+      "base_url"
+    ],
+    "additionalProperties": false,
+    "oneOf": [
+      {
+        "required": [
+          "api_key"
+        ]
+      },
+      {
+        "required": [
+          "secret_ref"
+        ]
+      }
+    ]
   }
 }
