@@ -12,6 +12,7 @@ import (
 )
 
 type Config struct {
+	EncryptionKeyRef                                               string
 	Listen, Database, SettingsRef, InferenceRef                    string
 	DecisionTimeout, FirstEventTimeout, IdleTimeout, RecordTimeout time.Duration
 	MaxBodyBytes                                                   int64
@@ -31,7 +32,7 @@ func LoadConfig(path string, lookup func(string) (string, bool)) (Config, error)
 			return c, errors.New("invalid JSON configuration")
 		}
 	}
-	stringsMap := map[string]*string{"listen": &c.Listen, "database": &c.Database, "settings_token_ref": &c.SettingsRef, "inference_token_ref": &c.InferenceRef}
+	stringsMap := map[string]*string{"encryption_key_ref": &c.EncryptionKeyRef, "listen": &c.Listen, "database": &c.Database, "settings_token_ref": &c.SettingsRef, "inference_token_ref": &c.InferenceRef}
 	durations := map[string]*time.Duration{"decision_timeout": &c.DecisionTimeout, "first_event_timeout": &c.FirstEventTimeout, "idle_timeout": &c.IdleTimeout, "record_timeout": &c.RecordTimeout}
 	numbers := map[string]bool{"max_body_bytes": true, "stream_buffer": true, "retention_days": true}
 	for k := range values {
@@ -63,7 +64,7 @@ func LoadConfig(path string, lookup func(string) (string, bool)) (Config, error)
 		if ok {
 			*p = v
 		}
-		if *p == "" {
+		if *p == "" && k != "encryption_key_ref" {
 			return c, errors.New("empty startup setting")
 		}
 	}

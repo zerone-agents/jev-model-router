@@ -78,6 +78,16 @@ func (s *Store) Apply(ctx context.Context, principal string, c management.Call, 
 	canonical, _ := json.Marshal([]any{c.CapabilityID, *c.ExpectedVersion, v})
 	hash := sha256.Sum256(canonical)
 	digest := hex.EncodeToString(hash[:])
+	if c.CapabilityID == "providers.put" {
+		if obj, ok := v.(map[string]any); ok {
+			if _, hasKey := obj["api_key"]; hasKey {
+				if s.cipher == nil {
+					return management.Result{}, credentialUnavailable()
+				}
+				digest = s.cipher.Digest(canonical)
+			}
+		}
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	tx, e := s.db.BeginTx(ctx, nil)
@@ -111,11 +121,18 @@ func (s *Store) Apply(ctx context.Context, principal string, c management.Call, 
 	if e = contracts.Validate(c.CapabilityID, c.Input); e != nil {
 		return management.Result{}, routing.Fail("invalid_request", "input does not match capability schema")
 	}
-	resource, e := mutate(&current, c)
+	prepared, e := s.prepareProvider(ctx, tx, c)
+	if e != nil {
+		return management.Result{}, e
+	}
+	resource, e := mutate(&current, prepared)
 	if e != nil {
 		return management.Result{}, e
 	}
 	if e = routing.ValidateSnapshot(current); e != nil {
+		return management.Result{}, e
+	}
+	if e = s.validateManaged(ctx, tx, current); e != nil {
 		return management.Result{}, e
 	}
 	if validate != nil {

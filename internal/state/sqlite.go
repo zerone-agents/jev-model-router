@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"github.com/zerone-agents/jev-model-router/internal/credential"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"github.com/zerone-agents/jev-model-router/templates"
 	_ "modernc.org/sqlite"
@@ -18,12 +19,17 @@ import (
 var migrations embed.FS
 
 type Store struct {
-	db  *sql.DB
-	mu  sync.Mutex
-	now func() time.Time
+	cipher *credential.Cipher
+	db     *sql.DB
+	mu     sync.Mutex
+	now    func() time.Time
 }
 
 func Open(path string, now func() time.Time) (*Store, error) {
+	return OpenWithCipher(path, now, nil)
+}
+
+func OpenWithCipher(path string, now func() time.Time, cipher *credential.Cipher) (*Store, error) {
 	if now == nil {
 		now = time.Now
 	}
@@ -40,12 +46,16 @@ func Open(path string, now func() time.Time) (*Store, error) {
 		return nil, storageError()
 	}
 	db.SetMaxOpenConns(1)
-	s := &Store{db: db, now: now}
+	s := &Store{db: db, now: now, cipher: cipher}
 	if e = s.migrate(); e != nil {
 		db.Close()
 		return nil, e
 	}
 	if e = os.Chmod(absolute, 0600); e != nil {
+		db.Close()
+		return nil, e
+	}
+	if e = s.verifyCredentials(context.Background()); e != nil {
 		db.Close()
 		return nil, e
 	}

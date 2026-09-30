@@ -128,7 +128,11 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 						}
 					}
 				}
-				return Success(map[string]any{"version": cfg.Version, "resource": p, "api_key_masked": masked}, time.Now()), nil
+				result := Success(map[string]any{"version": cfg.Version, "resource": p, "api_key_masked": masked}, time.Now())
+				if masked == nil {
+					result.Warnings = append(result.Warnings, "provider_credential_unavailable")
+				}
+				return result, nil
 			}
 		}
 	case "models.get":

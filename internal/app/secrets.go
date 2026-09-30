@@ -2,6 +2,8 @@ package app
 
 import (
 	"errors"
+	"github.com/zerone-agents/jev-model-router/internal/credential"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -36,4 +38,22 @@ func ResolveSecret(ref string, lookup func(string) (string, bool), readFile func
 		return nil, errors.New("invalid credential value")
 	}
 	return b, nil
+}
+
+// Empty optional environment material preserves external-secret-only deployments.
+func loadEncryptionCipher(ref string) (*credential.Cipher, error) {
+	if ref == "" {
+		return nil, nil
+	}
+	if strings.HasPrefix(ref, "env:") {
+		name := strings.TrimPrefix(ref, "env:")
+		if name != "" && !strings.ContainsRune(name, 0) && os.Getenv(name) == "" {
+			return nil, nil
+		}
+	}
+	b, err := ResolveSecret(ref, os.LookupEnv, os.ReadFile)
+	if err != nil {
+		return nil, errors.New("encryption key unavailable")
+	}
+	return credential.New(string(b))
 }
