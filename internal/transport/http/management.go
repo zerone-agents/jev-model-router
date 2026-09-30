@@ -19,8 +19,13 @@ func writeResult(w http.ResponseWriter, r management.Result) {
 	json.NewEncoder(w).Encode(r)
 }
 func NewManagementHandler(s *management.Service, authenticate func(string) (management.Principal, error)) http.Handler {
+	return newRequestManagementHandler(s, func(r *http.Request) (management.Principal, error) {
+		return authenticate(r.Header.Get("Authorization"))
+	})
+}
+func newRequestManagementHandler(s *management.Service, authenticate func(*http.Request) (management.Principal, error)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		p, e := authenticate(r.Header.Get("Authorization"))
+		p, e := authenticate(r)
 		if e != nil {
 			writeResult(w, management.Failure(e))
 			return
