@@ -149,7 +149,19 @@ export function Models(
           "Describe what each model does best. Capabilities stay explicit.",
           "用描述表达模型专长，用能力声明约束输入。",
         )}
-      />
+      >
+        {!selected && (
+          <button
+            disabled={loading}
+            onClick={() => {
+              setCursors([""]);
+              setListRevision((value) => value + 1);
+            }}
+          >
+            {text(lang, "Refresh", "刷新")}
+          </button>
+        )}
+      </PageTitle>
       {selected ? (
         <>
           <button
