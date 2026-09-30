@@ -3,6 +3,7 @@ package management_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/zerone-agents/jev-model-router/internal/management"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"testing"
@@ -78,5 +79,15 @@ func TestProviderCredentialPreview(t *testing.T) {
 				t.Fatalf("unexpected masked key: %s", data["api_key_masked"])
 			}
 		})
+	}
+}
+
+func TestUnavailableCredentialWarning(t *testing.T) {
+	store := &memoryStore{routing.Snapshot{Version: 1, Providers: []routing.Provider{{ID: "p", SecretRef: "env:KEY"}}}}
+	service := management.New(store, nil)
+	service.ResolveSecret = func(string) ([]byte, error) { return nil, fmt.Errorf("sensitive-upstream-error") }
+	r, e := service.Execute(context.Background(), "settings", management.Call{CapabilityID: "providers.get", Input: json.RawMessage(`{"id":"p"}`)})
+	if e != nil || len(r.Warnings) != 1 || r.Warnings[0] != "provider_credential_unavailable" {
+		t.Fatal("missing generic warning")
 	}
 }

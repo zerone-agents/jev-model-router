@@ -24,11 +24,21 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 	if e != nil {
 		return nil, nil, e
 	}
-	store, e := state.Open(cfg.Database, time.Now)
+	cipher, e := loadEncryptionCipher(cfg.EncryptionKeyRef)
 	if e != nil {
 		return nil, nil, e
 	}
-	resolve := func(ref string) ([]byte, error) { return ResolveSecret(ref, os.LookupEnv, os.ReadFile) }
+	store, e := state.OpenWithCipher(cfg.Database, time.Now, cipher)
+	if e != nil {
+		return nil, nil, e
+	}
+	externalResolve := func(ref string) ([]byte, error) { return ResolveSecret(ref, os.LookupEnv, os.ReadFile) }
+	resolve := func(ref string) ([]byte, error) {
+		if strings.HasPrefix(ref, "managed:") {
+			return store.ResolveManaged(ref)
+		}
+		return externalResolve(ref)
+	}
 	gen, e := provider.New(resolve)
 	if e != nil {
 		store.Close()
@@ -68,19 +78,23 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 	}
 	service := management.New(store, func(s routing.Snapshot) error {
 		for _, p := range s.Providers {
-			if _, e := resolve(p.SecretRef); e != nil {
+			// State validates managed revisions using its active transaction.
+			if strings.HasPrefix(p.SecretRef, "managed:") {
+				continue
+			}
+			if _, e := externalResolve(p.SecretRef); e != nil {
 				return routing.Fail("config_missing", "provider credential unavailable")
 			}
 		}
 		if s.Decision.Model != "" {
-			if _, e := resolve(s.Decision.SecretRef); e != nil {
+			if _, e := externalResolve(s.Decision.SecretRef); e != nil {
 				return routing.Fail("config_missing", "decision credential unavailable")
 			}
 		}
 		return nil
 	})
 	service.ResolveSecret = resolve
-	planner := &routing.Planner{Decider: decision.New(nil, resolve, decision.DefaultBudget()), Check: provider.Check}
+	planner := &routing.Planner{Decider: decision.New(nil, externalResolve, decision.DefaultBudget()), Check: provider.Check}
 	checks := management.Checks{Store: store, Planner: planner, Generator: gen, DecisionTimeout: cfg.DecisionTimeout, FirstEventTimeout: cfg.FirstEventTimeout}
 	checks.Register(service)
 	service.RecordsDegraded = recorder.Degraded
