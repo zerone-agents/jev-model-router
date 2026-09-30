@@ -54,3 +54,29 @@ func TestInspectionDoesNotGenerateOrMutate(t *testing.T) {
 		t.Fatalf("%+v %v", p, e)
 	}
 }
+
+func TestProviderCredentialPreview(t *testing.T) {
+	for _, tc := range []struct{ key, want string }{{"sk-example-secret", `"sk-e***"`}, {"short", `"***"`}, {"", "null"}} {
+		t.Run(tc.key, func(t *testing.T) {
+			store := &memoryStore{routing.Snapshot{Version: 1, Providers: []routing.Provider{{ID: "p", BaseURL: "https://example.com/v1", SecretRef: "env:KEY"}}}}
+			service := management.New(store, nil)
+			service.ResolveSecret = func(ref string) ([]byte, error) {
+				if ref != "env:KEY" {
+					t.Fatal(ref)
+				}
+				return []byte(tc.key), nil
+			}
+			result, err := service.Execute(context.Background(), "settings", management.Call{CapabilityID: "providers.get", Input: json.RawMessage(`{"id":"p"}`)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var data map[string]json.RawMessage
+			if err := json.Unmarshal(result.Data, &data); err != nil {
+				t.Fatal(err)
+			}
+			if string(data["api_key_masked"]) != tc.want {
+				t.Fatalf("unexpected masked key: %s", data["api_key_masked"])
+			}
+		})
+	}
+}

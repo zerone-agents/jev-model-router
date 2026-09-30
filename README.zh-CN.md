@@ -4,7 +4,7 @@
 
 面向 Agent 的轻量模型路由网关。以 Jev 原生 choice 根据任务和可编辑模型卡选模，提供 OpenAI Chat Completions 兼容 JSON/SSE、管理 CLI 与配套 SKILL。
 
-首版已实现 Go 单实例 + SQLite、显式/自动选模和 OpenAI 兼容生成适配。本地 Laya、敏感会话锁定、ArbiterOS、PostgreSQL 与 UI 属于后续阶段。已建立小规模选模与Agent诊断基线，详见[验收摘要](docs/acceptance/2026-09-29.zh-CN.md)；生产全场景质量与经济收益仍未验证。未声明 AgentUse 认证。
+首版已实现 Go 单实例 + SQLite、显式/自动选模和 OpenAI 兼容生成适配。本地 Laya、敏感会话锁定、ArbiterOS 与 PostgreSQL 属于后续阶段。已建立小规模选模与Agent诊断基线，详见[验收摘要](docs/acceptance/2026-09-29.zh-CN.md)；生产全场景质量与经济收益仍未验证。未声明 AgentUse 认证。
 
 ## 启动
 
@@ -17,6 +17,20 @@ go build -o /tmp/jev-router ./cmd/jev-router
 ```
 
 默认监听 `127.0.0.1:8080`，数据库为 `.data/router.sqlite`。支持 `serve --config conf.json` 和环境变量覆盖，详见[启动配置](docs/configuration.md)。启动时必须存在两种不同凭证。
+
+## 管理 UI
+
+```sh
+/tmp/jev-router serve
+# 在另一个终端打开页面
+/tmp/jev-router dashboard
+# 无浏览器环境：仅输出地址，不探测或打开浏览器
+/tmp/jev-router dashboard --no-open
+```
+
+UI 由同一个 Go 可执行文件提供，路径为 `/dashboard/`。远程实例使用 `dashboard --url https://router.example.com`。该命令不会自动启动服务或向浏览器传递凭证。页面输入 settings 凭证后仅保留在内存中，刷新需重新输入；远程连接要求 HTTPS。
+
+中英文 UI 可查看实例状态、模型、路由提示词和路由记录，通过现有管理 API 修改模型描述及提示词，保留版本冲突和显式同键重试语义。供应商、模型映射与能力仍通过 CLI 配置。开发与能力边界见 [UI 说明](web/README.md)。
 
 ## Agent 配置流程
 
@@ -80,7 +94,7 @@ flowchart TD
 ├── tests/        # 黑盒端到端测试
 ├── evals/        # 显式付费评测工具与合成数据
 ├── services/     # 后续本地 Laya 服务
-├── web/          # 后续 UI
+├── web/          # 嵌入式双语管理 UI
 └── docs/         # 架构、配置、兼容及协作规范
 ```
 

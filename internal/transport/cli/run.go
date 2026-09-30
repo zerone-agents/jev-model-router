@@ -16,6 +16,7 @@ import (
 
 const Version = "0.1.0"
 const help = `jev-router serve [--config file]
+jev-router dashboard [--url URL] [--config file] [--no-open]
 jev-router schema [capability] [--url URL] [--config file]
 jev-router call <capability> --json <file|-> [--expected-version N --idempotency-key KEY]
 Read calls also support --id ID, --cursor CURSOR, --limit N.
@@ -46,6 +47,7 @@ func Run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	}
 	f := flag.NewFlagSet(command, flag.ContinueOnError)
 	f.SetOutput(io.Discard)
+	noOpen := f.Bool("no-open", false, "print dashboard URL only")
 	config := f.String("config", "", "startup config")
 	url := f.String("url", "", "instance URL")
 	file := f.String("json", "", "input JSON file or -")
@@ -57,8 +59,19 @@ func Run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	if f.Parse(args) != nil || f.NArg() != 0 {
 		return bad()
 	}
-	if command != "serve" && command != "schema" && command != "call" {
+	if command != "serve" && command != "schema" && command != "call" && command != "dashboard" {
 		return bad()
+	}
+	if command != "dashboard" {
+		invalid := false
+		f.Visit(func(v *flag.Flag) {
+			if v.Name == "no-open" {
+				invalid = true
+			}
+		})
+		if invalid {
+			return bad()
+		}
 	}
 	if command == "call" && id == "" {
 		return bad()
@@ -73,6 +86,13 @@ func Run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 			return fail(routing.Fail("internal_error", "server failed"))
 		}
 		return 0
+	}
+	if command == "dashboard" {
+		address, err := dashboardURL(*url, os.Getenv("JEV_ROUTER_URL"), cfg.Listen)
+		if err != nil {
+			return fail(routing.Fail("invalid_request", "invalid dashboard instance URL; use an http(s) root URL without credentials, query or fragment"))
+		}
+		return runDashboard(ctx, address, *noOpen, out, probeDashboard, openDashboard)
 	}
 	token, e := app.ResolveSecret(cfg.SettingsRef, os.LookupEnv, os.ReadFile)
 	if e != nil {

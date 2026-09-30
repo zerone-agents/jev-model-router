@@ -42,3 +42,12 @@ JSON 示例：
 first_event_timeout 覆盖流建立到首个有效 SSE 事件，非流式及固定连接测试则覆盖完整响应；之后以 idle_timeout 约束事件等待及下游写入，不设健康流总时长上限。生成客户端最多保留 16 组供应商地址/密钥快照，满载时明确拒绝额外目标，不偷换在途配置。
 
 记录每次尝试最多等待 record_timeout，保留清理在启动及每小时执行；失败令 status.get 的 records_degraded 置 true 并给出 warning，状态持续到重启。记录不是事务审计，不承诺无损。数据库用于单实例进程，请勿多进程共享同一文件。
+
+
+## 管理页面
+
+`serve` 在同源 `/dashboard/` 提供管理 UI，无需 Node 运行时。`dashboard [--url URL] [--config file] [--no-open]` 使用 CLI 相同的地址优先级；从 listen 构造地址时将通配监听映射为本机 loopback。URL 必须是 HTTP(S) 根地址，不能含凭证、查询或片段。
+
+普通模式先执行最多 5 秒、无凭证且不跟随重定向的 HTML 可达检查，再通过系统浏览器打开；失败以 JSON 返回错误及有效地址供手动打开。`--no-open` 仅返回 JSON 地址，不执行探测，不启动服务。该命令不需要 settings 凭证。
+
+浏览器单独输入 settings 凭证，仅在页面内存保存。刷新或断开连接后需重新输入；不写入 URL 或浏览器存储。UI 只访问同源 API，远程使用必须部署 HTTPS，本机 loopback HTTP 例外。UI 不管理账号、密钥或启动参数。

@@ -2,7 +2,7 @@
 
 本文记录当前产品决策与实现边界。第一阶段的 Go/SQLite/CLI/Jev 路径已经实现；以下涉及第二阶段的内容仍是设计目标。
 
-第一阶段由 [Issue #1](https://github.com/zerone-agents/jev-model-router/issues/1) 追踪，仅实现 Jev 单实例路由、CLI/SKILL 和 SQLite。本文中的 Laya、敏感会话锁定、UI 与 PostgreSQL 属于 [第二阶段 #2](https://github.com/zerone-agents/jev-model-router/issues/2)，不是首版能力。
+第一阶段由 [Issue #1](https://github.com/zerone-agents/jev-model-router/issues/1) 追踪，仅实现 Jev 单实例路由、CLI/SKILL 和 SQLite。本文中的 Laya、敏感会话锁定与 PostgreSQL 属于 [第二阶段 #2](https://github.com/zerone-agents/jev-model-router/issues/2)，不是首版能力。简单管理 UI 由 [Issue #8](https://github.com/zerone-agents/jev-model-router/issues/8) 独立交付，复用第一阶段管理 API。
 
 ## 入口与调用路径
 
@@ -102,13 +102,13 @@ SQLite 保存配置元数据，原始对话默认不持久化；密钥通过受�
 
 ## CLI、SKILL 与 UI
 
-产品可执行名称暂定 `jev-router`。命令分为能力发现、状态读取、配置变更和选模检查；具体参数在实现契约时确定，当前目录不代表命令已经可执行。
+产品可执行名称为 `jev-router`。`serve` 提供 API 与嵌入式 `/dashboard/`，`schema`/`call` 负责机器管理，`dashboard` 仅打开已有实例页面或输出 URL。参数以离线帮助和实例契约为准。
 
-CLI 非交互输出为结构化 JSON，事件流为 JSON Lines，日志走 stderr；stdout 不混入横幅或进度动画。管理响应与 Chat Completions 响应分开，模型接口不套 AgentUse 信封。
+CLI 管理与 dashboard 输出为结构化 JSON，日志走 stderr；stdout 不混入横幅或进度动画。管理响应与 Chat Completions 响应分开，模型接口不套 AgentUse 信封。
 
 SKILL 说明“何时发现能力、如何选择操作、如何理解失败及验证结果”，字段与命令以运行时 schema 为准。技能作为产品资产随仓库/发布包分发，当前不自动安装到开发者的个人技能目录。
 
-第二阶段的初版 UI 只承担状态、模型描述、提示词和路由记录的查看及辅助调整；核心能力不依赖浏览器隐藏状态。管理权限不因使用 UI 而扩大。
+独立交付的管理 UI 只承担状态、模型描述、提示词和路由记录的查看及辅助调整；核心能力不依赖浏览器隐藏状态。管理权限不因使用 UI 而扩大。React 静态资源由 Go embed 提供，业务调用仍走同源管理 API。浏览器 settings 凭证仅保留在页面内存；首版仅允许描述和提示词编辑，其他配置通过 CLI。
 
 ## 实现顺序与验证边界
 
@@ -120,6 +120,6 @@ SKILL 说明“何时发现能力、如何选择操作、如何理解失败及�
 
 测试随模块实现就近放置；跨边界测试验证 CLI/HTTP 行为一致、冲突与幂等、取消、SSE、显式模型无隐式回退及敏感内容不发往云端。真实模型选模质量与程序约束分别评测。
 
-首版评测使用代表性任务及其可接受模型集合，对比 `auto` 与固定模型的生成质量、总费用和端到端延迟。先实测建立基线，再设质量门槛；程序约束测试独立要求通过，选模效果不能抵消协议错误。
+首版评测使用代表性任务及其可接受模型集合，分别评估 `auto` 与固定模型的生成质量和选模偏好。首版基线及验收见 docs/acceptance/2026-09-29.md；总费用与可比较延迟留给独立研究。先实测建立基线，再设质量门槛；程序约束测试独立要求通过，选模效果不能抵消协议错误。
 
 ArbiterOS 工具执行治理仍在后续阶段。当前架构不创建空治理接口、不宣称拥有执行沙箱或 AgentUse 认证。完整能力契约和风险分级遵循 [AgentUse 协议](https://www.zerone.run/zh/protocol)，以实现后的可重复检查验证。

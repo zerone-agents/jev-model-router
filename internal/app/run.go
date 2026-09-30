@@ -10,9 +10,11 @@ import (
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"github.com/zerone-agents/jev-model-router/internal/state"
 	httptransport "github.com/zerone-agents/jev-model-router/internal/transport/http"
+	"github.com/zerone-agents/jev-model-router/web"
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -77,6 +79,7 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 		}
 		return nil
 	})
+	service.ResolveSecret = resolve
 	planner := &routing.Planner{Decider: decision.New(nil, resolve, decision.DefaultBudget()), Check: provider.Check}
 	checks := management.Checks{Store: store, Planner: planner, Generator: gen, DecisionTimeout: cfg.DecisionTimeout, FirstEventTimeout: cfg.FirstEventTimeout}
 	checks.Register(service)
@@ -94,7 +97,15 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 		return management.Success(page, time.Now()), nil
 	})
 	auth := func(h string) (management.Principal, error) { return Authenticate(h, creds) }
-	return httptransport.NewHandler(service, store, planner, &routing.Executor{Generator: gen}, auth, httptransport.Limits{Recorder: recorder, DecisionTimeout: cfg.DecisionTimeout, FirstEventTimeout: cfg.FirstEventTimeout, IdleTimeout: cfg.IdleTimeout, MaxBodyBytes: cfg.MaxBodyBytes, StreamBuffer: cfg.StreamBuffer}), close, nil
+	api := httptransport.NewHandler(service, store, planner, &routing.Executor{Generator: gen}, auth, httptransport.Limits{Recorder: recorder, DecisionTimeout: cfg.DecisionTimeout, FirstEventTimeout: cfg.FirstEventTimeout, IdleTimeout: cfg.IdleTimeout, MaxBodyBytes: cfg.MaxBodyBytes, StreamBuffer: cfg.StreamBuffer})
+	dashboard := web.Handler()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/dashboard" || strings.HasPrefix(r.URL.Path, "/dashboard/") {
+			dashboard.ServeHTTP(w, r)
+			return
+		}
+		api.ServeHTTP(w, r)
+	}), close, nil
 }
 func Run(ctx context.Context, cfg Config) error {
 	h, close, e := Handler(cfg)

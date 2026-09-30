@@ -1,5 +1,25 @@
-# 人类辅助 UI
+# Management UI
 
-用于查看状态、模型描述、提示词及路由结果，并辅助调整配置。所有操作复用管理 API 的契约、权限、冲突与幂等行为。
+React/TypeScript application embedded in the Go binary at `/dashboard/`. `jev-router dashboard` opens it; `--no-open` returns the address. There is no separate production frontend process.
 
-UI 不参与选模、不直接调用供应商、不写数据库，也不成为任何核心能力的唯一入口。当前不锁定前端框架，尚无页面实现。
+The UI reads status, models, the prompt and routing records. Only model descriptions and the prompt are editable. Provider setup, model mapping, capability changes and enabling/disabling models remain CLI operations. All business operations use existing management capabilities discovered from the running instance.
+
+Settings credentials are memory-only: refresh requires reconnecting, disconnect clears drafts and loaded data. HTTPS is required outside loopback. Unknown write outcomes retain an identical request for explicit retry within 24 hours; conflicts preserve drafts for deliberate reconciliation. Routing records are best-effort metadata, not audit logs or conversation history.
+
+## Development
+
+Use Node 24 LTS and npm. Dependencies are locked in package-lock.json.
+
+```sh
+npm --prefix web ci
+npm --prefix web run typecheck
+npm --prefix web test
+npm --prefix web run build
+go build -o /tmp/jev-router ./cmd/jev-router
+npm --prefix web exec -- playwright install chromium
+npm --prefix web run test:e2e
+```
+
+Browser tests start their own Go instance with temporary SQLite and synthetic credentials; they never call generation or decision endpoints. Port 18763 must be free. For manual development, rebuild and restart the Go binary to serve the latest same-origin assets.
+
+`dist/` is committed so a clean Go checkout builds without Node. Rebuild and commit assets with source changes; CI rebuilds and checks all changes, including new files. Do not edit generated files directly. Fonts are bundled locally; the Zerone logo is reused from the Zerone home-page project. Radix supplies dialog behavior, and Phosphor supplies navigation icons.

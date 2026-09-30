@@ -1,0 +1,3 @@
+# Bundled dependencies contain meaningful multiline CSS template strings.
+web/dist/** linguist-generated=true
+web/dist/**/*.js whitespace=-blank-at-eol
