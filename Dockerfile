@@ -1,18 +1,21 @@
 # syntax=docker/dockerfile:1
-FROM node:24.14.1-bookworm-slim AS web
+FROM --platform=$BUILDPLATFORM node:24.14.1-bookworm-slim AS web
 WORKDIR /src/web
 COPY web/package*.json ./
 RUN npm ci
 COPY web/ ./
 RUN npm run build
 
-FROM golang:1.27.0-bookworm AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.0-bookworm AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=web /src/web/dist ./web/dist
-RUN CGO_ENABLED=0 go build -trimpath -o /out/jev-router ./cmd/jev-router
+# Run compilers natively; only the output binary targets the image platform.
+ARG TARGETOS
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /out/jev-router ./cmd/jev-router
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
