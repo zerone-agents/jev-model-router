@@ -75,4 +75,4 @@ docker compose down                 # stop; retain the SQLite volume
 
 ## Publishing (maintainers)
 
-The Docker image workflow builds Linux amd64/arm64 images. Configure repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` with push access to `zeroneai/jev-model-router`. A `v*` version tag publishes a versioned image; stable releases also update `latest`. Manual dispatch publishes `latest` from the selected ref. PR runs build without publishing. First publication requires these credentials and an explicit release action; adding this workflow alone does not publish an image.
+The Release workflow builds Linux amd64/arm64 images. Configure repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` with push access to `zeroneai/jev-model-router`. A `v*` version tag publishes a versioned image; stable releases also update `latest`. Manual dispatch publishes `latest` from the selected ref. PR runs build without publishing. First publication requires these credentials and an explicit release action; adding this workflow alone does not publish an image.

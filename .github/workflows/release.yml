@@ -1,11 +1,11 @@
-name: Docker image
+name: Release
 on:
   pull_request:
     paths:
       - Dockerfile
       - .dockerignore
       - quickstart/**
-      - .github/workflows/docker.yml
+      - .github/workflows/release.yml
   push:
     tags: ['v*']
   workflow_dispatch:
