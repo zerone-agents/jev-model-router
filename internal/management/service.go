@@ -71,6 +71,11 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 	s.mu.RUnlock()
 	if h != nil {
 		if contracts.Validate(c.CapabilityID, c.Input) != nil {
+			if c.CapabilityID == "route.inspect" {
+				if err := routing.ValidateChatSchema(c.Input); err != nil {
+					return Result{}, err
+				}
+			}
 			return Result{}, routing.Fail("invalid_request", "invalid capability input")
 		}
 		return h(ctx, principal, c)

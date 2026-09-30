@@ -346,11 +346,22 @@
         "include_usage"
       ],
       "additionalProperties": false
+    },
+    "max_tokens": {
+      "type": "integer",
+      "minimum": 16,
+      "maximum": 10000000
     }
   },
   "required": [
     "model",
     "messages"
   ],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "not": {
+    "required": [
+      "max_tokens",
+      "max_completion_tokens"
+    ]
+  }
 }

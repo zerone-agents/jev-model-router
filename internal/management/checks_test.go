@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/zerone-agents/jev-model-router/internal/management"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
+	"strings"
 	"testing"
 	"time"
 )
@@ -89,5 +90,36 @@ func TestUnavailableCredentialWarning(t *testing.T) {
 	r, e := service.Execute(context.Background(), "settings", management.Call{CapabilityID: "providers.get", Input: json.RawMessage(`{"id":"p"}`)})
 	if e != nil || len(r.Warnings) != 1 || r.Warnings[0] != "provider_credential_unavailable" {
 		t.Fatal("missing generic warning")
+	}
+}
+
+func TestInspectionFieldDiagnostics(t *testing.T) {
+	checks, store, generator := checksFixture()
+	store.s.Models[0].Enabled = true
+	service := management.New(store, nil)
+	checks.Register(service)
+	for _, tc := range []struct{ fields, code, message string }{
+		{`"max_tokens":1024,"max_completion_tokens":1024`, "invalid_request", "mutually exclusive"},
+		{`"max_tokens":null`, "invalid_request", "max_tokens must be an integer between 16 and 10000000"},
+		{`"max_tokens":10000001`, "invalid_request", "max_tokens must be an integer between 16 and 10000000"},
+		{`"max_completion_tokens":15`, "invalid_request", "max_completion_tokens must be an integer between 16 and 10000000"},
+		{`"reasoning_effort":"SECRET"`, "unsupported_request", "reasoning_effort"},
+	} {
+		input := json.RawMessage(`{"model":"auto","messages":[{"role":"user","content":"SECRET"}],` + tc.fields + `}`)
+		_, err := service.Execute(context.Background(), "settings", management.Call{CapabilityID: "route.inspect", Input: input})
+		result := management.Failure(err)
+		if result.Error.Code != tc.code || !strings.Contains(result.Error.Message, tc.message) || strings.Contains(result.Error.Message, "SECRET") {
+			t.Fatalf("%s: %+v", tc.fields, result.Error)
+		}
+	}
+	for _, field := range []string{"max_tokens", "max_completion_tokens"} {
+		input := json.RawMessage(`{"model":"auto","messages":[{"role":"user","content":"hi"}],"` + field + `":1024}`)
+		result, err := service.Execute(context.Background(), "settings", management.Call{CapabilityID: "route.inspect", Input: input})
+		if err != nil || !result.OK {
+			t.Fatalf("%s: %+v %v", field, result, err)
+		}
+	}
+	if generator.calls != 0 || store.s.Version != 1 {
+		t.Fatal("inspection generated or mutated configuration")
 	}
 }

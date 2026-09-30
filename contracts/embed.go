@@ -8,6 +8,8 @@ import (
 	"fmt"
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
 	"io"
+	"sort"
+	"strconv"
 	"sync"
 	"time"
 	"unicode/utf8"
@@ -177,4 +179,49 @@ func callSchema(write bool) map[string]any {
 func IdempotencyTTL() time.Duration {
 	once.Do(initSchemas)
 	return time.Duration(idempotencyHours) * time.Hour
+}
+
+// ChatInvalidField identifies only the top-level field, never schema error
+// text (which may contain message content, credentials, or request values).
+func ChatInvalidField(input json.RawMessage) string {
+	once.Do(initSchemas)
+	value, err := Decode(input)
+	if err != nil {
+		return ""
+	}
+	obj, ok := value.(map[string]any)
+	if !ok {
+		return ""
+	}
+	keys := make([]string, 0, len(obj))
+	for key := range obj {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		property, known := validators["chat"].Properties[key]
+		if !known {
+			// Bound attacker-controlled names and exclude control characters.
+			if len(key) > 64 {
+				return "unknown field"
+			}
+			for _, c := range key {
+				if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '_' {
+					return "unknown field"
+				}
+			}
+			return strconv.Quote(key)
+		}
+		if property.Validate(obj[key]) != nil {
+			return strconv.Quote(key)
+		}
+	}
+	return ""
+}
+
+// ValidChatOutputLimit uses the published constraint for either output alias.
+func ValidChatOutputLimit(input json.RawMessage) bool {
+	once.Do(initSchemas)
+	value, err := Decode(input)
+	return err == nil && validators["chat"].Properties["max_completion_tokens"].Validate(value) == nil
 }

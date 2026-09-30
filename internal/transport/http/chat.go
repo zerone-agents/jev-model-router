@@ -3,6 +3,7 @@ package httptransport
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/zerone-agents/jev-model-router/internal/management"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"io"
@@ -29,7 +30,16 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, s.limits.MaxBodyBytes)
 	var req routing.Request
 	d := json.NewDecoder(r.Body)
-	if d.Decode(&req) != nil || d.Decode(new(any)) != io.EOF {
+	if err := d.Decode(&req); err != nil {
+		var fieldError *routing.Error
+		if errors.As(err, &fieldError) {
+			fail(fieldError)
+		} else {
+			fail(routing.Fail("invalid_request", "invalid chat body"))
+		}
+		return
+	}
+	if d.Decode(new(any)) != io.EOF {
 		fail(routing.Fail("invalid_request", "invalid chat body"))
 		return
 	}

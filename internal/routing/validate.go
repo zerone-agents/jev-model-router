@@ -45,8 +45,8 @@ func ValidateRequest(r Request) error {
 	if b == nil {
 		b, _ = json.Marshal(r)
 	}
-	if contracts.Validate("chat", b) != nil {
-		return Fail("unsupported_request", "request is outside the supported chat schema")
+	if err := ValidateChatSchema(b); err != nil {
+		return err
 	}
 	if len(r.Tools) == 0 && (r.Options["tool_choice"] != nil || r.Options["parallel_tool_calls"] != nil) {
 		return Fail("invalid_request", "tool options require tools")
@@ -126,4 +126,27 @@ func RequiresTools(r Request) bool {
 		}
 	}
 	return false
+}
+
+// ValidateChatSchema shares field diagnostics across inference and inspection.
+func ValidateChatSchema(b json.RawMessage) error {
+	var fields map[string]json.RawMessage
+	json.Unmarshal(b, &fields)
+	if fields["max_tokens"] != nil && fields["max_completion_tokens"] != nil {
+		return Fail("invalid_request", "max_tokens and max_completion_tokens are mutually exclusive; send only one")
+	}
+	for _, name := range []string{"max_tokens", "max_completion_tokens"} {
+		if value, present := fields[name]; present {
+			if !contracts.ValidChatOutputLimit(value) {
+				return Fail("invalid_request", name+" must be an integer between 16 and 10000000")
+			}
+		}
+	}
+	if contracts.Validate("chat", b) != nil {
+		if field := contracts.ChatInvalidField(b); field != "" {
+			return Fail("unsupported_request", "unsupported or invalid chat field: "+field)
+		}
+		return Fail("unsupported_request", "request is outside the supported chat schema")
+	}
+	return nil
 }
