@@ -89,11 +89,18 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 		return Result{}, e
 	}
 	var input struct {
-		ID     string `json:"id"`
-		Cursor string `json:"cursor"`
-		Limit  int    `json:"limit"`
+		ID       string `json:"id"`
+		Cursor   string `json:"cursor"`
+		Limit    int    `json:"limit"`
+		Sort     string `json:"sort"`
+		Offset   *int   `json:"offset"`
+		Query    string `json:"query"`
+		Language string `json:"language"`
 	}
 	json.Unmarshal(c.Input, &input)
+	if input.Offset != nil && input.Cursor != "" {
+		return Result{}, routing.Fail("invalid_request", "offset and cursor cannot be combined")
+	}
 	var resource any
 	switch c.CapabilityID {
 	case "status.get":
@@ -154,7 +161,18 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 			}
 		} else {
 			for _, m := range cfg.Models {
-				all = append(all, item{m.ID, m})
+				if !modelMatches(m, input.Query, input.Language) {
+					continue
+				}
+				key := m.ID
+				if input.Sort == "enabled_first" {
+					prefix := "1:"
+					if m.Enabled {
+						prefix = "0:"
+					}
+					key = prefix + m.ID
+				}
+				all = append(all, item{key, m})
 			}
 		}
 		sort.Slice(all, func(i, j int) bool { return all[i].id < all[j].id })
@@ -163,29 +181,69 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 			limit = 50
 		}
 		next := ""
-		for _, x := range all {
+		last := ""
+		for index, x := range all {
+			if input.Offset != nil && index < *input.Offset {
+				continue
+			}
 			if x.id <= input.Cursor {
 				continue
 			}
 			if len(items) == limit {
-				next = allCursor(items)
+				next = last
 				break
 			}
 			items = append(items, x.v)
+			last = x.id
 		}
-		return Success(map[string]any{"version": cfg.Version, "items": items, "next_cursor": next}, time.Now()), nil
+		data := map[string]any{"version": cfg.Version, "items": items, "next_cursor": next}
+		if c.CapabilityID == "models.list" {
+			data["total"] = len(all)
+		}
+		return Success(data, time.Now()), nil
 	}
 	if resource == nil {
 		return Result{}, routing.Fail("not_found", "resource not found")
 	}
 	return Success(map[string]any{"version": cfg.Version, "resource": resource}, time.Now()), nil
 }
-func allCursor(items []any) string {
-	switch x := items[len(items)-1].(type) {
-	case routing.Provider:
-		return x.ID
-	case routing.Model:
-		return x.ID
+
+// Search the fields and labels shown in the model list before pagination.
+func modelMatches(m routing.Model, query, language string) bool {
+	query = strings.ToLower(strings.TrimSpace(query))
+	if query == "" {
+		return true
 	}
-	return ""
+	status := "Disabled"
+	if m.Enabled {
+		status = "Enabled"
+	}
+	tools, images, structured, empty := "Tools", "Images", "Structured output", "No description yet"
+	if language == "zh" {
+		status = "已禁用"
+		if m.Enabled {
+			status = "已启用"
+		}
+		tools, images, structured, empty = "工具", "图片", "结构化输出", "暂无描述"
+	}
+	description := m.Description
+	if description == "" {
+		description = empty
+	}
+	fields := []string{m.ID, m.ProviderID + " / " + m.UpstreamName, description, m.Location, status}
+	if m.Capabilities.Tools {
+		fields = append(fields, tools)
+	}
+	if m.Capabilities.Images {
+		fields = append(fields, images)
+	}
+	if m.Capabilities.StructuredOutput {
+		fields = append(fields, structured)
+	}
+	for _, field := range fields {
+		if strings.Contains(strings.ToLower(field), query) {
+			return true
+		}
+	}
+	return false
 }

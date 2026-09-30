@@ -361,6 +361,22 @@
     "input_schema": {
       "type": "object",
       "properties": {
+        "query": {"type": "string", "maxLength": 256, "description": "Case-insensitive literal substring search over visible model list fields and labels; applied before pagination. Surrounding whitespace is ignored."},
+        "language": {"type": "string", "enum": ["en", "zh"], "description": "Language of searchable UI labels; defaults to en."},
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647,
+          "description": "Zero-based offset for direct page navigation. Do not combine with a nonempty cursor."
+        },
+        "sort": {
+          "type": "string",
+          "enum": [
+            "id",
+            "enabled_first"
+          ],
+          "description": "Defaults to id. enabled_first sorts enabled models first, then by ID. Keep sort unchanged while paging and pass next_cursor unchanged."
+        },
         "cursor": {
           "type": "string",
           "minLength": 0,
@@ -378,6 +394,10 @@
     "output_schema": {
       "type": "object",
       "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
         "version": {
           "type": "integer",
           "minimum": 0
@@ -462,6 +482,7 @@
         }
       },
       "required": [
+        "total",
         "version",
         "items",
         "next_cursor"

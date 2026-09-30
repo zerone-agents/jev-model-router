@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   PageTitle,
   Empty,
   ErrorBox,
   Loading,
   Pager,
+  NumberedPager,
   useRead,
   type PageProps,
 } from "./components";
@@ -132,14 +133,37 @@ export function Models(
   },
 ) {
   const { lang } = props;
-  const [cursors, setCursors] = useState([""]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [search, setSearch] = useState("");
+  const query = search.trim();
+  const highlight = (value: string) => (
+    <SearchHighlight value={value} query={query} />
+  );
   const [selected, setSelected] = useState("");
   const [listRevision, setListRevision] = useState(0);
   const { data, error, loading } = useRead<{
     items: Model[];
+    total: number;
     next_cursor: string;
     version: number;
-  }>(props, "models.list", { cursor: cursors.at(-1), limit: 20 }, listRevision);
+  }>(
+    props,
+    "models.list",
+    {
+      offset: (page - 1) * pageSize,
+      limit: pageSize,
+      sort: "enabled_first",
+      ...(query ? { query, language: lang } : {}),
+    },
+    listRevision,
+  );
+  useEffect(() => {
+    if (data?.total !== undefined) {
+      const lastPage = Math.max(1, Math.ceil(data.total / pageSize));
+      if (page > lastPage) setPage(lastPage);
+    }
+  }, [data?.total, page, pageSize]);
   return (
     <>
       <PageTitle
@@ -149,7 +173,32 @@ export function Models(
           "Describe what each model does best. Capabilities stay explicit.",
           "用描述表达模型专长，用能力声明约束输入。",
         )}
-      />
+      >
+        {!selected && (
+          <div className="model-list-actions">
+            <input
+              type="search"
+              aria-label={text(lang, "Search models", "搜索模型")}
+              placeholder={text(lang, "Search models…", "搜索模型…")}
+              value={search}
+              maxLength={256}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+            />
+            <button
+              disabled={loading}
+              onClick={() => {
+                setPage(1);
+                setListRevision((value) => value + 1);
+              }}
+            >
+              {text(lang, "Refresh", "刷新")}
+            </button>
+          </div>
+        )}
+      </PageTitle>
       {selected ? (
         <>
           <button
@@ -192,12 +241,24 @@ export function Models(
             </div>
             {!data.items.length ? (
               <Empty
-                title={text(lang, "No models configured", "尚未配置模型")}
-                detail={text(
-                  lang,
-                  "Use jev-router schema models.put to get started.",
-                  "使用 jev-router schema models.put 开始配置。",
-                )}
+                title={
+                  query
+                    ? text(lang, "No matching models", "没有匹配的模型")
+                    : text(lang, "No models configured", "尚未配置模型")
+                }
+                detail={
+                  query
+                    ? text(
+                        lang,
+                        "Try another search or clear the search field.",
+                        "请更换关键词或清空搜索框。",
+                      )
+                    : text(
+                        lang,
+                        "Use jev-router schema models.put to get started.",
+                        "使用 jev-router schema models.put 开始配置。",
+                      )
+                }
               />
             ) : (
               <div className="model-list">
@@ -212,36 +273,78 @@ export function Models(
                     </div>
                     <div className="model-copy">
                       <h3>
-                        {m.id}
+                        {highlight(m.id)}
                         <span
-                          className={"badge " + (m.enabled ? "enabled" : "")}
+                          className={
+                            "badge " + (m.enabled ? "enabled" : "disabled")
+                          }
                         >
-                          {text(
-                            lang,
-                            m.enabled ? "Enabled" : "Disabled",
-                            m.enabled ? "已启用" : "已禁用",
+                          {highlight(
+                            text(
+                              lang,
+                              m.enabled ? "Enabled" : "Disabled",
+                              m.enabled ? "已启用" : "已禁用",
+                            ),
                           )}
                         </span>
                       </h3>
-                      <p>
-                        {m.description ||
-                          text(lang, "No description yet", "暂无描述")}
+                      <p
+                        className={
+                          query &&
+                          m.description
+                            .toLowerCase()
+                            .includes(query.toLowerCase())
+                            ? "search-expanded"
+                            : undefined
+                        }
+                      >
+                        {highlight(
+                          m.description ||
+                            text(lang, "No description yet", "暂无描述"),
+                        )}
                       </p>
-                      <small>
-                        {m.provider_id} / {m.upstream_name}
-                      </small>
+                      <div className="model-details">
+                        <small>
+                          {highlight(`${m.provider_id} / ${m.upstream_name}`)}
+                        </small>
+
+                        {m.location && (
+                          <span className="badge">{highlight(m.location)}</span>
+                        )}
+                        {m.capabilities.tools === true && (
+                          <span className="badge">
+                            {highlight(text(lang, "Tools", "工具"))}
+                          </span>
+                        )}
+                        {m.capabilities.images === true && (
+                          <span className="badge">
+                            {highlight(text(lang, "Images", "图片"))}
+                          </span>
+                        )}
+                        {m.capabilities.structured_output === true && (
+                          <span className="badge">
+                            {highlight(
+                              text(lang, "Structured output", "结构化输出"),
+                            )}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <span aria-hidden>↗</span>
                   </button>
                 ))}
               </div>
             )}
-            <Pager
+            <NumberedPager
               lang={lang}
-              next={data.next_cursor}
-              back={cursors.length > 1}
-              onBack={() => setCursors((x) => x.slice(0, -1))}
-              onNext={() => setCursors((x) => [...x, data.next_cursor])}
+              total={data.total ?? data.items.length}
+              page={page}
+              pageSize={pageSize}
+              onPage={setPage}
+              onPageSize={(size) => {
+                setPageSize(size);
+                setPage(1);
+              }}
             />
           </>
         )
@@ -384,4 +487,23 @@ export function Records(props: PageProps) {
       )}
     </>
   );
+}
+
+function SearchHighlight({ value, query }: { value: string; query: string }) {
+  if (!query) return <>{value}</>;
+  const lower = value.toLowerCase();
+  const needle = query.toLowerCase();
+  const parts: React.ReactNode[] = [];
+  let position = 0;
+  let match = lower.indexOf(needle);
+  while (match !== -1) {
+    parts.push(value.slice(position, match));
+    parts.push(
+      <mark key={match}>{value.slice(match, match + query.length)}</mark>,
+    );
+    position = match + query.length;
+    match = lower.indexOf(needle, position);
+  }
+  parts.push(value.slice(position));
+  return <>{parts}</>;
 }
