@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	httptransport "github.com/zerone-agents/jev-model-router/internal/transport/http"
 	"net"
 	"os"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 )
 
 type Config struct {
+	DashboardOrigin                                                string
 	EncryptionKeyRef                                               string
 	Listen, Database, SettingsRef, InferenceRef                    string
 	DecisionTimeout, FirstEventTimeout, IdleTimeout, RecordTimeout time.Duration
@@ -32,7 +34,7 @@ func LoadConfig(path string, lookup func(string) (string, bool)) (Config, error)
 			return c, errors.New("invalid JSON configuration")
 		}
 	}
-	stringsMap := map[string]*string{"encryption_key_ref": &c.EncryptionKeyRef, "listen": &c.Listen, "database": &c.Database, "settings_token_ref": &c.SettingsRef, "inference_token_ref": &c.InferenceRef}
+	stringsMap := map[string]*string{"dashboard_origin": &c.DashboardOrigin, "encryption_key_ref": &c.EncryptionKeyRef, "listen": &c.Listen, "database": &c.Database, "settings_token_ref": &c.SettingsRef, "inference_token_ref": &c.InferenceRef}
 	durations := map[string]*time.Duration{"decision_timeout": &c.DecisionTimeout, "first_event_timeout": &c.FirstEventTimeout, "idle_timeout": &c.IdleTimeout, "record_timeout": &c.RecordTimeout}
 	numbers := map[string]bool{"max_body_bytes": true, "stream_buffer": true, "retention_days": true}
 	for k := range values {
@@ -64,7 +66,7 @@ func LoadConfig(path string, lookup func(string) (string, bool)) (Config, error)
 		if ok {
 			*p = v
 		}
-		if *p == "" && k != "encryption_key_ref" {
+		if *p == "" && k != "encryption_key_ref" && k != "dashboard_origin" {
 			return c, errors.New("empty startup setting")
 		}
 	}
@@ -110,5 +112,7 @@ func LoadConfig(path string, lookup func(string) (string, bool)) (Config, error)
 	if _, _, e := net.SplitHostPort(c.Listen); e != nil {
 		return c, errors.New("invalid listen address")
 	}
-	return c, nil
+	var err error
+	c.DashboardOrigin, err = httptransport.NormalizeDashboardOrigin(c.DashboardOrigin)
+	return c, err
 }

@@ -104,3 +104,7 @@ ROUTER_IMAGE=swr.cn-east-3.myhuaweicloud.com/zerone/jev-model-router:latest
 | Secret | `DOCKER_REGISTRY_PASSWORD` | SWR 登录密码 |
 
 配置完整后，Release 将同一次构建及相同版本/latest 标签推送到 Docker Hub 和 SWR。两项 SWR 变量均未配置时只发布 Docker Hub；配置不完整或地址不匹配会报错。任一仓库认证或推送失败都会导致发布失败，宣布可用前需核实两个仓库。PR 构建不登录、不发布。私有 SWR 仓库要求用户认证；无需登录的 Quickstart 应使用公开镜像。
+
+### Dashboard 会话
+
+远程管理页面需在 `.env` 配置 `JEV_ROUTER_DASHBOARD_ORIGIN=https://router.example.com` 并重建容器。反向代理负责 TLS、保留原始 Host，后端保持私网访问。未配置 Origin 时，浏览器登录仅允许回环 HTTP。登录有效期固定为 24 小时，刷新和同凭证重启后保留；注销撤销当前请求会话。CLI 仍使用 Bearer。容量、凭证轮换及备份恢复见[会话部署说明](../docs/configuration.md#dashboard-sessions)。
