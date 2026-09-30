@@ -8,6 +8,7 @@ import (
 	"github.com/zerone-agents/jev-model-router/internal/management"
 	"github.com/zerone-agents/jev-model-router/internal/provider"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
+	"github.com/zerone-agents/jev-model-router/internal/session"
 	"github.com/zerone-agents/jev-model-router/internal/state"
 	httptransport "github.com/zerone-agents/jev-model-router/internal/transport/http"
 	"github.com/zerone-agents/jev-model-router/web"
@@ -20,6 +21,10 @@ import (
 
 // Handler wires one instance. The returned close function releases its resources.
 func Handler(cfg Config) (http.Handler, func(), error) {
+	origin, e := httptransport.NormalizeDashboardOrigin(cfg.DashboardOrigin)
+	if e != nil {
+		return nil, nil, e
+	}
 	creds, e := LoadCredentials(cfg, os.LookupEnv, os.ReadFile)
 	if e != nil {
 		return nil, nil, e
@@ -30,6 +35,11 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 	}
 	store, e := state.OpenWithCipher(cfg.Database, time.Now, cipher)
 	if e != nil {
+		return nil, nil, e
+	}
+	sessions, e := session.New(context.Background(), store, creds.settings, origin, time.Now)
+	if e != nil {
+		store.Close()
 		return nil, nil, e
 	}
 	externalResolve := func(ref string) ([]byte, error) { return ResolveSecret(ref, os.LookupEnv, os.ReadFile) }
@@ -112,10 +122,20 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 	})
 	auth := func(h string) (management.Principal, error) { return Authenticate(h, creds) }
 	api := httptransport.NewHandler(service, store, planner, &routing.Executor{Generator: gen}, auth, httptransport.Limits{Recorder: recorder, DecisionTimeout: cfg.DecisionTimeout, FirstEventTimeout: cfg.FirstEventTimeout, IdleTimeout: cfg.IdleTimeout, MaxBodyBytes: cfg.MaxBodyBytes, StreamBuffer: cfg.StreamBuffer})
+	sessionHTTP, e := httptransport.NewSessionHTTP(sessions, origin, auth)
+	if e != nil {
+		close()
+		return nil, nil, e
+	}
+	admin := httptransport.NewSessionManagementHandler(service, sessionHTTP)
 	dashboard := web.Handler()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/dashboard" || strings.HasPrefix(r.URL.Path, "/dashboard/") {
 			dashboard.ServeHTTP(w, r)
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/admin/") {
+			admin.ServeHTTP(w, r)
 			return
 		}
 		api.ServeHTTP(w, r)

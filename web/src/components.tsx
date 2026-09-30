@@ -21,6 +21,14 @@ export function errorText(e: unknown, lang: Lang) {
       "Credential expired or invalid. Reconnect to continue.",
       "凭证无效或已过期，请重新连接。",
     ],
+    session_changed: [
+      "Session changed in another tab. Restore it before deciding what to do next.",
+      "另一标签页已更换会话，请恢复会话后再决定操作。",
+    ],
+    session_limit: [
+      "Session capacity reached. Log out an existing session or wait for expiry.",
+      "会话数量已达上限，请注销已有会话或等待过期。",
+    ],
     forbidden: [
       "This credential cannot manage this instance.",
       "此凭证没有管理权限。",

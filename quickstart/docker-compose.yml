@@ -5,6 +5,7 @@ services:
     ports:
       - "${ROUTER_BIND:-127.0.0.1}:${ROUTER_PORT:-8080}:8080"
     environment:
+      JEV_ROUTER_DASHBOARD_ORIGIN: ${JEV_ROUTER_DASHBOARD_ORIGIN:-}
       JEV_ROUTER_SETTINGS_TOKEN: ${JEV_ROUTER_SETTINGS_TOKEN:?Set a unique settings token in .env}
       JEV_ROUTER_INFERENCE_TOKEN: ${JEV_ROUTER_INFERENCE_TOKEN:?Set a different inference token in .env}
       JEV_ROUTER_ENCRYPTION_KEY_REF: env:JEV_ROUTER_ENCRYPTION_KEY

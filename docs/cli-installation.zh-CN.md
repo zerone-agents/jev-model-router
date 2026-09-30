@@ -69,3 +69,5 @@ jev-router call providers.put --json /secure/provider.json \
 使用 HTTPS，或经 SSH 隧道使用回环 HTTP。CLI 会拒绝通过公网 HTTP 提交内联密钥，也不会跟随重定向。读取 `providers.get` 核对脱敏状态，按 SKILL 测试禁用模型后再启用。更换上游 API Key 时提交相同供应商 ID、endpoint、新 `api_key`、当前版本和新的幂等键。结果未知时，在 24 小时内用完全相同的输入、版本和幂等键重试。仅改 endpoint 时保留响应中的托管 `secret_ref`，不要把脱敏显示值作为真实密钥。临时明文输入文件按你的密钥管理规范处理。
 
 托管写入为原子操作，无需重启；在途请求保留旧凭证版本。主密钥与供应商 API Key 不同，必须独立备份，目前不支持原地轮换。详见[配置说明](configuration.md#managed-provider-credentials)。
+
+CLI 继续使用 Settings Bearer 认证。浏览器将该凭证交换为 24 小时 HttpOnly 会话；远程访问需配置公开 HTTPS Origin。见[Dashboard 会话配置](configuration.md#dashboard-sessions)。

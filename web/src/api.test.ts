@@ -1,35 +1,36 @@
 import { describe, it, expect, vi } from "vitest";
 import { createManagementClient, APIError, secureOrigin } from "./api";
 describe("management client", () => {
-  it("calls only same-origin paths with a memory token, and rejects redirects", async () => {
+  it("calls only same-origin paths with a cookie session, and rejects redirects", async () => {
     const fetcher = vi
       .fn()
       .mockResolvedValue(
         new Response(JSON.stringify({ ok: true, data: [], meta: {} })),
       );
     await createManagementClient("sentinel", fetcher).schema();
+    expect(fetcher.mock.calls[0][1].headers).not.toHaveProperty(
+      "Authorization",
+    );
     expect(fetcher.mock.calls[0][0]).toBe("/admin/v1/schema");
     expect(fetcher.mock.calls[0][1]).toMatchObject({
-      headers: { Authorization: "Bearer sentinel" },
+      headers: { "X-Jev-Session": "1" },
       redirect: "error",
-      credentials: "omit",
+      credentials: "same-origin",
     });
   });
   it("never echoes server error messages", async () => {
     const client = createManagementClient(
       "sentinel",
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({
-              ok: false,
-              error: { code: "forbidden", message: "sentinel" },
-              meta: { operation_id: "op" },
-            }),
-            { status: 403 },
-          ),
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            ok: false,
+            error: { code: "forbidden", message: "sentinel" },
+            meta: { operation_id: "op" },
+          }),
+          { status: 403 },
         ),
+      ),
     );
     await expect(client.schema()).rejects.toMatchObject({
       code: "forbidden",
@@ -56,4 +57,29 @@ describe("management client", () => {
     expect(secureOrigin(new URL("http://example.com"))).toBe(false);
     expect(secureOrigin(new URL("https://example.com"))).toBe(true);
   });
+});
+
+it("does not impose the restoration timeout on model probes", async () => {
+  vi.useFakeTimers();
+  const timeout = vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+    const c = new AbortController();
+    setTimeout(() => c.abort(), ms);
+    return c.signal;
+  });
+  let requestSignal!: AbortSignal;
+  const fetcher = vi.fn(
+    async (_input: RequestInfo | URL, init?: RequestInit) => {
+      requestSignal = init!.signal!;
+      return new Response(JSON.stringify({ ok: true, data: {}, meta: {} }));
+    },
+  );
+  const client = createManagementClient("csrf", fetcher);
+  await client.call("models.test", { input: { id: "model" } });
+  // Model probes follow the server's generation deadline, not the 15s restore deadline.
+  await vi.advanceTimersByTimeAsync(15001);
+  expect(requestSignal.aborted).toBe(false);
+  client.dispose();
+  expect(requestSignal.aborted).toBe(true);
+  timeout.mockRestore();
+  vi.useRealTimers();
 });

@@ -63,6 +63,10 @@
     "internal_error": {
       "http_status": 500,
       "exit_code": 9
+    },
+    "session_limit": {
+      "http_status": 429,
+      "exit_code": 6
     }
   },
   "retention": {

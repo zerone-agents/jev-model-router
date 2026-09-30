@@ -104,3 +104,7 @@ Maintainers: use the same repository variable/secret names as Agent Hub:
 | Secret | `DOCKER_REGISTRY_PASSWORD` | SWR login password |
 
 With these configured, Release pushes the same build and version/latest tags to both Docker Hub and SWR. Without both SWR variables it publishes only to Docker Hub; partial or mismatched configuration fails. Registry authentication or push failures fail the release; verify both registries before announcing availability. PR builds never log in or publish. A private SWR repository requires users to authenticate; make the mirror public for an unauthenticated quickstart.
+
+### Dashboard sessions
+
+For a remote dashboard, set `JEV_ROUTER_DASHBOARD_ORIGIN=https://router.example.com` in `.env` and recreate the container. Terminate TLS at a proxy that preserves Host, and keep the backend private. With no origin configured, browser login works only on loopback HTTP. Login lasts 24 hours across refresh and same-credential restart; logout revokes the current request session. CLI still uses Bearer. See [session deployment and recovery](../docs/configuration.md#dashboard-sessions) for capacity, credential rotation and backup recovery.

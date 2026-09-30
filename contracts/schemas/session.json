@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "ttl_seconds": 86400,
+  "max_sessions": 128,
+  "token_bytes": 32,
+  "body_limit_bytes": 1024,
+  "cookie": {"name":"jev_router_session","path":"/admin/","http_only":true,"same_site":"Strict","host_only":true,"secure":"HTTPS public origin; loopback HTTP exception","writer":"successful login only"},
+  "input_schema":{"type":"object","additionalProperties":false},
+  "endpoints": {
+    "login":{"method":"POST","path":"/admin/v1/session/login","authentication":"Settings Bearer","body":{},"response":["expires_at","csrf_token"]},
+    "status":{"method":"GET","path":"/admin/v1/session","authentication":"Cookie only","headers":{"X-Jev-Session":"1"},"response":["expires_at","csrf_token"]},
+    "logout":{"method":"POST","path":"/admin/v1/session/logout","authentication":"Cookie only","body":{},"csrf_header":"X-CSRF-Token"}
+  },
+  "source":"Exact configured Origin and Host; cookie GET may omit Origin. Sec-Fetch-Site must be same-origin when present. All cookie POSTs require JSON and session-bound X-CSRF-Token; login requires Settings Bearer instead.",
+  "precedence":"A present Authorization selects Bearer without cookie fallback; status/logout reject Authorization. Inference accepts Bearer only.",
+  "lifecycle":"Fixed expiry, no sliding renewal. Logout revokes only the request session. Same Settings/origin restart preserves sessions; changes invalidate all old generations permanently.",
+  "retry":"Do not retry login automatically; resolve unknown outcome through status. Never replay business writes after authentication failure. Never fetch a newer CSRF token to retry stale logout.",
+  "cache_control":"no-store",
+  "errors":{"session_limit":{"http_status":429,"exit_code":6,"retryable":false},"other":"schemas/results.json error_mapping"}
+}

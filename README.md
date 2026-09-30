@@ -36,7 +36,7 @@ The default listener is `127.0.0.1:8080`, and the database is `.data/router.sqli
 /tmp/jev-router dashboard --no-open
 ```
 
-The UI is served at `/dashboard/` by the same Go binary. Use `dashboard --url https://router.example.com` for a remote instance. This command never starts the server or passes credentials to the browser. Enter the settings credential on the page; it stays in page memory and must be entered again after refresh. Remote connections require HTTPS.
+The UI is served at `/dashboard/` by the same Go binary. Use `dashboard --url https://router.example.com` for a remote instance. This command never starts the server or passes credentials to the browser. Enter the Settings credential once to establish a 24-hour HttpOnly session; refresh and same-credential restart retain login. Logout revokes the current session. Remote browser access requires HTTPS and `JEV_ROUTER_DASHBOARD_ORIGIN`; see [session configuration](docs/configuration.md#dashboard-sessions).
 
 The English/Chinese UI shows instance status, models, the routing prompt and routing records. It edits model descriptions and the prompt through the existing management API, preserving version conflicts and explicit same-key retries. Configure providers, model mappings and capabilities through the CLI. See [UI development and boundaries](web/README.md).
 
