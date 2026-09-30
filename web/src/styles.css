@@ -721,13 +721,7 @@ pre {
 
 .provider-details {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   margin-block: 24px;
-}
-.provider-details input {
-  width: 100%;
-  background: #faf9f5;
-}
-.provider-details small {
-  color: #706b65;
+  overflow-wrap: anywhere;
 }
