@@ -10,6 +10,10 @@
 
 推荐通过 [Docker Compose 快速开始](quickstart/README.zh-CN.md)部署 Docker Hub 预构建镜像，包含 SQLite 持久化和管理 UI，无需本地安装 Go 或 Node。
 
+### 本地 CLI
+
+通过 GitHub Releases 下载 CLI，即可管理远程 Compose 实例，详见 [CLI 安装与远程访问](docs/cli-installation.zh-CN.md)。
+
 ### 从源码运行
 
 需要 Go 1.27.0；SQLite 驱动无需 CGO。
