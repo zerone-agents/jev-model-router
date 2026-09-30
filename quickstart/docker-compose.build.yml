@@ -1,0 +1,8 @@
+# docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+services:
+  router:
+    image: jev-model-router:local
+    pull_policy: build
+    build:
+      context: ..
+      dockerfile: Dockerfile

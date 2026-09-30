@@ -1,0 +1,21 @@
+services:
+  router:
+    image: ${ROUTER_IMAGE:-zeroneai/jev-model-router:latest}
+    restart: unless-stopped
+    ports:
+      - "${ROUTER_BIND:-127.0.0.1}:${ROUTER_PORT:-8080}:8080"
+    environment:
+      JEV_ROUTER_SETTINGS_TOKEN: ${JEV_ROUTER_SETTINGS_TOKEN:?Set a unique settings token in .env}
+      JEV_ROUTER_INFERENCE_TOKEN: ${JEV_ROUTER_INFERENCE_TOKEN:?Set a different inference token in .env}
+      PROVIDER_API_KEY: ${PROVIDER_API_KEY:-}
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
+    volumes:
+      - router_data:/data
+    healthcheck:
+      test: ["CMD", "jev-router", "schema", "providers.get"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+volumes:
+  router_data:
