@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   PageTitle,
   Empty,
   ErrorBox,
   Loading,
   Pager,
+  NumberedPager,
   useRead,
   type PageProps,
 } from "./components";
@@ -132,14 +133,27 @@ export function Models(
   },
 ) {
   const { lang } = props;
-  const [cursors, setCursors] = useState([""]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [selected, setSelected] = useState("");
   const [listRevision, setListRevision] = useState(0);
   const { data, error, loading } = useRead<{
     items: Model[];
+    total: number;
     next_cursor: string;
     version: number;
-  }>(props, "models.list", { cursor: cursors.at(-1), limit: 20 }, listRevision);
+  }>(
+    props,
+    "models.list",
+    { offset: (page - 1) * pageSize, limit: pageSize, sort: "enabled_first" },
+    listRevision,
+  );
+  useEffect(() => {
+    if (data?.total !== undefined) {
+      const lastPage = Math.max(1, Math.ceil(data.total / pageSize));
+      if (page > lastPage) setPage(lastPage);
+    }
+  }, [data?.total, page, pageSize]);
   return (
     <>
       <PageTitle
@@ -154,7 +168,7 @@ export function Models(
           <button
             disabled={loading}
             onClick={() => {
-              setCursors([""]);
+              setPage(1);
               setListRevision((value) => value + 1);
             }}
           >
@@ -226,7 +240,9 @@ export function Models(
                       <h3>
                         {m.id}
                         <span
-                          className={"badge " + (m.enabled ? "enabled" : "")}
+                          className={
+                            "badge " + (m.enabled ? "enabled" : "disabled")
+                          }
                         >
                           {text(
                             lang,
@@ -239,21 +255,46 @@ export function Models(
                         {m.description ||
                           text(lang, "No description yet", "暂无描述")}
                       </p>
-                      <small>
-                        {m.provider_id} / {m.upstream_name}
-                      </small>
+                      <div className="model-details">
+                        <small>
+                          {m.provider_id} / {m.upstream_name}
+                        </small>
+
+                        {m.location && (
+                          <span className="badge">{m.location}</span>
+                        )}
+                        {m.capabilities.tools === true && (
+                          <span className="badge">
+                            {text(lang, "Tools", "工具")}
+                          </span>
+                        )}
+                        {m.capabilities.images === true && (
+                          <span className="badge">
+                            {text(lang, "Images", "图片")}
+                          </span>
+                        )}
+                        {m.capabilities.structured_output === true && (
+                          <span className="badge">
+                            {text(lang, "Structured output", "结构化输出")}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <span aria-hidden>↗</span>
                   </button>
                 ))}
               </div>
             )}
-            <Pager
+            <NumberedPager
               lang={lang}
-              next={data.next_cursor}
-              back={cursors.length > 1}
-              onBack={() => setCursors((x) => x.slice(0, -1))}
-              onNext={() => setCursors((x) => [...x, data.next_cursor])}
+              total={data.total ?? data.items.length}
+              page={page}
+              pageSize={pageSize}
+              onPage={setPage}
+              onPageSize={(size) => {
+                setPageSize(size);
+                setPage(1);
+              }}
             />
           </>
         )
