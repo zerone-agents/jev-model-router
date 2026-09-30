@@ -45,13 +45,15 @@ export function App() {
   const [token, setToken] = useState("");
   const [error, setError] = useState<unknown>();
   const [busy, setBusy] = useState(false);
+  const [restoring, setRestoring] = useState(true);
+  const [restoreFailed, setRestoreFailed] = useState(false);
   const [mobile, setMobile] = useState(false);
   const dirty = useRef(false);
   const setDirty = useCallback((value: boolean) => {
     dirty.current = value;
   }, []);
   const disconnect = useCallback(() => {
-    session.disconnect();
+    session.dispose();
     setClient(null);
     setToken("");
     setBusy(false);
@@ -59,7 +61,61 @@ export function App() {
     setMobile(false);
     setError(undefined);
   }, [session]);
-  useEffect(() => () => session.disconnect(), [session]);
+  const restore = useCallback(async () => {
+    setRestoring(true);
+    setRestoreFailed(false);
+    setError(undefined);
+    try {
+      if (await session.restore()) {
+        setClient(session.client);
+        setPage("overview");
+      } else {
+        setClient(null);
+      }
+    } catch (e) {
+      setError(e);
+      setRestoreFailed(true);
+    } finally {
+      setRestoring(false);
+    }
+  }, [session]);
+  useEffect(() => {
+    let active = true;
+    void Promise.resolve()
+      .then(async () => {
+        if (!active) return;
+        return session.restore();
+      })
+      .then((ok) => {
+        if (active && ok) setClient(session.client);
+      })
+      .catch((e) => {
+        if (active) {
+          setError(e);
+          setRestoreFailed(true);
+        }
+      })
+      .finally(() => {
+        if (active) setRestoring(false);
+      });
+    return () => {
+      active = false;
+      session.dispose();
+    };
+  }, [session]);
+  const logout = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      await session.logout();
+      disconnect();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
   useEffect(() => {
     document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
     try {
@@ -140,6 +196,7 @@ export function App() {
         {text(lang, "Connected to instance", "已连接实例")}
         <small>{location.host}</small>
         <button
+          disabled={busy}
           onClick={() => {
             if (
               !dirty.current ||
@@ -151,7 +208,7 @@ export function App() {
                 ),
               )
             )
-              disconnect();
+              void logout();
           }}
         >
           <SignOut size={18} />
@@ -195,60 +252,82 @@ export function App() {
                 "连接你的实例，调整模型描述与选模偏好。",
               )}
             </p>
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (busy) return;
-                if (!secureOrigin(new URL(location.href))) {
-                  setError(new APIError("https_required"));
-                  return;
-                }
-                setBusy(true);
-                setError(undefined);
-                const value = token;
-                setToken("");
-                try {
-                  if (await session.connect(value)) {
-                    setClient(session.client);
-                    setPage("overview");
+            {restoring ? (
+              <p role="status">
+                {text(lang, "Restoring session…", "正在恢复会话…")}
+              </p>
+            ) : restoreFailed ? (
+              <>
+                <ErrorBox error={error} lang={lang} />
+                <button className="primary" onClick={() => void restore()}>
+                  {text(lang, "Retry connection", "重试连接")}
+                </button>
+              </>
+            ) : (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (busy) return;
+                  if (!secureOrigin(new URL(location.href))) {
+                    setError(new APIError("https_required"));
+                    return;
                   }
-                } catch (e) {
-                  setError(e);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              <label htmlFor="credential">
-                {text(lang, "Settings credential", "Settings 凭证")}
-              </label>
-              <input
-                id="credential"
-                type="password"
-                autoComplete="off"
-                spellCheck={false}
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                required
+                  setBusy(true);
+                  setError(undefined);
+                  const value = token;
+                  setToken("");
+                  try {
+                    if (await session.connect(value)) {
+                      setClient(session.client);
+                      setPage("overview");
+                    }
+                  } catch (e) {
+                    setError(e);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                <label htmlFor="credential">
+                  {text(lang, "Settings credential", "Settings 凭证")}
+                </label>
+                <input
+                  id="credential"
+                  type="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  required
+                  disabled={busy}
+                />
+                <small>
+                  {text(
+                    lang,
+                    "Exchanged for a 24-hour session. Refreshing keeps you connected.",
+                    "凭证交换为 24 小时会话，刷新后保持连接。",
+                  )}
+                </small>
+                {error != null && <ErrorBox error={error} lang={lang} />}
+                <button className="primary" disabled={busy || !token}>
+                  {text(
+                    lang,
+                    busy ? "Connecting…" : "Connect to instance",
+                    busy ? "正在连接…" : "连接实例",
+                  )}
+                  <ArrowRight size={18} />
+                </button>
+              </form>
+            )}
+            {!restoring && !restoreFailed && (
+              <button
+                type="button"
                 disabled={busy}
-              />
-              <small>
-                {text(
-                  lang,
-                  "Kept in memory only. Refreshing requires reconnecting.",
-                  "凭证仅保留在页面内存中，刷新后需重新连接。",
-                )}
-              </small>
-              {error != null && <ErrorBox error={error} lang={lang} />}
-              <button className="primary" disabled={busy || !token}>
-                {text(
-                  lang,
-                  busy ? "Connecting…" : "Connect to instance",
-                  busy ? "正在连接…" : "连接实例",
-                )}
-                <ArrowRight size={18} />
+                onClick={() => void restore()}
+              >
+                {text(lang, "Restore current session", "恢复当前会话")}
               </button>
-            </form>
+            )}
             <div className="connect-host">{location.host}</div>
           </section>
           <footer>
@@ -295,6 +374,39 @@ export function App() {
               <span>/</span>
               {labels[lang][page]}
             </div>
+            {error != null && (
+              <div className="notice" role="status">
+                <p>
+                  {text(
+                    lang,
+                    "Logout was not confirmed. Retry, or restore the current session if it changed.",
+                    "未能确认注销。请重试；若会话已变化，请恢复当前会话。",
+                  )}
+                </p>
+                <ErrorBox error={error} lang={lang} />
+                <button
+                  disabled={busy}
+                  onClick={() => {
+                    if (
+                      !dirty.current ||
+                      window.confirm(
+                        text(
+                          lang,
+                          "Discard unsaved changes?",
+                          "放弃未保存的修改？",
+                        ),
+                      )
+                    ) {
+                      dirty.current = false;
+                      disconnect();
+                      void restore();
+                    }
+                  }}
+                >
+                  {text(lang, "Restore current session", "恢复当前会话")}
+                </button>
+              </div>
+            )}
             <div className="page-content" key={page}>
               {!can(required[page]) ? (
                 <div className="empty">
