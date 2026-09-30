@@ -7,8 +7,10 @@ const client = (data: unknown) =>
     "x",
     vi
       .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ ok: true, data, meta: {} })),
+      .mockImplementation(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ ok: true, data, meta: {} })),
+        ),
       ),
   );
 it("shows readiness separately from actual upstream health", async () => {
@@ -98,3 +100,42 @@ it("late model details cannot replace the newly selected model", async () => {
     expect(screen.queryByText(/"old"/)).not.toBeInTheDocument(),
   );
 });
+
+it.each([false, true])(
+  "only confirms returning when dirty=%s",
+  async (dirty) => {
+    const user = (await import("@testing-library/user-event")).default.setup();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(
+      <Models
+        client={client({
+          version: 1,
+          items: [
+            {
+              id: "m",
+              description: "original",
+              enabled: true,
+              capabilities: {},
+            },
+          ],
+          next_cursor: "",
+        })}
+        lang="en"
+        onError={() => {}}
+        canEdit
+        onDirty={() => {}}
+        hasUnsavedChanges={() => dirty}
+        renderEditor={() => <p>Model editor</p>}
+      />,
+    );
+    await user.click(await screen.findByRole("button", { name: /original/ }));
+    await user.click(screen.getByRole("button", { name: /All models/ }));
+    expect(confirm).toHaveBeenCalledTimes(dirty ? 1 : 0);
+    if (dirty) expect(screen.getByText("Model editor")).toBeInTheDocument();
+    else
+      expect(
+        await screen.findByRole("button", { name: /original/ }),
+      ).toBeInTheDocument();
+    confirm.mockRestore();
+  },
+);

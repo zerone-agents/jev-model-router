@@ -126,6 +126,7 @@ export function Overview(props: PageProps) {
 export function Models(
   props: PageProps & {
     canEdit: boolean;
+    hasUnsavedChanges?: () => boolean;
     onDirty: (dirty: boolean) => void;
     renderEditor?: (id: string) => React.ReactNode;
   },
@@ -155,6 +156,7 @@ export function Models(
             className="back"
             onClick={() => {
               if (
+                !props.hasUnsavedChanges?.() ||
                 window.confirm(
                   text(
                     lang,

@@ -312,6 +312,7 @@ export function App() {
                   <Models
                     {...props}
                     canEdit={can("models.put")}
+                    hasUnsavedChanges={() => dirty.current}
                     onDirty={setDirty}
                     renderEditor={(id) =>
                       can("models.get") ? (
