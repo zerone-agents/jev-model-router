@@ -206,7 +206,7 @@ func ChatInvalidField(input json.RawMessage) string {
 				return "unknown field"
 			}
 			for _, c := range key {
-				if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_') {
+				if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '_' {
 					return "unknown field"
 				}
 			}

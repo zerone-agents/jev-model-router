@@ -38,7 +38,7 @@ SSE usage 按上游实际提供情况返回：未报告时省略，明确报告�
 
 Chat Completions 与 `route.inspect` 接受 `max_tokens` 或 `max_completion_tokens`，二者只能出现一个，即使值相同或其中一个为 null 也拒绝。内部容量估算、Jev 决策输入和生成适配统一使用 `max_completion_tokens`，不会钳制或丢弃值。自动与显式选模均执行相同限制。
 
-冲突返回 HTTP 400 / `invalid_request`，消息说明两个字段互斥；范围外、null、字符串、布尔、数组、对象和非整数值返回同一错误码，消息指出字段及整数范围 16–10000000。其他未支持字段仍返回 `unsupported_request`；schema 错误尽可能指出顶层字段，不回显字段值、对话内容或 schema 原始错误。异常长度或字符的未知字段名使用通用提示。
+Chat Completions 与 `route.inspect` 共享以下字段校验与诊断：冲突返回 HTTP 400 / `invalid_request`，消息说明两个字段互斥；范围外、null、字符串、布尔、数组、对象和非整数值返回同一错误码，消息指出字段及整数范围 16–10000000。其他未支持字段仍返回 `unsupported_request`；schema 错误尽可能指出顶层字段，不回显字段值、对话内容或 schema 原始错误。异常长度或字符的未知字段名使用通用提示。
 
 `go test ./internal/transport/http -run TestSDKOutputLimitThroughRouter -v` 使用生产 HTTP、路由和 Bifrost 路径加本地模拟生成端点，覆盖两种字段、两种选模路径、JSON/SSE、输出限制保留及无效请求不外发。路由测试另覆盖上下文预算、上下界和冲突。
 
