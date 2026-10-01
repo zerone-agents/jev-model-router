@@ -66,6 +66,11 @@ test.beforeAll(async ({ request }) => {
         tools: true,
         images: false,
         structured_output: true,
+        reasoning: [
+          { enable_thinking: true },
+          { reasoning_effort: "high" },
+          { enable_thinking: true, reasoning_effort: "high" },
+        ],
       },
     },
     true,
@@ -79,6 +84,7 @@ test("real API read, edit, conflict, retry, language, disconnect and refresh", a
   await expect(page.getByText("Ready", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Models", exact: true }).click();
   await page.getByRole("button", { name: /flash Enabled/ }).click();
+  await expect(page.getByText(/reasoning:.*enable_thinking/)).toBeVisible();
   const editor = page.getByLabel("Model description");
   await editor.fill("Updated description");
   await page.getByRole("button", { name: "Save changes" }).click();
@@ -86,6 +92,10 @@ test("real API read, edit, conflict, retry, language, disconnect and refresh", a
   expect(
     (await call(request, "models.get", { id: "flash" })).resource.description,
   ).toBe("Updated description");
+  expect(
+    (await call(request, "models.get", { id: "flash" })).resource.capabilities
+      .reasoning,
+  ).toHaveLength(3);
   await page
     .getByRole("button", { name: "Routing prompt", exact: true })
     .click();

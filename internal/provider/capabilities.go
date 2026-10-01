@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/maximhq/bifrost/core/providers/openai"
+	providerutils "github.com/maximhq/bifrost/core/providers/utils"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"reflect"
@@ -26,6 +27,21 @@ func encode(ctx *schemas.BifrostContext, target routing.Target, r routing.Reques
 	req.Provider = schemas.OpenAI
 	req.Model = target.Model.UpstreamName
 	req.Fallbacks = nil
+	// The current adapter targets OpenAI-compatible endpoints. Preserve the
+	// validated wire controls rather than applying OpenAI model-name heuristics
+	// to third-party models. Only these allowlisted fields can enter ExtraParams.
+	req.Params.Reasoning = nil
+	req.Params.ExtraParams = map[string]interface{}{}
+	for _, key := range []string{"chat_template_kwargs", "reasoning_effort"} {
+		if raw := r.Options[key]; raw != nil {
+			var value any
+			if err := json.Unmarshal(raw, &value); err != nil {
+				return nil, err
+			}
+			req.Params.ExtraParams[key] = value
+		}
+	}
+	ctx.SetValue(schemas.BifrostContextKeyPassthroughExtraParams, true)
 	return req, nil
 }
 func Check(target routing.Target, r routing.Request) error {
@@ -41,14 +57,22 @@ func Check(target routing.Target, r routing.Request) error {
 	if routing.RequiresStructuredOutput(r) && !target.Model.Capabilities.StructuredOutput {
 		return routing.Fail("unsupported_request", "model does not support structured output")
 	}
+	if e := routing.CheckReasoning(target.Model.Capabilities, r); e != nil {
+		return e
+	}
 	ctx := schemas.NewBifrostContext(context.Background(), time.Time{})
 	defer ctx.Cancel()
 	req, e := encode(ctx, target, r)
 	if e != nil {
 		return routing.Fail("unsupported_request", "cannot encode request")
 	}
-	converted := openai.ToOpenAIChatRequest(ctx, req)
-	after, _ := json.Marshal(converted)
+	// Use the same final serialization and extension merge as the actual send.
+	after, failure := providerutils.CheckContextAndGetRequestBody(ctx, req, func() (providerutils.RequestBodyWithExtraParams, error) {
+		return openai.ToOpenAIChatRequest(ctx, req), nil
+	})
+	if failure != nil {
+		return routing.Fail("unsupported_request", "cannot encode request")
+	}
 	before, _ := json.Marshal(r)
 	var a, b map[string]any
 	json.Unmarshal(before, &a)

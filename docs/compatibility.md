@@ -48,4 +48,39 @@ Chat Completions 与 `route.inspect` 共享以下字段校验与诊断：冲突�
 JEV_TEST_AGENT_SDK=/absolute/path/to/agent-sdk go test ./internal/transport/http -run TestUnmodifiedAgentSDK -count=1 -v
 ```
 
-未设置变量时此 SDK 集成测试明确跳过，常规 Go 回归仍执行。`reasoning_effort`、`chat_template_kwargs` 与空 tools 数组未因本修复而获得支持。
+未设置变量时此 SDK 集成测试明确跳过，常规 Go 回归仍执行。该次 #18 修复没有扩大推理参数或空 tools 数组的支持范围；推理参数的后续支持见下节。
+
+## agent-sdk 推理参数兼容（Issue #22）
+
+Chat Completions 和 `route.inspect` 接受以下显式控制：
+
+- `chat_template_kwargs` 只允许必填的布尔字段 `enable_thinking`；支持 true 与 false，不接受空对象、null 或其他模板参数。
+- `reasoning_effort` 接受 `none`、`minimal`、`low`、`medium`、`high`、`xhigh`、`max`。这是入口词汇范围，不代表所有模型支持这些值。
+- SDK 的 `thinking: {type: "enabled"}` 对应上述 `chat_template_kwargs`；入口不接收 SDK 内部的顶层 `thinking` 对象。
+
+模型配置新增可选的 `capabilities.reasoning` 数组，逐项声明**已验证的完整参数组合**。字段省略表示请求中也必须省略该字段，不是通配符。分别声明 thinking 和 effort，不会自动允许两者同时使用。例如，确认某端点/模型支持下面三种请求后，可配置：
+
+```json
+"reasoning": [
+  {"enable_thinking": true},
+  {"reasoning_effort": "high"},
+  {"enable_thinking": true, "reasoning_effort": "high"}
+]
+```
+
+数组省略或为空时，仍允许无显式推理控制的原有请求，但不允许任何显式推理控制；上游默认行为保持不变。允许关闭 thinking 需另行声明 `{"enable_thinking": false}`。此能力以实际 endpoint/model 测试为准，不依据模型名称猜测或由连接测试自动赋予。
+
+`auto` 在调用 Jev 前过滤不支持组合的模型；显式选模不兼容返回 `unsupported_request`，自动选模没有合格候选返回 `no_candidates`。Jev state 的 requirements 包含完整推理控制，计入必需部分字节预算。选模检查和生成使用同一规划及适配检查。
+
+当前 OpenAI 兼容上游路径通过 Bifrost 的 ExtraParams 仅转发这两个已校验字段，绕开 OpenAI 模型名称对 effort 的自动归一化；不开放任意 overrides。适配检查使用与发送相同的转换、序列化及扩展合并函数。输出限额维持既有 max_completion_tokens 语义，不换算为 thinking budget；不增加重试、fallback 或静默降级。
+
+JSON message 与 SSE delta 保留文本 `reasoning_content`，仅含推理文本的 SSE 帧也属于有效输出，参与首包/空闲超时处理。允许 assistant 历史消息携带有界字符串 `reasoning_content`，以支持 SDK 回传 thinking 历史；签名、加密及其他 reasoning 扩展仍不支持。推理历史属于会话文本，可随其他对话内容发送给 Jev，并计入预算；不写入路由记录。
+
+2026-10-01 本地验证：完整 Go 回归通过，未修改的本地 agent-sdk **3.5.1** 已通过 thinking、high effort、两者同时使用 × auto/显式模型 × JSON/SSE 的 12 次调用。该 SDK 仍发送 max_tokens，由 Router 既有兼容逻辑归一化；验证脚本打印实际 SDK 版本，不再假设本地 checkout 固定为 4.0.0。模拟上游检查实际发送的参数、输出预算、推理历史，并返回可断言的推理文本、正文及结束事件。另覆盖 false、各 effort 值在模型名称启发式下不被改写、无效组合零调用、推理阶段取消及路由检查一致性。
+
+```sh
+JEV_TEST_AGENT_SDK=/absolute/path/to/agent-sdk go test ./internal/transport/http -run TestUnmodifiedAgentSDKReasoning -count=1 -v
+go test ./internal/provider -run Reasoning -count=1
+```
+
+2026-10-01 随后完成真实阿里云对照：`qwen3.8-flash` 与 `qwen3.8-max` 的 thinking enabled、high effort 及两者组合，在未经修改的 SDK 直连、本地 Router 显式选模和 auto 路径上均通过 JSON/SSE 验证。已核对实际控制字段、1024 输出限额、非空正文/推理文本、stop 与 SSE DONE；auto 使用唯一合格候选，未调用真实 Jev。仅承诺本次已测组合，其他 effort 值及 thinking=false 仍需对应端点验证。详细范围和脱敏证据见 [真实验收记录](acceptance/2026-10-01-reasoning.md)。

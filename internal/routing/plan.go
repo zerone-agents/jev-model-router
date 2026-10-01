@@ -99,6 +99,9 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 		if HasImages(r) && !m.Capabilities.Images || RequiresTools(r) && !m.Capabilities.Tools || RequiresStructuredOutput(r) && !m.Capabilities.StructuredOutput {
 			e = Fail("unsupported_request", "model capabilities do not support request")
 		}
+		if e == nil {
+			e = CheckReasoning(m.Capabilities, r)
+		}
 		if e == nil && p.Check != nil {
 			e = p.Check(target, r)
 		}

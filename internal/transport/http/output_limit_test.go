@@ -95,7 +95,7 @@ func TestSDKOutputLimitThroughRouter(t *testing.T) {
 func TestUnmodifiedAgentSDK(t *testing.T) {
 	sdk := os.Getenv("JEV_TEST_AGENT_SDK")
 	if sdk == "" {
-		t.Skip("set JEV_TEST_AGENT_SDK to an agent-sdk 4.0.0 checkout with tsx installed")
+		t.Skip("set JEV_TEST_AGENT_SDK to an agent-sdk checkout with tsx installed")
 	}
 	h, calls := outputLimitRouter(t)
 	server := httptest.NewServer(h)

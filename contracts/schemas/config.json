@@ -73,6 +73,33 @@
           },
           "structured_output": {
             "type": "boolean"
+          },
+          "reasoning": {
+            "type": "array",
+            "maxItems": 64,
+            "uniqueItems": true,
+            "description": "Verified exact combinations of reasoning controls. Omitted fields mean absent in the request, not a wildcard. Empty or omitted means no explicit reasoning controls supported.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "enable_thinking": {
+                  "type": "boolean"
+                },
+                "reasoning_effort": {
+                  "enum": [
+                    "none",
+                    "minimal",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                }
+              },
+              "minProperties": 1,
+              "additionalProperties": false
+            }
           }
         },
         "required": [

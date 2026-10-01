@@ -1,0 +1,609 @@
+{
+  "date": "2026-10-01",
+  "sdk_version": "3.5.1",
+  "scope": "User-provided Alibaba OpenAI-compatible endpoint; local patched router; synthetic greeting prompt; no endpoint or credentials retained.",
+  "auto_path": "single eligible candidate; second model excluded by reasoning capabilities; no live Jev call",
+  "output_limit": 1024,
+  "cases": [
+    {
+      "model": "qwen3.8-flash",
+      "path": "direct-observed",
+      "controls": "thinking",
+      "stream": false,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": null,
+      "text_chars": 6,
+      "thinking_chars": 95,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_tokens": 1024
+      }
+    },
+    {
+      "model": "qwen3.8-flash",
+      "path": "direct-observed",
+      "controls": "thinking",
+      "stream": true,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": true,
+      "text_chars": 12,
+      "thinking_chars": 95,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_tokens": 1024
+      }
+    },
+    {
+      "model": "qwen3.8-flash",
+      "path": "direct-observed",
+      "controls": "effort",
+      "stream": false,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": null,
+      "text_chars": 6,
+      "thinking_chars": 128,
+      "wire_controls": {
+        "max_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-flash",
+      "path": "direct-observed",
+      "controls": "effort",
+      "stream": true,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": true,
+      "text_chars": 6,
+      "thinking_chars": 130,
+      "wire_controls": {
+        "max_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-flash",
+      "path": "direct-observed",
+      "controls": "both",
+      "stream": false,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": null,
+      "text_chars": 6,
+      "thinking_chars": 192,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-flash",
+      "path": "direct-observed",
+      "controls": "both",
+      "stream": true,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": true,
+      "text_chars": 6,
+      "thinking_chars": 97,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-flash",
+      "path": "explicit",
+      "controls": "thinking",
+      "stream": false,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": null,
+      "text_chars": 6,
+      "thinking_chars": 89,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_completion_tokens": 1024
+      }
+    },
+    {
+      "model": "qwen3.8-flash",
+      "path": "explicit",
+      "controls": "thinking",
+      "stream": true,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": true,
+      "text_chars": 6,
+      "thinking_chars": 153,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_completion_tokens": 1024
+      }
+    },
+    {
+      "model": "qwen3.8-flash",
+      "path": "explicit",
+      "controls": "effort",
+      "stream": false,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": null,
+      "text_chars": 6,
+      "thinking_chars": 107,
+      "wire_controls": {
+        "max_completion_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-flash",
+      "path": "explicit",
+      "controls": "effort",
+      "stream": true,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": true,
+      "text_chars": 6,
+      "thinking_chars": 209,
+      "wire_controls": {
+        "max_completion_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-flash",
+      "path": "explicit",
+      "controls": "both",
+      "stream": false,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": null,
+      "text_chars": 6,
+      "thinking_chars": 136,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_completion_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-flash",
+      "path": "explicit",
+      "controls": "both",
+      "stream": true,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": true,
+      "text_chars": 6,
+      "thinking_chars": 99,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_completion_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-flash",
+      "path": "auto",
+      "controls": "thinking",
+      "stream": false,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": null,
+      "text_chars": 6,
+      "thinking_chars": 802,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_completion_tokens": 1024
+      }
+    },
+    {
+      "model": "qwen3.8-flash",
+      "path": "auto",
+      "controls": "thinking",
+      "stream": true,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": true,
+      "text_chars": 12,
+      "thinking_chars": 1702,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_completion_tokens": 1024
+      }
+    },
+    {
+      "model": "qwen3.8-flash",
+      "path": "auto",
+      "controls": "effort",
+      "stream": false,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": null,
+      "text_chars": 6,
+      "thinking_chars": 127,
+      "wire_controls": {
+        "max_completion_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-flash",
+      "path": "auto",
+      "controls": "effort",
+      "stream": true,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": true,
+      "text_chars": 6,
+      "thinking_chars": 339,
+      "wire_controls": {
+        "max_completion_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-flash",
+      "path": "auto",
+      "controls": "both",
+      "stream": false,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": null,
+      "text_chars": 6,
+      "thinking_chars": 110,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_completion_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-flash",
+      "path": "auto",
+      "controls": "both",
+      "stream": true,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": true,
+      "text_chars": 6,
+      "thinking_chars": 117,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_completion_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "path": "direct-observed",
+      "controls": "thinking",
+      "stream": false,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": null,
+      "text_chars": 6,
+      "thinking_chars": 156,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_tokens": 1024
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "path": "direct-observed",
+      "controls": "thinking",
+      "stream": true,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": true,
+      "text_chars": 6,
+      "thinking_chars": 109,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_tokens": 1024
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "path": "direct-observed",
+      "controls": "effort",
+      "stream": false,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": null,
+      "text_chars": 6,
+      "thinking_chars": 103,
+      "wire_controls": {
+        "max_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "path": "direct-observed",
+      "controls": "effort",
+      "stream": true,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": true,
+      "text_chars": 6,
+      "thinking_chars": 86,
+      "wire_controls": {
+        "max_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "path": "direct-observed",
+      "controls": "both",
+      "stream": false,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": null,
+      "text_chars": 6,
+      "thinking_chars": 80,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "path": "direct-observed",
+      "controls": "both",
+      "stream": true,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": true,
+      "text_chars": 6,
+      "thinking_chars": 170,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "path": "explicit",
+      "controls": "thinking",
+      "stream": false,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": null,
+      "text_chars": 6,
+      "thinking_chars": 107,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_completion_tokens": 1024
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "path": "explicit",
+      "controls": "thinking",
+      "stream": true,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": true,
+      "text_chars": 6,
+      "thinking_chars": 159,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_completion_tokens": 1024
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "path": "explicit",
+      "controls": "effort",
+      "stream": false,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": null,
+      "text_chars": 6,
+      "thinking_chars": 113,
+      "wire_controls": {
+        "max_completion_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "path": "explicit",
+      "controls": "effort",
+      "stream": true,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": true,
+      "text_chars": 6,
+      "thinking_chars": 101,
+      "wire_controls": {
+        "max_completion_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "path": "explicit",
+      "controls": "both",
+      "stream": false,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": null,
+      "text_chars": 6,
+      "thinking_chars": 172,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_completion_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "path": "explicit",
+      "controls": "both",
+      "stream": true,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": true,
+      "text_chars": 6,
+      "thinking_chars": 158,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_completion_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "path": "auto",
+      "controls": "thinking",
+      "stream": false,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": null,
+      "text_chars": 6,
+      "thinking_chars": 163,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_completion_tokens": 1024
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "path": "auto",
+      "controls": "thinking",
+      "stream": true,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": true,
+      "text_chars": 6,
+      "thinking_chars": 86,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_completion_tokens": 1024
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "path": "auto",
+      "controls": "effort",
+      "stream": false,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": null,
+      "text_chars": 6,
+      "thinking_chars": 80,
+      "wire_controls": {
+        "max_completion_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "path": "auto",
+      "controls": "effort",
+      "stream": true,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": true,
+      "text_chars": 6,
+      "thinking_chars": 110,
+      "wire_controls": {
+        "max_completion_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "path": "auto",
+      "controls": "both",
+      "stream": false,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": null,
+      "text_chars": 6,
+      "thinking_chars": 113,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_completion_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "path": "auto",
+      "controls": "both",
+      "stream": true,
+      "http_status": 200,
+      "finish_reason": "stop",
+      "sse_done": true,
+      "text_chars": 6,
+      "thinking_chars": 77,
+      "wire_controls": {
+        "chat_template_kwargs": {
+          "enable_thinking": true
+        },
+        "max_completion_tokens": 1024,
+        "reasoning_effort": "high"
+      }
+    }
+  ]
+}

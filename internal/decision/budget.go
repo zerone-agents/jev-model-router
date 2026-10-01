@@ -72,7 +72,7 @@ func BuildState(in routing.DecisionInput, p BudgetPolicy) (json.RawMessage, erro
 	}
 	s := state{Preference: in.Prompt, Candidates: in.Candidates, Messages: fixed, Tools: in.Request.Tools, Omitted: len(groups) > 1}
 	s.Requirements = map[string]json.RawMessage{}
-	for _, key := range []string{"response_format", "tool_choice", "parallel_tool_calls", "max_completion_tokens"} {
+	for _, key := range []string{"response_format", "tool_choice", "parallel_tool_calls", "max_completion_tokens", "chat_template_kwargs", "reasoning_effort"} {
 		if v := in.Request.Options[key]; v != nil {
 			s.Requirements[key] = append(json.RawMessage{}, v...)
 		}

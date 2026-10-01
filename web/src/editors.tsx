@@ -207,7 +207,10 @@ function Editor(props: Props & { initial: Snapshot }) {
           <div className="capabilities">
             {Object.entries(snapshot.model.capabilities).map(([k, v]) => (
               <span className="badge" key={k}>
-                {k}: {String(v)}
+                {k}:{" "}
+                {typeof v === "object" && v !== null
+                  ? JSON.stringify(v)
+                  : String(v)}
               </span>
             ))}
           </div>
