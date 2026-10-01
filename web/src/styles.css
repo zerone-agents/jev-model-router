@@ -639,6 +639,10 @@ pre {
   flex-wrap: wrap;
   margin: 14px 0;
 }
+.capabilities .badge {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
 .read-only {
   font-size: 12px;
   color: var(--muted);

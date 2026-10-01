@@ -36,6 +36,14 @@ Edit `prompt` to adjust preferences; the default is one balanced template. `auto
 Jev mode offers no sensitive-data routing guarantee. Image fields are excluded from the decision call, but conversation text and tool content may go to Jev. Local Laya, privacy session locking, ArbiterOS are future capabilities, not available in this version. Disabling a model affects new requests; it does not revoke an in-flight snapshot.
 
 
+## Reasoning controls
+
+Discover the current `models.put` and `route.inspect` schemas first. Chat requests support `chat_template_kwargs: {"enable_thinking": true|false}` and `reasoning_effort`; template kwargs cannot contain arbitrary provider overrides. SDK `thinking: {type: "enabled"}` becomes `chat_template_kwargs.enable_thinking=true` on the wire.
+
+Declare verified **exact combinations** in the model's optional `capabilities.reasoning` array. For example, `[{"enable_thinking":true},{"reasoning_effort":"high"},{"enable_thinking":true,"reasoning_effort":"high"}]` allows three distinct shapes. An omitted field means absent in the request, not any value. Omitted/empty reasoning capabilities allow only requests without explicit reasoning controls. Old configurations remain valid; do not infer capabilities from a model name or a basic connection test.
+
+Verify each combination against the actual endpoint/model in JSON and SSE before declaring it. `auto` filters unsupported combinations; explicit selection rejects them. Inspect uses the same checks as generation, and Jev receives the reasoning requirements within its input budget. No field dropping, reasoning downgrade, retry or fallback is used. Output limits are preserved independently of these controls. Responses preserve text `reasoning_content`, including thinking-only SSE events; assistant history can replay this text. Signed/encrypted reasoning and the Anthropic Messages API remain outside this capability.
+
 ## Human dashboard
 
 When the user wants the management page, run `jev-router dashboard` against the running instance; use `--url` for an HTTP(S) root address or `--no-open` to return its URL without network access or a browser. It does not start the server. `serve` provides `/dashboard/` with embedded assets.

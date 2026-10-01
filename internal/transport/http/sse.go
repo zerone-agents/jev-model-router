@@ -84,7 +84,7 @@ func validEvent(e routing.Event) bool {
 		}
 		if c.Delta != nil {
 			d := c.Delta
-			if d.Role != "" || len(d.ToolCalls) > 0 || d.Refusal != nil || (len(d.Content) > 0 && string(d.Content) != `""` && string(d.Content) != "null") {
+			if (d.ReasoningContent != nil && *d.ReasoningContent != "") || d.Role != "" || len(d.ToolCalls) > 0 || d.Refusal != nil || (len(d.Content) > 0 && string(d.Content) != `""` && string(d.Content) != "null") {
 				return true
 			}
 		}

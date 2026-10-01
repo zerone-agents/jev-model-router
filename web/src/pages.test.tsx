@@ -265,3 +265,38 @@ it("searches while typing and expands and highlights matching descriptions", asy
   await user.clear(screen.getByRole("searchbox", { name: "Search models" }));
   await waitFor(() => expect(document.querySelector("mark")).toBeNull());
 });
+
+it("shows reasoning combinations in model details without losing false", async () => {
+  const { ModelEditor } = await import("./editors");
+  render(
+    <ModelEditor
+      id="m"
+      client={client({
+        version: 1,
+        resource: {
+          id: "m",
+          provider_id: "p",
+          upstream_name: "upstream",
+          description: "model",
+          enabled: true,
+          capabilities: {
+            reasoning: [
+              { enable_thinking: false },
+              { reasoning_effort: "high" },
+            ],
+          },
+        },
+      })}
+      lang="en"
+      onError={() => {}}
+      canEdit={false}
+      onDirty={() => {}}
+    />,
+  );
+  expect(
+    await screen.findByText(
+      'reasoning: [{"enable_thinking":false},{"reasoning_effort":"high"}]',
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByText(/\[object Object\]/)).not.toBeInTheDocument();
+});

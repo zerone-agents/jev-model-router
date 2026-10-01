@@ -145,12 +145,32 @@
             },
             "maxItems": 128,
             "minItems": 1
+          },
+          "reasoning_content": {
+            "type": "string",
+            "maxLength": 1048576
           }
         },
         "required": [
           "role"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "reasoning_content"
+              ]
+            },
+            "then": {
+              "properties": {
+                "role": {
+                  "const": "assistant"
+                }
+              }
+            }
+          }
+        ]
       },
       "maxItems": 2048,
       "minItems": 1
@@ -351,6 +371,29 @@
       "type": "integer",
       "minimum": 16,
       "maximum": 10000000
+    },
+    "reasoning_effort": {
+      "enum": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "chat_template_kwargs": {
+      "type": "object",
+      "properties": {
+        "enable_thinking": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enable_thinking"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [

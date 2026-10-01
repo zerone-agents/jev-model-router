@@ -110,3 +110,30 @@ func TestOutputRequirementsConsumeRequiredBudget(t *testing.T) {
 		t.Fatal("oversized required output schema accepted")
 	}
 }
+
+func TestReasoningRequirementsConsumeBudget(t *testing.T) {
+	in := input()
+	base, err := BuildState(in, DefaultBudget())
+	if err != nil {
+		t.Fatal(err)
+	}
+	q, _ := json.Marshal(question(in))
+	p := DefaultBudget()
+	p.MaxBytes = len(base) + len(q) + 512
+	if _, err := BuildState(in, p); err != nil {
+		t.Fatal(err)
+	}
+	in.Request.Options = map[string]json.RawMessage{"chat_template_kwargs": json.RawMessage(`{"enable_thinking":true}`), "reasoning_effort": json.RawMessage(`"high"`)}
+	out, err := BuildState(in, DefaultBudget())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, part := range []string{`"chat_template_kwargs":{"enable_thinking":true}`, `"reasoning_effort":"high"`} {
+		if !bytes.Contains(out, []byte(part)) {
+			t.Fatalf("missing requirement %s", part)
+		}
+	}
+	if _, err := BuildState(in, p); err == nil {
+		t.Fatal("reasoning requirements omitted from budget")
+	}
+}

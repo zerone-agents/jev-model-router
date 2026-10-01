@@ -11,11 +11,19 @@ type Provider struct {
 	BaseURL   string `json:"base_url"`
 	SecretRef string `json:"secret_ref"`
 }
+
+// ReasoningCombination is an exact supported request shape; nil means omitted.
+type ReasoningCombination struct {
+	EnableThinking *bool  `json:"enable_thinking,omitempty"`
+	Effort         string `json:"reasoning_effort,omitempty"`
+}
+
 type Capabilities struct {
-	ContextLimit     int64 `json:"context_limit"`
-	Tools            bool  `json:"tools"`
-	Images           bool  `json:"images"`
-	StructuredOutput bool  `json:"structured_output"`
+	Reasoning        []ReasoningCombination `json:"reasoning,omitempty"`
+	ContextLimit     int64                  `json:"context_limit"`
+	Tools            bool                   `json:"tools"`
+	Images           bool                   `json:"images"`
+	StructuredOutput bool                   `json:"structured_output"`
 }
 type Model struct {
 	ID           string       `json:"id"`
@@ -39,12 +47,13 @@ type Snapshot struct {
 	Prompt    string         `json:"prompt"`
 }
 type Message struct {
-	Refusal    *string         `json:"refusal,omitempty"`
-	Role       string          `json:"role,omitempty"`
-	Content    json.RawMessage `json:"content,omitempty"`
-	Name       string          `json:"name,omitempty"`
-	ToolCallID string          `json:"tool_call_id,omitempty"`
-	ToolCalls  []ToolCall      `json:"tool_calls,omitempty"`
+	ReasoningContent *string         `json:"reasoning_content,omitempty"`
+	Refusal          *string         `json:"refusal,omitempty"`
+	Role             string          `json:"role,omitempty"`
+	Content          json.RawMessage `json:"content,omitempty"`
+	Name             string          `json:"name,omitempty"`
+	ToolCallID       string          `json:"tool_call_id,omitempty"`
+	ToolCalls        []ToolCall      `json:"tool_calls,omitempty"`
 }
 type Function struct {
 	Name        string          `json:"name"`
