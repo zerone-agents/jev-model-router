@@ -58,18 +58,9 @@ Chat Completions 和 `route.inspect` 接受以下显式控制：
 - `reasoning_effort` 接受 `none`、`minimal`、`low`、`medium`、`high`、`xhigh`、`max`。这是入口词汇范围，不代表所有模型支持这些值。
 - SDK 的 `thinking: {type: "enabled"}` 对应上述 `chat_template_kwargs`；入口不接收 SDK 内部的顶层 `thinking` 对象。
 
-模型配置的 `capabilities.reasoning` 数组声明独立支持的参数值，跨条目按字段汇总。请求可单独使用 thinking 或 effort，也可同时使用；不需要声明完整组合。已有同时含两个字段的条目继续有效，两个值也可以单独使用。例如：
+合法的 thinking / effort 参数不要求模型能力声明，单独或同时发送均原样转发，由上游判断是否支持。`auto`、显式选模和 `route.inspect` 都不依据推理能力声明拦截或过滤模型；格式、允许值及未知字段检查仍然保留。上游错误正常返回，不静默删除参数、降级或换模。
 
-```json
-"reasoning": [
-  {"enable_thinking": true},
-  {"reasoning_effort": "high"}
-]
-```
-
-数组省略或为空时，仍允许无显式推理控制的原有请求，但不允许任何显式推理控制；上游默认行为保持不变。允许关闭 thinking 需另行声明 `{"enable_thinking": false}`。此能力以实际 endpoint/model 测试为准，不依据模型名称猜测或由连接测试自动赋予。
-
-`auto` 在调用 Jev 前过滤不支持请求参数值的模型；显式选模不兼容返回 `unsupported_request`，自动选模没有合格候选返回 `no_candidates`。Jev state 的 requirements 包含完整推理控制，计入必需部分字节预算。选模检查和生成使用同一规划及适配检查。
+已有 `capabilities.reasoning` 数组保留读写兼容，仅作为说明性元数据；可省略，无需新增或更新配置。Jev state 的 requirements 仍包含实际请求的推理控制，计入必需部分字节预算。
 
 当前 OpenAI 兼容上游路径通过 Bifrost 的 ExtraParams 仅转发这两个已校验字段，绕开 OpenAI 模型名称对 effort 的自动归一化；不开放任意 overrides。适配检查使用与发送相同的转换、序列化及扩展合并函数。输出限额维持既有 max_completion_tokens 语义，不换算为 thinking budget；不增加重试、fallback 或静默降级。
 

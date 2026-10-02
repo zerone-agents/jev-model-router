@@ -7,31 +7,23 @@ import (
 	"testing"
 )
 
-func TestReasoningEligibility(t *testing.T) {
-	enabled, disabled := true, false
-	s, _ := planFixture()
-	s.Models[0].Capabilities.Reasoning = []ReasoningCombination{{EnableThinking: &enabled}, {Effort: "high"}}
-	s.Models[1].Capabilities.Reasoning = []ReasoningCombination{{EnableThinking: &disabled}}
-	for _, tc := range []struct {
-		fields, model, want string
-		fail                bool
-	}{
-		{`"chat_template_kwargs":{"enable_thinking":true}`, "auto", "a", false},
-		{`"reasoning_effort":"high"`, "auto", "a", false},
-		{`"chat_template_kwargs":{"enable_thinking":true},"reasoning_effort":"high"`, "auto", "a", false},
-		{`"chat_template_kwargs":{"enable_thinking":false}`, "auto", "b", false},
-		{`"chat_template_kwargs":{"enable_thinking":true},"reasoning_effort":"high"`, "a", "a", false},
-		{`"reasoning_effort":"low"`, "auto", "", true},
-		{`"reasoning_effort":"low"`, "a", "", true},
-	} {
-		var r Request
-		if err := json.Unmarshal([]byte(`{"model":"`+tc.model+`","messages":[{"role":"user","content":"hi"}],`+tc.fields+`}`), &r); err != nil {
-			t.Fatal(err)
-		}
-		p := Planner{}
-		plan, err := p.Plan(context.Background(), s, r)
-		if (err != nil) != tc.fail || (!tc.fail && plan.ModelID != tc.want) {
-			t.Fatalf("%s %s: %+v %v", tc.model, tc.fields, plan, err)
+func TestReasoningNeedsNoCapabilityDeclaration(t *testing.T) {
+	for _, declared := range [][]ReasoningCombination{nil, {}, {{EnableThinking: new(false), Effort: "low"}}} {
+		s, _ := planFixture()
+		s.Models = s.Models[:1]
+		s.Models[0].Capabilities.Reasoning = declared
+		for _, model := range []string{"auto", "a"} {
+			for _, fields := range []string{`"chat_template_kwargs":{"enable_thinking":true}`, `"chat_template_kwargs":{"enable_thinking":false}`, `"reasoning_effort":"high"`, `"chat_template_kwargs":{"enable_thinking":true},"reasoning_effort":"high"`} {
+				var r Request
+				if err := json.Unmarshal([]byte(`{"model":"`+model+`","messages":[{"role":"user","content":"hi"}],`+fields+`}`), &r); err != nil {
+					t.Fatal(err)
+				}
+				p := Planner{}
+				plan, err := p.Plan(context.Background(), s, r)
+				if err != nil || plan.ModelID != "a" {
+					t.Fatalf("%s %s: %+v %v", model, fields, plan, err)
+				}
+			}
 		}
 	}
 }
@@ -48,20 +40,6 @@ func TestInvalidReasoningControls(t *testing.T) {
 		}
 		if err := ValidateRequest(r); err == nil || strings.Contains(err.Error(), "SECRET") {
 			t.Fatalf("%s: %v", fields, err)
-		}
-	}
-}
-
-func TestCombinedDeclarationAllowsIndependentControls(t *testing.T) {
-	enabled := true
-	c := Capabilities{Reasoning: []ReasoningCombination{{EnableThinking: &enabled, Effort: "high"}}}
-	for _, fields := range []string{`"chat_template_kwargs":{"enable_thinking":true}`, `"reasoning_effort":"high"`, `"chat_template_kwargs":{"enable_thinking":true},"reasoning_effort":"high"`} {
-		var r Request
-		if err := json.Unmarshal([]byte(`{"model":"a","messages":[{"role":"user","content":"hi"}],`+fields+`}`), &r); err != nil {
-			t.Fatal(err)
-		}
-		if err := CheckReasoning(c, r); err != nil {
-			t.Fatal(err)
 		}
 	}
 }

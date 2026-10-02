@@ -57,9 +57,6 @@ func Check(target routing.Target, r routing.Request) error {
 	if routing.RequiresStructuredOutput(r) && !target.Model.Capabilities.StructuredOutput {
 		return routing.Fail("unsupported_request", "model does not support structured output")
 	}
-	if e := routing.CheckReasoning(target.Model.Capabilities, r); e != nil {
-		return e
-	}
 	ctx := schemas.NewBifrostContext(context.Background(), time.Time{})
 	defer ctx.Cancel()
 	req, e := encode(ctx, target, r)

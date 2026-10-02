@@ -128,9 +128,21 @@ func TestReasoningWireRoundTrip(t *testing.T) {
 	}
 }
 
-func TestUnsupportedReasoningDoesNotGenerate(t *testing.T) {
+func TestReasoningSupportIsDecidedByUpstream(t *testing.T) {
 	var calls atomic.Int32
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1) }))
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		var body map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+		}
+		if string(body["reasoning_effort"]) != `"high"` {
+			t.Error("reasoning effort not preserved")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, `{"error":{"message":"unsupported reasoning effort","type":"invalid_request_error","code":"unsupported_parameter"}}`)
+	}))
 	defer s.Close()
 	for _, streaming := range []bool{false, true} {
 		r := req(t, `{"model":"fast","messages":[{"role":"user","content":"SECRET"}],"reasoning_effort":"high"}`)
@@ -145,8 +157,8 @@ func TestUnsupportedReasoningDoesNotGenerate(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if calls.Load() != 0 {
-		t.Fatal("unsupported reasoning reached upstream")
+	if calls.Load() != 2 {
+		t.Fatalf("expected one upstream attempt per request, got %d", calls.Load())
 	}
 }
 

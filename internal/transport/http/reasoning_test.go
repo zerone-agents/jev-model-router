@@ -28,7 +28,7 @@ func (d reasoningDecider) Choose(_ context.Context, _ routing.DecisionConfig, in
 		ids = append(ids, m.ID)
 	}
 	if in.Request.Options["reasoning_effort"] != nil || in.Request.Options["chat_template_kwargs"] != nil {
-		if !reflect.DeepEqual(ids, []string{"external", "other"}) {
+		if !reflect.DeepEqual(ids, []string{"external", "other", "plain"}) {
 			d.t.Errorf("ineligible candidates: %v", ids)
 		}
 	}
@@ -65,9 +65,10 @@ func reasoningRouter(t *testing.T) (http.Handler, <-chan map[string]json.RawMess
 	cfg := snapshot()
 	cfg.Providers[0].BaseURL = upstream.URL
 	cfg.Models[0].UpstreamName = "qwen-test"
-	cfg.Models[0].Capabilities.Reasoning = []routing.ReasoningCombination{{EnableThinking: new(true)}, {Effort: "high"}, {EnableThinking: new(false)}}
+	cfg.Models[0].Capabilities.Reasoning = nil
 	other := cfg.Models[0]
 	other.ID = "other"
+	other.Capabilities.Reasoning = []routing.ReasoningCombination{{EnableThinking: new(false), Effort: "low"}}
 	unsupported := cfg.Models[0]
 	unsupported.ID = "plain"
 	unsupported.Capabilities.Reasoning = nil
@@ -89,7 +90,7 @@ func reasoningRouter(t *testing.T) (http.Handler, <-chan map[string]json.RawMess
 func TestReasoningThroughRouterAndInspection(t *testing.T) {
 	h, captured, calls := reasoningRouter(t)
 	for _, model := range []string{"auto", "external"} {
-		for _, fields := range []string{`"chat_template_kwargs":{"enable_thinking":true}`, `"reasoning_effort":"high"`, `"chat_template_kwargs":{"enable_thinking":true},"reasoning_effort":"high"`, `"chat_template_kwargs":{"enable_thinking":false}`} {
+		for _, fields := range []string{`"chat_template_kwargs":{"enable_thinking":true}`, `"reasoning_effort":"high"`, `"chat_template_kwargs":{"enable_thinking":true},"reasoning_effort":"high"`, `"chat_template_kwargs":{"enable_thinking":false}`, `"reasoning_effort":"low"`, `"chat_template_kwargs":{"enable_thinking":false},"reasoning_effort":"low"`} {
 			for _, stream := range []bool{false, true} {
 				body := fmt.Sprintf(`{"model":%q,"messages":[{"role":"user","content":"hello"}],"max_completion_tokens":1024,"stream":%t,%s}`, model, stream, fields)
 				before := calls.Load()
@@ -129,9 +130,6 @@ func TestReasoningThroughRouterAndInspection(t *testing.T) {
 	}{
 		{"auto", `"reasoning_effort":"SECRET"`, 400},
 		{"auto", `"chat_template_kwargs":{"enable_thinking":true,"override":"SECRET"}`, 400},
-		{"plain", `"reasoning_effort":"high"`, 400},
-		{"external", `"chat_template_kwargs":{"enable_thinking":false},"reasoning_effort":"low"`, 400},
-		{"auto", `"reasoning_effort":"low"`, 422},
 	} {
 		for _, stream := range []bool{false, true} {
 			body := fmt.Sprintf(`{"model":%q,"messages":[{"role":"user","content":"SECRET"}],"stream":%t,%s}`, tc.model, stream, tc.fields)
