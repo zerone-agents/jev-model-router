@@ -76,6 +76,6 @@ call body 为 `{"input":{...},"expected_version":1,"idempotency_key":"operation-
 
 ## 推理控制与模型能力
 
-`chat.json` 与 `route.inspect` 的发现 schema 接受有界 `chat_template_kwargs.enable_thinking` 和 `reasoning_effort`，拒绝未知模板字段。模型能力新增可选 `reasoning` 数组，声明独立支持的参数值：`enable_thinking`（布尔）和 `reasoning_effort`（枚举）至少一个存在，每项不允许额外字段或重复。各条目声明的值按字段汇总；请求可只传一个字段或同时传多个字段，无需额外声明组合。同一条目中的两个字段也可独立使用；省略/空数组保持旧配置有效，但不允许显式推理控制。保存不执行上游验证，管理员应先验证对应端点与模型。
+`chat.json` 与 `route.inspect` 校验 `chat_template_kwargs.enable_thinking` 和 `reasoning_effort` 的格式及允许值，拒绝未知模板字段。合法推理控制直接原样转发，不要求模型声明能力，也不根据这些参数过滤候选。上游判断是否支持，失败不触发参数删除、降级或换模。
 
-相同校验用于自动选模、显式选模和选模检查。推理控制进入 Jev 必需输入预算，模型列表/详情/写入响应保留能力声明。Chat JSON/SSE 保留文本 reasoning_content，并允许 assistant 历史回传；签名/加密推理扩展不在本契约内。实际验证边界见 docs/compatibility.md 的 Issue #22 章节。
+既有可选 `capabilities.reasoning` 保留读写兼容，但仅作为说明性元数据，不参与请求校验、自动选模或显式选模。无配置、空数组或与请求不同的元数据均不会阻止推理参数透传。Jev 仍接收请求的推理控制并计入输入预算。Chat JSON/SSE 保留文本 reasoning_content，并允许 assistant 历史回传；签名/加密推理扩展不在本契约内。

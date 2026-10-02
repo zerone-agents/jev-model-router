@@ -12,8 +12,8 @@ type Provider struct {
 	SecretRef string `json:"secret_ref"`
 }
 
-// ReasoningCombination declares supported values for independent controls.
-// Values are collected across all entries; nil declares no thinking value.
+// ReasoningCombination is optional informational metadata retained for existing
+// configurations. It does not restrict reasoning requests or model eligibility.
 type ReasoningCombination struct {
 	EnableThinking *bool  `json:"enable_thinking,omitempty"`
 	Effort         string `json:"reasoning_effort,omitempty"`

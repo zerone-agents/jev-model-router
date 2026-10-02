@@ -78,7 +78,7 @@
             "type": "array",
             "maxItems": 64,
             "uniqueItems": true,
-            "description": "Supported reasoning control values, checked independently across entries. Declared values may be used alone or together. Empty or omitted means no explicit reasoning controls supported.",
+            "description": "Optional informational reasoning metadata. Not used for request validation or model eligibility. Valid reasoning controls are forwarded unchanged; support is determined by the upstream.",
             "items": {
               "type": "object",
               "properties": {
