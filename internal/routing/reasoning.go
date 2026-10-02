@@ -2,8 +2,8 @@ package routing
 
 import "encoding/json"
 
-// CheckReasoning matches complete combinations, never the Cartesian product of
-// separately supported controls. No controls retains the upstream default.
+// CheckReasoning validates each supplied control independently.
+// Omitted controls retain the upstream default.
 func CheckReasoning(c Capabilities, r Request) error {
 	var requested ReasoningCombination
 	if raw := r.Options["chat_template_kwargs"]; raw != nil {
@@ -19,16 +19,21 @@ func CheckReasoning(c Capabilities, r Request) error {
 	if requested.EnableThinking == nil && requested.Effort == "" {
 		return nil
 	}
+	thinkingSupported := requested.EnableThinking == nil
+	effortSupported := requested.Effort == ""
 	for _, supported := range c.Reasoning {
-		if supported.Effort != requested.Effort {
-			continue
+		if requested.EnableThinking != nil && supported.EnableThinking != nil && *supported.EnableThinking == *requested.EnableThinking {
+			thinkingSupported = true
 		}
-		if supported.EnableThinking == nil && requested.EnableThinking == nil {
-			return nil
-		}
-		if supported.EnableThinking != nil && requested.EnableThinking != nil && *supported.EnableThinking == *requested.EnableThinking {
-			return nil
+		if requested.Effort != "" && supported.Effort == requested.Effort {
+			effortSupported = true
 		}
 	}
-	return Fail("unsupported_request", "model does not support the requested reasoning control combination; configure capabilities.reasoning with a verified combination or select a compatible model")
+	if !thinkingSupported {
+		return Fail("unsupported_request", "model does not support the requested enable_thinking value; configure capabilities.reasoning or select a compatible model")
+	}
+	if !effortSupported {
+		return Fail("unsupported_request", "model does not support the requested reasoning_effort value; configure capabilities.reasoning or select a compatible model")
+	}
+	return nil
 }

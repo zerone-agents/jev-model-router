@@ -11,16 +11,16 @@ func TestReasoningEligibility(t *testing.T) {
 	enabled, disabled := true, false
 	s, _ := planFixture()
 	s.Models[0].Capabilities.Reasoning = []ReasoningCombination{{EnableThinking: &enabled}, {Effort: "high"}}
-	s.Models[1].Capabilities.Reasoning = []ReasoningCombination{{EnableThinking: &enabled, Effort: "high"}, {EnableThinking: &disabled}}
+	s.Models[1].Capabilities.Reasoning = []ReasoningCombination{{EnableThinking: &disabled}}
 	for _, tc := range []struct {
 		fields, model, want string
 		fail                bool
 	}{
 		{`"chat_template_kwargs":{"enable_thinking":true}`, "auto", "a", false},
 		{`"reasoning_effort":"high"`, "auto", "a", false},
-		{`"chat_template_kwargs":{"enable_thinking":true},"reasoning_effort":"high"`, "auto", "b", false},
+		{`"chat_template_kwargs":{"enable_thinking":true},"reasoning_effort":"high"`, "auto", "a", false},
 		{`"chat_template_kwargs":{"enable_thinking":false}`, "auto", "b", false},
-		{`"chat_template_kwargs":{"enable_thinking":true},"reasoning_effort":"high"`, "a", "", true},
+		{`"chat_template_kwargs":{"enable_thinking":true},"reasoning_effort":"high"`, "a", "a", false},
 		{`"reasoning_effort":"low"`, "auto", "", true},
 		{`"reasoning_effort":"low"`, "a", "", true},
 	} {
@@ -48,6 +48,20 @@ func TestInvalidReasoningControls(t *testing.T) {
 		}
 		if err := ValidateRequest(r); err == nil || strings.Contains(err.Error(), "SECRET") {
 			t.Fatalf("%s: %v", fields, err)
+		}
+	}
+}
+
+func TestCombinedDeclarationAllowsIndependentControls(t *testing.T) {
+	enabled := true
+	c := Capabilities{Reasoning: []ReasoningCombination{{EnableThinking: &enabled, Effort: "high"}}}
+	for _, fields := range []string{`"chat_template_kwargs":{"enable_thinking":true}`, `"reasoning_effort":"high"`, `"chat_template_kwargs":{"enable_thinking":true},"reasoning_effort":"high"`} {
+		var r Request
+		if err := json.Unmarshal([]byte(`{"model":"a","messages":[{"role":"user","content":"hi"}],`+fields+`}`), &r); err != nil {
+			t.Fatal(err)
+		}
+		if err := CheckReasoning(c, r); err != nil {
+			t.Fatal(err)
 		}
 	}
 }
