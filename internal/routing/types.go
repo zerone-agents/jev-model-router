@@ -12,7 +12,8 @@ type Provider struct {
 	SecretRef string `json:"secret_ref"`
 }
 
-// ReasoningCombination is an exact supported request shape; nil means omitted.
+// ReasoningCombination declares supported values for independent controls.
+// Values are collected across all entries; nil declares no thinking value.
 type ReasoningCombination struct {
 	EnableThinking *bool  `json:"enable_thinking,omitempty"`
 	Effort         string `json:"reasoning_effort,omitempty"`

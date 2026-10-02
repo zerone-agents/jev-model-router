@@ -65,7 +65,7 @@ func reasoningRouter(t *testing.T) (http.Handler, <-chan map[string]json.RawMess
 	cfg := snapshot()
 	cfg.Providers[0].BaseURL = upstream.URL
 	cfg.Models[0].UpstreamName = "qwen-test"
-	cfg.Models[0].Capabilities.Reasoning = []routing.ReasoningCombination{{EnableThinking: new(true)}, {Effort: "high"}, {EnableThinking: new(true), Effort: "high"}, {EnableThinking: new(false)}}
+	cfg.Models[0].Capabilities.Reasoning = []routing.ReasoningCombination{{EnableThinking: new(true)}, {Effort: "high"}, {EnableThinking: new(false)}}
 	other := cfg.Models[0]
 	other.ID = "other"
 	unsupported := cfg.Models[0]
@@ -130,7 +130,7 @@ func TestReasoningThroughRouterAndInspection(t *testing.T) {
 		{"auto", `"reasoning_effort":"SECRET"`, 400},
 		{"auto", `"chat_template_kwargs":{"enable_thinking":true,"override":"SECRET"}`, 400},
 		{"plain", `"reasoning_effort":"high"`, 400},
-		{"external", `"chat_template_kwargs":{"enable_thinking":false},"reasoning_effort":"high"`, 400},
+		{"external", `"chat_template_kwargs":{"enable_thinking":false},"reasoning_effort":"low"`, 400},
 		{"auto", `"reasoning_effort":"low"`, 422},
 	} {
 		for _, stream := range []bool{false, true} {

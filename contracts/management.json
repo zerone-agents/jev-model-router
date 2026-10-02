@@ -459,7 +459,7 @@
                     "type": "array",
                     "maxItems": 64,
                     "uniqueItems": true,
-                    "description": "Verified exact combinations of reasoning controls. Omitted fields mean absent in the request, not a wildcard. Empty or omitted means no explicit reasoning controls supported.",
+                    "description": "Supported reasoning control values, checked independently across entries. Declared values may be used alone or together. Empty or omitted means no explicit reasoning controls supported.",
                     "items": {
                       "type": "object",
                       "properties": {
@@ -602,7 +602,7 @@
                   "type": "array",
                   "maxItems": 64,
                   "uniqueItems": true,
-                  "description": "Verified exact combinations of reasoning controls. Omitted fields mean absent in the request, not a wildcard. Empty or omitted means no explicit reasoning controls supported.",
+                  "description": "Supported reasoning control values, checked independently across entries. Declared values may be used alone or together. Empty or omitted means no explicit reasoning controls supported.",
                   "items": {
                     "type": "object",
                     "properties": {
@@ -721,7 +721,7 @@
               "type": "array",
               "maxItems": 64,
               "uniqueItems": true,
-              "description": "Verified exact combinations of reasoning controls. Omitted fields mean absent in the request, not a wildcard. Empty or omitted means no explicit reasoning controls supported.",
+              "description": "Supported reasoning control values, checked independently across entries. Declared values may be used alone or together. Empty or omitted means no explicit reasoning controls supported.",
               "items": {
                 "type": "object",
                 "properties": {
@@ -826,7 +826,7 @@
                   "type": "array",
                   "maxItems": 64,
                   "uniqueItems": true,
-                  "description": "Verified exact combinations of reasoning controls. Omitted fields mean absent in the request, not a wildcard. Empty or omitted means no explicit reasoning controls supported.",
+                  "description": "Supported reasoning control values, checked independently across entries. Declared values may be used alone or together. Empty or omitted means no explicit reasoning controls supported.",
                   "items": {
                     "type": "object",
                     "properties": {
