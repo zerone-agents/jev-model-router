@@ -193,8 +193,7 @@
               },
               "description": {
                 "type": "string",
-                "minLength": 0,
-                "maxLength": 4096
+                "minLength": 0
               },
               "parameters": {
                 "type": "object"
