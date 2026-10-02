@@ -84,3 +84,15 @@ go test ./internal/provider -run Reasoning -count=1
 ```
 
 2026-10-01 随后完成真实阿里云对照：`qwen3.8-flash` 与 `qwen3.8-max` 的 thinking enabled、high effort 及两者组合，在未经修改的 SDK 直连、本地 Router 显式选模和 auto 路径上均通过 JSON/SSE 验证。已核对实际控制字段、1024 输出限额、非空正文/推理文本、stop 与 SSE DONE；auto 使用唯一合格候选，未调用真实 Jev。仅承诺本次已测组合，其他 effort 值及 thinking=false 仍需对应端点验证。详细范围和脱敏证据见 [真实验收记录](acceptance/2026-10-01-reasoning.md)。
+
+## SDK 完整 Agent examples
+
+工具定义的 `function.description` 不再施加 4096 字符限制。SDK 的默认 Bash / Task 说明本身可能超过该值；网关完整保留说明，仍执行请求总大小（默认 16 MiB）、模型上下文容量及决策输入预算检查。`route.inspect` 与推理入口使用相同契约。
+
+除 Provider 层验证外，新增原始 `examples/basic/01-simple-query.ts` 与 `examples/streaming/16-streaming.ts` 回归：SDK 加载默认工具池，经过真实 router/Bifrost，执行 Read，再将结果回传。模拟上游逐请求比较完整工具定义，JSON/SSE × 自动/显式模型四种组合均验证，不修改 SDK 示例源码：
+
+```sh
+JEV_TEST_AGENT_SDK=/path/to/agent-sdk go test ./internal/transport/http -run TestAgentSDKSimpleQuerySample -v -count=1
+```
+
+真实上游验收可运行 `TestSDKLiveSamples`，需设置 `JEV_RUN_LIVE_SAMPLES=1`、`JEV_TEST_AGENT_SDK`、`JEV_LIVE_KEY_FILE`、`JEV_LIVE_BASE_URL`、`JEV_LIVE_MODEL`。可选 `JEV_SAMPLE_LOG_DIR` 保存本地输出。此测试会产生模型费用并执行 sample 的真实工具；请在受控环境运行。工作目录使用临时 fixture；两个使用固定 `/tmp` 文件名的示例会拒绝覆盖已有文件。当前验收模型应支持 tools、thinking 和 low/medium/high effort。详见 [验收记录](acceptance/2026-10-02-sdk-samples.md)。
