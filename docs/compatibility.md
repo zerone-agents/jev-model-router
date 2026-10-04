@@ -18,7 +18,7 @@ Jev 原生协议依据 [API reference](https://docs.typesafe.ai/api)：state/que
 
 生成参数需同时满足公布的 schema、模型能力声明和实际适配转换检查。此文件的 SDK 转换测试不是模型本身能力证明。本地测试已覆盖端到端取消、首包/空闲超时和有界事件缓冲；真实慢读 socket 的完整跨 SDK 压力场景仍待补充，实际模型质量需另行付费评测。
 
-Jev 决策默认限制为 255 个候选、24,000 UTF-8 序列化字节（包含问题和选项），这是有余量的本地估算边界，不是精确 token 计数。保留全部候选、偏好、system/developer 指令、工具定义和最新 user 回合；较旧回合按完整组从近到远加入，溢出时标记省略。图片结构替换为 image_present，不保留 URL 或内联数据。必需部分超限直接失败，生成请求保持完整。
+Jev 决策默认限制为 255 个候选、32,000 UTF-8 序列化字节（包含问题和选项），可通过 decision_max_bytes / JEV_ROUTER_DECISION_MAX_BYTES 修改。默认值参照官方单问题 32k token 上限采用保守字节估算；官方未提供字节推荐值，这不是精确 token 计数，详见 [启动配置](configuration.md#jev-决策输入预算)。保留全部候选、偏好、system/developer 指令和最新 user query；较旧回合按完整组从近到远加入，溢出时标记省略。Jev 不接收工具定义，工具执行仅保留调用 ID、工具名称和结果关联记录，不保留参数、输出及执行消息附带文本。图片结构替换为 image_present，不保留 URL 或内联数据。必需部分超限直接失败，生成请求保持完整。
 
 生成容量预检使用 UTF-8 字节数、每张图片额外 8192 估算单位、256 协议余量，以及请求输出限额（未指定时预留 4096）。`context_exact=false` 明确表示估算；图片实际 token 依模型和尺寸而异，上游仍可能拒绝。该预检不会裁剪或修改输入。
 
@@ -77,7 +77,7 @@ go test ./internal/provider -run Reasoning -count=1
 
 ## SDK 完整 Agent examples
 
-工具定义的 `function.description` 不再施加 4096 字符限制。SDK 的默认 Bash / Task 说明本身可能超过该值；网关完整保留说明，仍执行请求总大小（默认 16 MiB）、模型上下文容量及决策输入预算检查。`route.inspect` 与推理入口使用相同契约。
+工具定义的 `function.description` 不再施加 4096 字符限制。SDK 的默认 Bash / Task 说明本身可能超过该值；网关完整保留说明，仍执行请求总大小（默认 16 MiB）与模型上下文容量检查；工具定义不进入 Jev 决策输入。`route.inspect` 与推理入口使用相同契约。
 
 除 Provider 层验证外，新增原始 `examples/basic/01-simple-query.ts` 与 `examples/streaming/16-streaming.ts` 回归：SDK 加载默认工具池，经过真实 router/Bifrost，执行 Read，再将结果回传。模拟上游逐请求比较完整工具定义，JSON/SSE × 自动/显式模型四种组合均验证，不修改 SDK 示例源码：
 

@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/zerone-agents/jev-model-router/internal/decision"
 	"github.com/zerone-agents/jev-model-router/internal/management"
 	"github.com/zerone-agents/jev-model-router/internal/provider"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
@@ -105,8 +106,50 @@ func TestAgentSDKSimpleQuerySample(t *testing.T) {
 			cfg.Models[0].Capabilities.Tools = true
 			cfg.Models[0].Capabilities.Reasoning = []routing.ReasoningCombination{{EnableThinking: new(true)}}
 			cfg.Models[0].Capabilities.ContextLimit = 1000000
+			var decisions atomic.Int32
+			decisionServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				call := decisions.Add(1)
+				var body struct {
+					State struct {
+						Tools      json.RawMessage
+						Candidates []any
+						Messages   []map[string]json.RawMessage
+					}
+				}
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Error(err)
+				}
+				if len(body.State.Tools) != 0 || len(body.State.Candidates) != 2 {
+					t.Error("unexpected decision context")
+				}
+				var hasCall, hasResult bool
+				for _, message := range body.State.Messages {
+					if calls := message["tool_calls"]; len(calls) > 0 {
+						hasCall = bytes.Contains(calls, []byte(`"id":"read1"`))
+						if bytes.Contains(calls, []byte(`"arguments"`)) || len(message["content"]) > 0 {
+							t.Error("tool call payload reached Jev")
+						}
+					}
+					if string(message["role"]) == `"tool"` {
+						hasResult = string(message["tool_call_id"]) == `"read1"`
+						if len(message["content"]) > 0 {
+							t.Error("tool result payload reached Jev")
+						}
+					}
+				}
+				if call == 2 && (!hasCall || !hasResult) {
+					t.Error("missing paired tool execution records")
+				}
+				w.Header().Set("Content-Type", "application/json")
+				fmt.Fprint(w, `{"answers":{"model":{"type":"choice","choice":"m0"}}}`)
+			}))
+			defer decisionServer.Close()
+			other := cfg.Models[0]
+			other.ID = "other"
+			cfg.Models = append(cfg.Models, other)
+			cfg.Decision = routing.DecisionConfig{BaseURL: decisionServer.URL, Model: "jev-1.13.0"}
 			store := testStore{cfg}
-			h := NewHandler(management.New(store, nil), store, &routing.Planner{Check: provider.Check}, &routing.Executor{Generator: g}, func(string) (management.Principal, error) { return management.Principal{Role: "inference"}, nil }, Limits{})
+			h := NewHandler(management.New(store, nil), store, &routing.Planner{Check: provider.Check, Decider: decision.New(decisionServer.Client(), func(string) ([]byte, error) { return []byte("local"), nil }, decision.DefaultBudget())}, &routing.Executor{Generator: g}, func(string) (management.Principal, error) { return management.Principal{Role: "inference"}, nil }, Limits{})
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				raw, _ := io.ReadAll(r.Body)
 				r.Body = io.NopCloser(bytes.NewReader(raw))
@@ -127,6 +170,13 @@ func TestAgentSDKSimpleQuerySample(t *testing.T) {
 			cmd.Dir = dir
 			cmd.Env = append(os.Environ(), "ZERONE_AGENT_API_TYPE=openai-completions", "ZERONE_AGENT_API_KEY=local-test", "ZERONE_AGENT_MODEL="+model, "ZERONE_AGENT_BASE_URL="+server.URL+"/v1")
 			out, err := cmd.CombinedOutput()
+			expectedDecisions := int32(0)
+			if model == "auto" {
+				expectedDecisions = 2
+			}
+			if decisions.Load() != expectedDecisions {
+				t.Errorf("decision calls=%d want=%d", decisions.Load(), expectedDecisions)
+			}
 			if err != nil || (!strings.Contains(string(out), "subtype: success") && !strings.Contains(string(out), "Result: success")) || !strings.Contains(string(out), "router-sample-fixture version 1.0.0") || calls.Load() != 2 {
 				t.Fatalf("sample failed (%v), calls=%d: %s", err, calls.Load(), out)
 			}

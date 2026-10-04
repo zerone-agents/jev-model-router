@@ -70,7 +70,7 @@ func TestImageExcludedFromDecision(t *testing.T) {
 }
 func TestPairedToolHistory(t *testing.T) {
 	i := input()
-	i.Request.Messages = []routing.Message{{Role: "user", Content: json.RawMessage(`"old"`)}, {Role: "assistant", ToolCalls: []routing.ToolCall{{ID: "call", Type: "function", Function: routing.CallFunction{Name: "f", Arguments: strings.Repeat("x", 5000)}}}}, {Role: "tool", ToolCallID: "call", Content: json.RawMessage(`"result"`)}, {Role: "user", Content: json.RawMessage(`"latest"`)}}
+	i.Request.Messages = []routing.Message{{Role: "user", Content: json.RawMessage(`"` + strings.Repeat("old", 2000) + `"`)}, {Role: "assistant", ToolCalls: []routing.ToolCall{{ID: "call", Type: "function", Function: routing.CallFunction{Name: "f", Arguments: strings.Repeat("x", 5000)}}}}, {Role: "tool", ToolCallID: "call", Content: json.RawMessage(`"result"`)}, {Role: "user", Content: json.RawMessage(`"latest"`)}}
 	p := DefaultBudget()
 	p.MaxBytes = 2000
 	b, e := BuildState(i, p)
@@ -103,7 +103,7 @@ func TestDecisionIncludesOutputAndToolRequirements(t *testing.T) {
 }
 func TestOutputRequirementsConsumeRequiredBudget(t *testing.T) {
 	i := input()
-	format := map[string]any{"type": "json_schema", "json_schema": map[string]any{"name": "result", "schema": map[string]any{"description": strings.Repeat("x", 30000)}}}
+	format := map[string]any{"type": "json_schema", "json_schema": map[string]any{"name": "result", "schema": map[string]any{"description": strings.Repeat("x", DefaultMaxBytes)}}}
 	raw, _ := json.Marshal(format)
 	i.Request.Options = map[string]json.RawMessage{"response_format": raw}
 	if _, e := BuildState(i, DefaultBudget()); e == nil {
@@ -135,5 +135,78 @@ func TestReasoningRequirementsConsumeBudget(t *testing.T) {
 	}
 	if _, err := BuildState(in, p); err == nil {
 		t.Fatal("reasoning requirements omitted from budget")
+	}
+}
+
+func TestConfigurableDecisionByteBudget(t *testing.T) {
+	in := input()
+	in.Request.Messages[0].Content, _ = json.Marshal(strings.Repeat("x", 25000))
+	small := DefaultBudget()
+	small.MaxBytes = 24000
+	if _, err := BuildState(in, small); err == nil {
+		t.Fatal("small budget should reject")
+	}
+	if _, err := BuildState(in, DefaultBudget()); err != nil {
+		t.Fatal(err)
+	}
+	in.Request.Messages[0].Content, _ = json.Marshal(strings.Repeat("x", 40000))
+	if _, err := BuildState(in, DefaultBudget()); err == nil {
+		t.Fatal("default should still bound input")
+	}
+	large := DefaultBudget()
+	large.MaxBytes = 64000
+	if _, err := BuildState(in, large); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Write([]byte(`{"answers":{"model":{"type":"choice","choice":"m0"}}}`))
+	}))
+	defer server.Close()
+	_, err := New(server.Client(), func(string) ([]byte, error) { return []byte("test"), nil }, large).Choose(context.Background(), routing.DecisionConfig{BaseURL: server.URL}, in)
+	if err != nil || calls != 1 {
+		t.Fatalf("configured send budget: calls=%d err=%v", calls, err)
+	}
+}
+
+func TestDecisionOnlyKeepsToolRecords(t *testing.T) {
+	in := input()
+	description := strings.Repeat("DEFINITION_SENTINEL", 5000)
+	in.Request.Tools = []routing.Tool{{Type: "function", Function: routing.Function{Name: "Read", Description: &description, Parameters: json.RawMessage(`{"SCHEMA_SENTINEL":true}`)}}}
+	thought := "THOUGHT_SENTINEL"
+	in.Request.Messages = []routing.Message{
+		{Role: "system", Content: json.RawMessage(`"system preserved"`)},
+		{Role: "user", Content: json.RawMessage(`"latest task preserved"`)},
+		{Role: "assistant", Content: json.RawMessage(`"CALL_TEXT_SENTINEL"`), ReasoningContent: &thought, ToolCalls: []routing.ToolCall{
+			{ID: "call1", Type: "function", Function: routing.CallFunction{Name: "Read", Arguments: strings.Repeat("ARG_SENTINEL", 5000)}},
+			{ID: "call2", Type: "function", Function: routing.CallFunction{Name: "Bash", Arguments: "OTHER_ARG_SENTINEL"}},
+		}},
+		{Role: "tool", ToolCallID: "call1", Content: json.RawMessage(`"` + strings.Repeat("RESULT_SENTINEL", 5000) + `"`)},
+		{Role: "tool", ToolCallID: "call2", Content: json.RawMessage(`[{"type":"text","text":"ARRAY_RESULT_SENTINEL"}]`)},
+	}
+	before, _ := json.Marshal(in)
+	b, err := BuildState(in, BudgetPolicy{MaxBytes: 3000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var state map[string]json.RawMessage
+	if err := json.Unmarshal(b, &state); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := state["tools"]; exists {
+		t.Fatal("tool definitions included in decision state")
+	}
+	if bytes.Contains(b, []byte("SENTINEL")) || bytes.Contains(b, []byte(`"arguments":`)) {
+		t.Fatalf("tool payload leaked: %s", b)
+	}
+	for _, value := range []string{"system preserved", "latest task preserved", "Read", "Bash", `"tool_call_id":"call1"`, `"tool_call_id":"call2"`, `"id":"call1"`, `"id":"call2"`} {
+		if !bytes.Contains(b, []byte(value)) {
+			t.Errorf("missing record %s", value)
+		}
+	}
+	after, _ := json.Marshal(in)
+	if !bytes.Equal(before, after) {
+		t.Fatal("generation input mutated")
 	}
 }
