@@ -37,6 +37,7 @@ type state struct {
 	Candidates   []routing.Model            `json:"candidates"`
 	Messages     []decisionMessage          `json:"messages"`
 	Omitted      bool                       `json:"history_omitted"`
+	Truncated    bool                       `json:"content_truncated,omitempty"`
 }
 
 // decisionMessage is a projection, never an alias of generation history.
@@ -127,7 +128,7 @@ func BuildState(in routing.DecisionInput, p BudgetPolicy) (json.RawMessage, erro
 	fits := func(b []byte) bool { q, _ := json.Marshal(question(in)); return len(b)+len(q)+512 <= p.MaxBytes }
 	b, _ := json.Marshal(s)
 	if !fits(b) {
-		return nil, routing.Fail("budget_exceeded", "required decision context exceeds byte budget")
+		return truncateState(s, fits)
 	}
 	for n := len(groups) - 2; n >= 0; n-- {
 		candidate := append([]decisionMessage{}, fixed...)
@@ -144,6 +145,73 @@ func BuildState(in routing.DecisionInput, p BudgetPolicy) (json.RawMessage, erro
 	}
 	return b, nil
 }
+
+// truncateState caps each text independently, keeping its own beginning and end.
+// All probes operate on fresh projections; generation history is never changed.
+func truncateState(s state, fits func([]byte) bool) (json.RawMessage, error) {
+	const marker = "\n[...truncated...]\n"
+	maxRunes := 0
+	project := func(limit int) []byte {
+		out := s
+		out.Messages = append([]decisionMessage(nil), s.Messages...)
+		out.Truncated = true
+		trim := func(text string) string {
+			chars := []rune(text)
+			if len(chars) > maxRunes {
+				maxRunes = len(chars)
+			}
+			if len(chars) <= limit || len(chars) <= 2 {
+				return text
+			}
+			keep := max(limit, 2)
+			return string(chars[:(keep+1)/2]) + marker + string(chars[len(chars)-keep/2:])
+		}
+		for i := range out.Messages {
+			m := &out.Messages[i]
+			var text string
+			if json.Unmarshal(m.Content, &text) == nil && len(m.Content) > 0 && string(m.Content) != "null" {
+				m.Content, _ = json.Marshal(trim(text))
+			} else {
+				var parts []map[string]json.RawMessage
+				if json.Unmarshal(m.Content, &parts) == nil && parts != nil {
+					for _, part := range parts {
+						if raw, ok := part["text"]; ok && json.Unmarshal(raw, &text) == nil {
+							part["text"], _ = json.Marshal(trim(text))
+						}
+					}
+					m.Content, _ = json.Marshal(parts)
+				}
+			}
+			if m.ReasoningContent != nil {
+				value := trim(*m.ReasoningContent)
+				m.ReasoningContent = &value
+			}
+			if m.Refusal != nil {
+				value := trim(*m.Refusal)
+				m.Refusal = &value
+			}
+		}
+		b, _ := json.Marshal(out)
+		return b
+	}
+	best := project(0)
+	if !fits(best) {
+		return nil, routing.Fail("budget_exceeded", "decision metadata and minimum head/tail context exceed byte budget")
+	}
+	low, high := 0, maxRunes
+	for low < high {
+		mid := low + (high-low+1)/2
+		candidate := project(mid)
+		if fits(candidate) {
+			low = mid
+			best = candidate
+		} else {
+			high = mid - 1
+		}
+	}
+	return best, nil
+}
+
 func question(in routing.DecisionInput) any {
 	criteria := map[string]string{}
 	for n, m := range in.Candidates {
