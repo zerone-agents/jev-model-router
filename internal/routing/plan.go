@@ -52,7 +52,7 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 		estimate = func(Model, Request) (int64, bool, error) { return value.TotalTokens, false, nil }
 	}
 	targets := []Target{}
-	var overflow *Target
+	var overflow []Target
 	exactOverflow := false
 	exact := map[string]bool{}
 	for _, m := range s.Models {
@@ -103,9 +103,12 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 		if units > m.Capabilities.ContextLimit {
 			if isExact {
 				exactOverflow = true
-			} else if overflow == nil || m.Capabilities.ContextLimit > overflow.Model.Capabilities.ContextLimit || (m.Capabilities.ContextLimit == overflow.Model.Capabilities.ContextLimit && m.ID < overflow.Model.ID) {
-				copy := target
-				overflow = &copy
+			} else {
+				if len(overflow) == 0 || m.Capabilities.ContextLimit > overflow[0].Model.Capabilities.ContextLimit {
+					overflow = []Target{target}
+				} else if m.Capabilities.ContextLimit == overflow[0].Model.Capabilities.ContextLimit {
+					overflow = append(overflow, target)
+				}
 			}
 			continue
 		}
@@ -113,10 +116,12 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 		exact[m.ID] = isExact
 		result.CandidateIDs = append(result.CandidateIDs, m.ID)
 	}
-	fallback := len(targets) == 0 && overflow != nil && !exactOverflow
+	fallback := len(targets) == 0 && len(overflow) > 0 && !exactOverflow
 	if fallback {
-		targets = append(targets, *overflow)
-		result.CandidateIDs = append(result.CandidateIDs, overflow.Model.ID)
+		targets = overflow
+		for _, target := range targets {
+			result.CandidateIDs = append(result.CandidateIDs, target.Model.ID)
+		}
 	}
 	if len(targets) == 0 {
 		if r.Model != "auto" {
@@ -133,6 +138,8 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 		result.Path = "single_candidate"
 	} else {
 		result.Path = "jev_choice"
+	}
+	if r.Model == "auto" && len(targets) > 1 {
 		if p.Decider == nil || s.Decision.Model == "" {
 			return result, Fail("config_missing", "decision configuration required")
 		}
