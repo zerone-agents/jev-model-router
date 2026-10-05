@@ -17,6 +17,7 @@
 | max_body_bytes | 16777216 |
 | stream_buffer | 8 |
 | retention_days | 7 |
+| record_max_count | 100000 |
 
 以上是通过本地边界测试的首版默认值，不代表真实模型延迟承诺。时长接受 Go duration 字符串；数值限额必须为正。
 
@@ -43,7 +44,7 @@ JSON 示例：
 
 first_event_timeout 覆盖流建立到首个有效 SSE 事件，非流式及固定连接测试则覆盖完整响应；之后以 idle_timeout 约束事件等待及下游写入，不设健康流总时长上限。生成客户端最多保留 16 组供应商地址/密钥快照，满载时明确拒绝额外目标，不偷换在途配置。
 
-记录每次尝试最多等待 record_timeout，保留清理在启动及每小时执行；失败令 status.get 的 records_degraded 置 true 并给出 warning，状态持续到重启。记录不是事务审计，不承诺无损。数据库用于单实例进程，请勿多进程共享同一文件。
+记录每次尝试最多等待 record_timeout。`retention_days`（1–3650，默认 7）限制保留天数；`record_max_count`（1–10000000，默认 100000）限制记录总数，对应环境变量 `JEV_ROUTER_RETENTION_DAYS` 和 `JEV_ROUTER_RECORD_MAX_COUNT`，重启生效。数量上限在每次写入事务内执行，超出后按写入顺序丢弃最旧记录；调低上限时启动阶段每批最多删除 1000 条。过期清理在启动及每小时分批执行，因此到期记录可能延迟至下一次清理移除。清理释放的 SQLite 页可供后续写入复用，不自动缩小数据库文件，也不承诺磁盘字节上限。后台清理或记录写入失败令 status.get 的 records_degraded 置 true 并给出 warning，状态持续到重启。记录不是事务审计，不承诺无损。数据库用于单实例进程，请勿多进程共享同一文件。
 
 
 ## 管理页面

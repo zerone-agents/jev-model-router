@@ -67,7 +67,7 @@ Set the inference client's base URL to `http://127.0.0.1:8080/v1` and use the in
 - `auto` is a reserved ID. Generation requests are not truncated, parameters are not silently dropped, and requests are not retried or switched to another model.
 - Jev mode provides no sensitive-data routing guarantee. Image fields are not sent to Jev, but text and tool results may be.
 - Configuration writes affect new requests immediately. Disabling a model does not revoke snapshots already in use.
-- Records retain routing metadata only, with a default retention of seven days. Writes are best effort and degraded status is exposed; these records are not audit logs.
+- Records retain routing metadata and up to 120 characters from the latest user message. Default retention is seven days or 100,000 records, whichever limit is reached first. Writes are best effort and degraded status is exposed; these records are not audit logs.
 
 See the [compatibility matrix](docs/compatibility.md) for supported fields and estimation limits, and the [evaluation guide](docs/evaluation.md) for measuring real-world quality and cost.
 

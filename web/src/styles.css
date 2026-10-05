@@ -887,3 +887,31 @@ pre {
     width: 0;
   }
 }
+
+.request-summary {
+  min-width: 180px;
+  max-width: 360px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.request-summary-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+tr:has(details[open]) .request-summary-text {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
+.record-result-success {
+  color: #72a687;
+}
+
+.record-result-error {
+  color: #d17f7f;
+}

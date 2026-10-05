@@ -19,10 +19,11 @@ import (
 var migrations embed.FS
 
 type Store struct {
-	cipher *credential.Cipher
-	db     *sql.DB
-	mu     sync.Mutex
-	now    func() time.Time
+	recordLimit int // Configured before serving requests.
+	cipher      *credential.Cipher
+	db          *sql.DB
+	mu          sync.Mutex
+	now         func() time.Time
 }
 
 func Open(path string, now func() time.Time) (*Store, error) {
@@ -46,7 +47,7 @@ func OpenWithCipher(path string, now func() time.Time, cipher *credential.Cipher
 		return nil, storageError()
 	}
 	db.SetMaxOpenConns(1)
-	s := &Store{db: db, now: now, cipher: cipher}
+	s := &Store{db: db, now: now, cipher: cipher, recordLimit: DefaultRecordLimit}
 	if e = s.migrate(); e != nil {
 		db.Close()
 		return nil, e

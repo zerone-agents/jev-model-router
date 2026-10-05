@@ -1773,7 +1773,7 @@
   },
   {
     "id": "records.list",
-    "description": "Read safe bounded routing metadata",
+    "description": "Read bounded routing records with request text excerpts and selection timing",
     "role": "settings",
     "input_schema": {
       "type": "object",
@@ -1787,6 +1787,11 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 200
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based offset; a nonzero offset cannot be combined with a nonempty cursor."
         }
       },
       "required": [],
@@ -1830,22 +1835,21 @@
                 "type": "integer",
                 "minimum": 0
               },
-              "generation_ms": {
-                "type": "integer",
-                "minimum": 0
-              },
               "outcome": {
                 "type": "string"
               },
               "error_code": {
                 "type": "string"
+              },
+              "request_summary": {
+                "type": "string",
+                "maxLength": 120
               }
             },
             "required": [
               "request_id",
               "created_at",
               "decision_ms",
-              "generation_ms",
               "outcome"
             ],
             "additionalProperties": false
@@ -1853,11 +1857,16 @@
         },
         "next_cursor": {
           "type": "string"
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0
         }
       },
       "required": [
         "records",
-        "next_cursor"
+        "next_cursor",
+        "total"
       ],
       "additionalProperties": false
     },
