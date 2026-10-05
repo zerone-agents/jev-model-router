@@ -10,6 +10,7 @@
 | inference_token_ref | env:JEV_ROUTER_INFERENCE_TOKEN |
 | encryption_key_ref | 空（仅使用外部凭证时无需设置） |
 | decision_timeout | 10s |
+| decision_max_bytes | 32000 |
 | first_event_timeout | 60s |
 | idle_timeout | 60s |
 | record_timeout | 100ms |
@@ -80,3 +81,11 @@ A TLS reverse proxy must preserve the original Host. Keep the HTTP container bac
 Logout revokes only its request session. Its now-useless cookie may remain until expiry or the next login: logout and error responses never write/clear cookies, so a delayed response cannot erase another tab's newer login. A stale tab's CSRF cannot revoke a newer session; reconnect explicitly without automatic write/logout retry. Network or storage failure does not confirm revocation; retain the session and retry logout. If login has an unknown outcome, check session status before another authentication action.
 
 At most 128 active sessions are allowed. Expiry/logout frees capacity; replacement login can replace its own session at capacity. `session_limit` requires an existing logout or expiry, not automatic retries. Changing Settings or the origin policy on restart invalidates all sessions, including when an old Settings value is later restored. Inference-only rotation leaves sessions intact. When restoring a database backup, use a new Settings credential to invalidate backed-up sessions. Provider encryption keys are unrelated to session authentication.
+
+## Jev 决策输入预算
+
+`decision_max_bytes` 控制序列化后的 Jev 请求字节预算，环境变量为 `JEV_ROUTER_DECISION_MAX_BYTES`。例如 JSON 配置 `{"decision_max_bytes":64000}` 或环境变量 `JEV_ROUTER_DECISION_MAX_BYTES=64000`；环境变量优先，需重启。取值为 1 至 268435456 的整数；增大本地预算不改变上游限制。
+
+2026-10-03 核对 [Jev 官方模型文档](https://docs.typesafe.ai/models)：请求总上下文 64k tokens，state 加最长问题 32k tokens。本项目只发一个选模问题，所以参照 32k；官方未给出字节预算推荐值。默认 32,000 **字节**是本地按每 token 一字节的保守启发式，不是官方 token 限制的精确换算，也不保证上游一定接受。需要更高利用率时，可按实际语言、模型和上游验证结果配置更大字节预算。
+
+预算包含候选、偏好、系统指令、最新 query、问题与序列化开销。Jev 不接收工具定义；工具历史仅保留调用 ID、工具名称及结果关联记录，不包含参数、输出或执行消息的附带文本。只能省略更旧的完整历史组，不能裁剪生成请求；必需部分超限仍返回 budget_exceeded。auto 多候选和 route.inspect 使用相同预算，显式模型与单候选不调用 Jev。

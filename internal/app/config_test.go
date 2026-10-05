@@ -59,3 +59,27 @@ func TestInvalidTimeoutRejected(t *testing.T) {
 		t.Fatal("unbounded idle timeout")
 	}
 }
+
+func TestDecisionBudgetConfiguration(t *testing.T) {
+	c, err := LoadConfig("", env(nil))
+	if err != nil || c.DecisionMaxBytes != 32000 {
+		t.Fatalf("defaults: %+v %v", c, err)
+	}
+	p := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(p, []byte(`{"decision_max_bytes":64000}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	c, err = LoadConfig(p, env(nil))
+	if err != nil || c.DecisionMaxBytes != 64000 {
+		t.Fatalf("file: %+v %v", c, err)
+	}
+	c, err = LoadConfig(p, env(map[string]string{"JEV_ROUTER_DECISION_MAX_BYTES": "96000"}))
+	if err != nil || c.DecisionMaxBytes != 96000 {
+		t.Fatalf("env: %+v %v", c, err)
+	}
+	for _, value := range []string{"0", "-1", "1.5", "invalid", "268435457"} {
+		if _, err := LoadConfig("", env(map[string]string{"JEV_ROUTER_DECISION_MAX_BYTES": value})); err == nil {
+			t.Errorf("accepted invalid budget %q", value)
+		}
+	}
+}

@@ -12,13 +12,21 @@ type BudgetPolicy struct {
 	CountMethod             string
 }
 
-func DefaultBudget() BudgetPolicy { return BudgetPolicy{255, 24000, "utf8_bytes_conservative"} }
+// DefaultMaxBytes conservatively uses one serialized byte per token of Jev's
+// documented 32k state-plus-longest-question context. This is a local byte
+// heuristic, not the official token limit or an exact tokenizer count.
+// Source: https://docs.typesafe.ai/models (checked 2026-10-03).
+const DefaultMaxBytes = 32000
+
+func DefaultBudget() BudgetPolicy {
+	return BudgetPolicy{255, DefaultMaxBytes, "utf8_bytes_conservative"}
+}
 func normalize(p BudgetPolicy) BudgetPolicy {
 	if p.MaxCandidates <= 0 || p.MaxCandidates > 255 {
 		p.MaxCandidates = 255
 	}
 	if p.MaxBytes <= 0 {
-		p.MaxBytes = 24000
+		p.MaxBytes = DefaultMaxBytes
 	}
 	return p
 }
@@ -27,50 +35,84 @@ type state struct {
 	Requirements map[string]json.RawMessage `json:"requirements,omitempty"`
 	Preference   string                     `json:"preference"`
 	Candidates   []routing.Model            `json:"candidates"`
-	Messages     []routing.Message          `json:"messages"`
-	Tools        []routing.Tool             `json:"tools,omitempty"`
+	Messages     []decisionMessage          `json:"messages"`
 	Omitted      bool                       `json:"history_omitted"`
 }
 
-func clean(m routing.Message) routing.Message {
+// decisionMessage is a projection, never an alias of generation history.
+// Tool records carry identity and ordering, but no arguments or output payloads.
+type decisionMessage struct {
+	Role             string          `json:"role,omitempty"`
+	Content          json.RawMessage `json:"content,omitempty"`
+	Name             string          `json:"name,omitempty"`
+	ReasoningContent *string         `json:"reasoning_content,omitempty"`
+	Refusal          *string         `json:"refusal,omitempty"`
+	ToolCallID       string          `json:"tool_call_id,omitempty"`
+	ToolCalls        []toolRecord    `json:"tool_calls,omitempty"`
+}
+type toolRecord struct {
+	ID       string `json:"id,omitempty"`
+	Type     string `json:"type,omitempty"`
+	Function struct {
+		Name string `json:"name,omitempty"`
+	} `json:"function"`
+}
+
+func clean(m routing.Message) decisionMessage {
+	out := decisionMessage{Role: m.Role, Name: m.Name, ToolCallID: m.ToolCallID}
+	if m.Role == "tool" {
+		return out
+	}
+	if len(m.ToolCalls) > 0 {
+		for _, call := range m.ToolCalls {
+			record := toolRecord{ID: call.ID, Type: call.Type}
+			record.Function.Name = call.Function.Name
+			out.ToolCalls = append(out.ToolCalls, record)
+		}
+		return out
+	}
+	out.Content = m.Content
+	out.ReasoningContent = m.ReasoningContent
+	out.Refusal = m.Refusal
 	var parts []struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
 	}
 	if json.Unmarshal(m.Content, &parts) == nil && parts != nil {
-		out := []map[string]string{}
-		for _, p := range parts {
-			switch p.Type {
+		content := []map[string]string{}
+		for _, part := range parts {
+			switch part.Type {
 			case "text":
-				out = append(out, map[string]string{"type": "text", "text": p.Text})
+				content = append(content, map[string]string{"type": "text", "text": part.Text})
 			case "image_url":
-				out = append(out, map[string]string{"type": "image_present"})
+				content = append(content, map[string]string{"type": "image_present"})
 			}
 		}
-		m.Content, _ = json.Marshal(out)
+		out.Content, _ = json.Marshal(content)
 	}
-	return m
+	return out
 }
+
 func BuildState(in routing.DecisionInput, p BudgetPolicy) (json.RawMessage, error) {
 	p = normalize(p)
 	if len(in.Candidates) == 0 || len(in.Candidates) > p.MaxCandidates {
 		return nil, routing.Fail("budget_exceeded", "decision candidate limit exceeded")
 	}
-	// User turns form indivisible groups, keeping tool calls and results together.
-	groups := [][]routing.Message{}
-	fixed := []routing.Message{}
-	for _, m := range in.Request.Messages {
-		m = clean(m)
+	// User queries form indivisible groups, keeping tool records together.
+	groups := [][]decisionMessage{}
+	fixed := []decisionMessage{}
+	for _, original := range in.Request.Messages {
+		m := clean(original)
 		if m.Role == "system" || m.Role == "developer" {
 			fixed = append(fixed, m)
 			continue
 		}
 		if m.Role == "user" || len(groups) == 0 {
-			groups = append(groups, []routing.Message{})
+			groups = append(groups, []decisionMessage{})
 		}
 		groups[len(groups)-1] = append(groups[len(groups)-1], m)
 	}
-	s := state{Preference: in.Prompt, Candidates: in.Candidates, Messages: fixed, Tools: in.Request.Tools, Omitted: len(groups) > 1}
+	s := state{Preference: in.Prompt, Candidates: in.Candidates, Messages: fixed, Omitted: len(groups) > 1}
 	s.Requirements = map[string]json.RawMessage{}
 	for _, key := range []string{"response_format", "tool_choice", "parallel_tool_calls", "max_completion_tokens", "chat_template_kwargs", "reasoning_effort"} {
 		if v := in.Request.Options[key]; v != nil {
@@ -79,7 +121,7 @@ func BuildState(in routing.DecisionInput, p BudgetPolicy) (json.RawMessage, erro
 	}
 
 	if len(groups) > 0 {
-		s.Messages = append(append([]routing.Message{}, fixed...), groups[len(groups)-1]...)
+		s.Messages = append(append([]decisionMessage{}, fixed...), groups[len(groups)-1]...)
 	}
 	// Include question overhead and all criteria in the budget; model-name overhead is checked at send time.
 	fits := func(b []byte) bool { q, _ := json.Marshal(question(in)); return len(b)+len(q)+512 <= p.MaxBytes }
@@ -88,7 +130,7 @@ func BuildState(in routing.DecisionInput, p BudgetPolicy) (json.RawMessage, erro
 		return nil, routing.Fail("budget_exceeded", "required decision context exceeds byte budget")
 	}
 	for n := len(groups) - 2; n >= 0; n-- {
-		candidate := append([]routing.Message{}, fixed...)
+		candidate := append([]decisionMessage{}, fixed...)
 		for j := n; j < len(groups); j++ {
 			candidate = append(candidate, groups[j]...)
 		}
