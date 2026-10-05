@@ -390,6 +390,24 @@ export function PromptRead(props: PageProps) {
 }
 export function Records(props: PageProps) {
   const { lang } = props;
+  const dateFormatter = new Intl.DateTimeFormat(
+    lang === "zh" ? "zh-CN" : "en-US",
+    {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+      timeZoneName: "shortOffset",
+    },
+  );
+  const formatTime = (value: unknown) => {
+    if (typeof value !== "string" || !value) return "—";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date);
+  };
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [refresh, setRefresh] = useState(0);
@@ -470,7 +488,9 @@ export function Records(props: PageProps) {
                           </summary>
                           <pre>{JSON.stringify(r, null, 2)}</pre>
                         </details>
-                        <small>{String(r.created_at)}</small>
+                        <small title={String(r.created_at ?? "")}>
+                          {formatTime(r.created_at)}
+                        </small>
                       </td>
                       <td className="request-summary">
                         <span className="request-summary-text">
