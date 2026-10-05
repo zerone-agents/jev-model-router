@@ -323,15 +323,6 @@ export function App() {
                 </button>
               </form>
             )}
-            {!restoring && !restoreFailed && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void restore()}
-              >
-                {text(lang, "Restore current session", "恢复当前会话")}
-              </button>
-            )}
             <div className="connect-host">{location.host}</div>
           </section>
           <footer>
