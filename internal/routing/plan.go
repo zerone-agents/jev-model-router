@@ -2,7 +2,6 @@ package routing
 
 import (
 	"context"
-	"encoding/json"
 )
 
 type Planner struct {
@@ -11,43 +10,16 @@ type Planner struct {
 	Estimate func(Model, Request) (int64, bool, error)
 }
 type Plan struct {
-	ConfigVersion int64    `json:"config_version"`
-	Target        Target   `json:"-"`
-	ModelID       string   `json:"model_id"`
-	CandidateIDs  []string `json:"candidate_ids"`
-	Path          string   `json:"path"`
-	DecisionUsage *Usage   `json:"decision_usage,omitempty"`
-	ContextExact  bool     `json:"context_exact"`
+	ConfigVersion   int64            `json:"config_version"`
+	Target          Target           `json:"-"`
+	ModelID         string           `json:"model_id"`
+	CandidateIDs    []string         `json:"candidate_ids"`
+	Path            string           `json:"path"`
+	DecisionUsage   *Usage           `json:"decision_usage,omitempty"`
+	ContextEstimate *ContextEstimate `json:"context_estimate,omitempty"`
+	ContextExact    bool             `json:"context_exact"`
 }
 
-// EstimateContext deliberately overcounts text using UTF-8 bytes and reserves
-// 8192 units per image. Providers remain the authority on actual token limits.
-func EstimateContext(_ Model, r Request) (int64, bool, error) {
-	copy := r
-	copy.Messages = append([]Message{}, r.Messages...)
-	images := int64(0)
-	for i, m := range copy.Messages {
-		var parts []map[string]json.RawMessage
-		if json.Unmarshal(m.Content, &parts) == nil && parts != nil {
-			for _, p := range parts {
-				if string(p["type"]) == `"image_url"` {
-					images++
-					delete(p, "image_url")
-				}
-			}
-			copy.Messages[i].Content, _ = json.Marshal(parts)
-		}
-	}
-	b, e := json.Marshal(copy)
-	if e != nil {
-		return 0, false, Fail("invalid_request", "cannot estimate context")
-	}
-	var output int64 = 4096
-	if v := r.Options["max_completion_tokens"]; v != nil {
-		json.Unmarshal(v, &output)
-	}
-	return int64(len(b)) + images*8192 + output + 256, false, nil
-}
 func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error) {
 	result := Plan{ConfigVersion: s.Version, CandidateIDs: []string{}}
 	if e := ValidateRequest(r); e != nil {
@@ -70,10 +42,18 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 	}
 
 	estimate := p.Estimate
+	var breakdown *ContextEstimate
 	if estimate == nil {
-		estimate = EstimateContext
+		value, err := EstimateRequestContext(r)
+		if err != nil {
+			return result, err
+		}
+		breakdown = &value
+		estimate = func(Model, Request) (int64, bool, error) { return value.TotalTokens, false, nil }
 	}
 	targets := []Target{}
+	var overflow *Target
+	exactOverflow := false
 	exact := map[string]bool{}
 	for _, m := range s.Models {
 		if r.Model != "auto" && m.ID != r.Model {
@@ -116,11 +96,22 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 			if r.Model != "auto" {
 				return result, Fail("budget_exceeded", "generation context exceeds configured capacity")
 			}
+			if isExact {
+				exactOverflow = true
+			} else if overflow == nil || m.Capabilities.ContextLimit > overflow.Model.Capabilities.ContextLimit || (m.Capabilities.ContextLimit == overflow.Model.Capabilities.ContextLimit && m.ID < overflow.Model.ID) {
+				copy := target
+				overflow = &copy
+			}
 			continue
 		}
 		targets = append(targets, target)
 		exact[m.ID] = isExact
 		result.CandidateIDs = append(result.CandidateIDs, m.ID)
+	}
+	fallback := len(targets) == 0 && overflow != nil && !exactOverflow
+	if fallback {
+		targets = append(targets, *overflow)
+		result.CandidateIDs = append(result.CandidateIDs, overflow.Model.ID)
 	}
 	if len(targets) == 0 {
 		if r.Model != "auto" {
@@ -131,6 +122,8 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 	selected := targets[0]
 	if r.Model != "auto" {
 		result.Path = "explicit"
+	} else if fallback {
+		result.Path = "context_estimate_fallback"
 	} else if len(targets) == 1 {
 		result.Path = "single_candidate"
 	} else {
@@ -162,5 +155,6 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 	result.Target = selected
 	result.ModelID = selected.Model.ID
 	result.ContextExact = exact[selected.Model.ID]
+	result.ContextEstimate = breakdown
 	return result, nil
 }

@@ -20,7 +20,9 @@ Jev 原生协议依据 [API reference](https://docs.typesafe.ai/api)：state/que
 
 Jev 决策默认限制为 255 个候选、32,000 UTF-8 序列化字节（包含问题和选项），可通过 decision_max_bytes / JEV_ROUTER_DECISION_MAX_BYTES 修改。默认值参照官方单问题 32k token 上限采用保守字节估算；官方未提供字节推荐值，这不是精确 token 计数，详见 [启动配置](configuration.md#jev-决策输入预算)。保留全部候选、偏好、system/developer 指令和最新 user query；较旧回合按完整组从近到远加入，溢出时标记省略。Jev 不接收工具定义，工具执行仅保留调用 ID、工具名称和结果关联记录，不保留参数、输出及执行消息附带文本。图片结构替换为 image_present，不保留 URL 或内联数据。system/developer 与最新 query 的各文本段超限时分别保留首尾、从中间截断，并标记 content_truncated；仅不可裁剪元数据与最小首尾结构仍超限时失败。生成请求保持完整。
 
-生成容量预检使用 UTF-8 字节数、每张图片额外 8192 估算单位、256 协议余量，以及请求输出限额（未指定时预留 4096）。`context_exact=false` 明确表示估算；图片实际 token 依模型和尺寸而异，上游仍可能拒绝。该预检不会裁剪或修改输入。
+生成容量预检使用 `semantic_bytes_v1`：完整历史文本（含工具结果、reasoning/refusal）、工具名称和描述按 ceil(UTF-8 字节总数/4) 估算；工具参数按解码后的字符串字节数、工具 schema/response_format/tool_choice 按紧凑 JSON 字节数单独核算；每消息预留 4、每工具调用/定义预留 8、每张图片预留 8192。图片 URL/base64 不计作文本；model、stream、temperature 等非提示字段不计入。输入与输出分开，输出限额只加一次，未指定时仍预留 4096，但不会向上游注入该限额。`route.inspect.context_estimate` 返回方法、文本/结构化字节数、图片/framing、输入、输出预留及总估算；`context_exact=false` 表明它不是精确计数，也不保证多语言或视觉模型上界。
+
+`auto` 仅当所有通过非容量约束的模型都因非精确估算超限而被排除时，选择 ContextLimit 最大的模型继续执行，路径标记为 `context_estimate_fallback`，候选列表只含保底模型；并列按模型 ID 字典序选择。若任一模型正常通过容量检查，沿用原流程；精确超限不进入此保底。能力、启用状态、供应商配置检查不能被绕过；显式模型超限仍报错，不换模。保底不调用 Jev，不重试上游；完整生成输入和输出限额保持不变，实际超限由上游处理。
 
 普通 `response_format.type=text` 不要求结构化输出能力，JSON 模式才要求。Jev 的必需输入同时包含输出格式/JSON Schema、tool_choice、parallel_tool_calls 和 max_completion_tokens，这些需求也占用决策预算。
 

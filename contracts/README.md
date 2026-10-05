@@ -85,3 +85,5 @@ call body 为 `{"input":{...},"expected_version":1,"idempotency_key":"operation-
 `records.list` 返回 `records`、`total` 和 `next_cursor`。默认每次 50 条，上限 200；支持从 0 开始的 `offset` 或既有游标，不允许非空 cursor 与非零 offset 混用。按写入顺序从新到旧，每次查询的总数和记录来自同一数据库快照；分页间新写入或清理可能改变页内容，不承诺跨请求快照。UI 默认每页 20 条，并提供 10/50/100 条和页码；清理后超出的页码回到最后有效页。
 
 `decision_ms` 只计选模阶段（请求验证、候选过滤及需要时的决策调用），不含生成耗时；不再输出 `generation_ms`。`request_summary` 为最后一条 user 消息的文本片段，合并空白后最多 120 个 Unicode 字符，本地提取，不额外调用模型；无文本或旧记录时缺省。工具消息、图片地址和更早的消息不进入摘要。默认保留 7 天且最多 100000 条，数量超限按写入顺序丢弃最旧记录；天数和数量均可通过启动配置调整，详见 configuration.md。
+
+`route.inspect` 的可选 `context_estimate` 返回 semantic_bytes_v1 分项和输入/输出预留总量；新增 path `context_estimate_fallback` 表示 auto 全部合格候选估算超限后的最大上下文保底，不代表精确容量足够。
