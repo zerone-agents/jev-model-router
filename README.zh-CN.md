@@ -36,7 +36,7 @@ go build -o /tmp/jev-router ./cmd/jev-router
 /tmp/jev-router dashboard --no-open
 ```
 
-UI 由同一个 Go 可执行文件提供，路径为 `/dashboard/`。远程实例使用 `dashboard --url https://router.example.com`。该命令不会自动启动服务或向浏览器传递凭证。页面输入 Settings 凭证后交换为 24 小时 HttpOnly 会话，刷新与同凭证重启后保留登录，注销撤销当前会话。远程浏览器访问要求 HTTPS 并配置 `JEV_ROUTER_DASHBOARD_ORIGIN`；见[会话配置](docs/configuration.md#dashboard-sessions)。
+UI 由同一个 Go 可执行文件提供，路径为 `/dashboard/`。远程实例使用 `dashboard --url https://router.example.com`。该命令不会自动启动服务或向浏览器传递凭证。页面输入 Settings 凭证后交换为 7 天 HttpOnly 会话，刷新与同凭证重启后保留登录，注销撤销当前会话。远程浏览器访问要求 HTTPS 并配置 `JEV_ROUTER_DASHBOARD_ORIGIN`；见[会话配置](docs/configuration.md#dashboard-sessions)。
 
 中英文 UI 可查看实例状态、模型、路由提示词和路由记录，通过现有管理 API 修改模型描述及提示词，保留版本冲突和显式同键重试语义。供应商、模型映射与能力仍通过 CLI 配置。开发与能力边界见 [UI 说明](web/README.md)。
 

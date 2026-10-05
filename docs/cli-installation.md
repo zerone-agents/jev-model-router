@@ -70,4 +70,4 @@ Use HTTPS or loopback HTTP via an SSH tunnel. The CLI refuses public HTTP for in
 
 Managed writes are atomic and do not restart the server. Existing in-flight requests retain old credential revisions. The master key is distinct from supplier API keys: it requires separate backup and cannot currently be rotated in place. See [configuration](configuration.md#managed-provider-credentials).
 
-The CLI keeps using Settings Bearer authentication. Browser login exchanges that credential for a 24-hour HttpOnly session; it requires a configured public HTTPS origin for remote access. See [dashboard session configuration](configuration.md#dashboard-sessions).
+The CLI keeps using Settings Bearer authentication. Browser login exchanges that credential for a 7-day HttpOnly session; it requires a configured public HTTPS origin for remote access. See [dashboard session configuration](configuration.md#dashboard-sessions).

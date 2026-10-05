@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "ttl_seconds": 86400,
+  "ttl_seconds": 604800,
   "max_sessions": 128,
   "token_bytes": 32,
   "body_limit_bytes": 1024,

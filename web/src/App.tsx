@@ -308,8 +308,8 @@ export function App() {
                 <small>
                   {text(
                     lang,
-                    "Exchanged for a 24-hour session. Refreshing keeps you connected.",
-                    "凭证交换为 24 小时会话，刷新后保持连接。",
+                    "Exchanged for a 7-day session. Refreshing keeps you connected.",
+                    "凭证交换为 7 天会话，刷新后保持连接。",
                   )}
                 </small>
                 {error != null && <ErrorBox error={error} lang={lang} />}

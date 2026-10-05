@@ -52,7 +52,7 @@ first_event_timeout 覆盖流建立到首个有效 SSE 事件，非流式及固�
 
 普通模式先执行最多 5 秒、无凭证且不跟随重定向的 HTML 可达检查，再通过系统浏览器打开；失败以 JSON 返回错误及有效地址供手动打开。`--no-open` 仅返回 JSON 地址，不执行探测，不启动服务。该命令不需要 settings 凭证。
 
-浏览器单独输入 Settings 凭证并交换为固定 24 小时的 HttpOnly 会话，刷新或同凭证重启后可恢复；显式注销在服务端撤销当前请求会话。认证材料不写入 URL 或 Web Storage。UI 只访问同源 API，远程使用需部署 HTTPS 并配置公开 Origin，本机回环 HTTP 例外。UI 不管理账号、密钥或启动参数；完整生命周期与恢复规则见下方 Dashboard sessions。
+浏览器单独输入 Settings 凭证并交换为固定 7 天的 HttpOnly 会话，刷新或同凭证重启后可恢复；显式注销在服务端撤销当前请求会话。认证材料不写入 URL 或 Web Storage。UI 只访问同源 API，远程使用需部署 HTTPS 并配置公开 Origin，本机回环 HTTP 例外。UI 不管理账号、密钥或启动参数；完整生命周期与恢复规则见下方 Dashboard sessions。
 
 ## Docker Compose
 
@@ -72,7 +72,7 @@ Key revisions are retained so captured request snapshots and successful idempote
 
 ## Dashboard sessions
 
-The dashboard exchanges the Settings credential for a host-only HttpOnly, SameSite=Strict cookie scoped to `/admin/`. Sessions expire exactly 24 hours after login, without renewal. Refresh/reopen and server restarts with the same Settings credential and origin preserve valid sessions. CLI continues to use Bearer authentication. No browser authentication material is written to Web Storage.
+The dashboard exchanges the Settings credential for a host-only HttpOnly, SameSite=Strict cookie scoped to `/admin/`. Sessions expire exactly 7 days after login, without renewal. Refresh/reopen and server restarts with the same Settings credential and origin preserve valid sessions. CLI continues to use Bearer authentication. No browser authentication material is written to Web Storage.
 
 Set `JEV_ROUTER_DASHBOARD_ORIGIN=https://router.example.com` (or JSON `dashboard_origin`) for remote access. Use an origin only, with optional port. The environment overrides the configuration file. Without it only loopback HTTP browser sessions are allowed; remote CLI remains available. Remote origins require HTTPS; explicit HTTP is allowed only for localhost/literal loopback IPs.
 

@@ -70,4 +70,4 @@ jev-router call providers.put --json /secure/provider.json \
 
 托管写入为原子操作，无需重启；在途请求保留旧凭证版本。主密钥与供应商 API Key 不同，必须独立备份，目前不支持原地轮换。详见[配置说明](configuration.md#managed-provider-credentials)。
 
-CLI 继续使用 Settings Bearer 认证。浏览器将该凭证交换为 24 小时 HttpOnly 会话；远程访问需配置公开 HTTPS Origin。见[Dashboard 会话配置](configuration.md#dashboard-sessions)。
+CLI 继续使用 Settings Bearer 认证。浏览器将该凭证交换为 7 天 HttpOnly 会话；远程访问需配置公开 HTTPS Origin。见[Dashboard 会话配置](configuration.md#dashboard-sessions)。

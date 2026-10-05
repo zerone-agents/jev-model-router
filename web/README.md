@@ -4,7 +4,7 @@ React/TypeScript application embedded in the Go binary at `/dashboard/`. `jev-ro
 
 The UI reads status, models, the prompt and routing records. Only model descriptions and the prompt are editable. Provider setup, model mapping, capability changes and enabling/disabling models remain CLI operations. All business operations use existing management capabilities discovered from the running instance.
 
-Settings credentials are exchanged once for a fixed 24-hour HttpOnly cookie session. Refresh/reopen restores login; explicit disconnect revokes the request session and clears drafts and loaded data only after success or confirmed expiry. Remote use requires HTTPS and the configured public dashboard origin; see [session configuration](../docs/configuration.md#dashboard-sessions). Unknown write outcomes retain an identical request for explicit retry within 24 hours; conflicts preserve drafts for deliberate reconciliation. Routing records are best-effort metadata, not audit logs or conversation history.
+Settings credentials are exchanged once for a fixed 7-day HttpOnly cookie session. Refresh/reopen restores login; explicit disconnect revokes the request session and clears drafts and loaded data only after success or confirmed expiry. Remote use requires HTTPS and the configured public dashboard origin; see [session configuration](../docs/configuration.md#dashboard-sessions). Unknown write outcomes retain an identical request for explicit retry within 24 hours; conflicts preserve drafts for deliberate reconciliation. Routing records are best-effort metadata, not audit logs or conversation history.
 
 ## Development
 

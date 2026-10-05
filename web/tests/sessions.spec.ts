@@ -157,8 +157,8 @@ test("dashboard refresh restores HttpOnly session without persistent credentials
     path: "/admin/",
     secure: false,
   });
-  expect(c.expires - Date.now() / 1000).toBeGreaterThan(86300);
-  expect(c.expires - Date.now() / 1000).toBeLessThanOrEqual(86400);
+  expect(c.expires - Date.now() / 1000).toBeGreaterThan(604700);
+  expect(c.expires - Date.now() / 1000).toBeLessThanOrEqual(604800);
   expect(await page.evaluate(() => document.cookie)).not.toContain(cookieName);
   await page.reload();
   await expect(

@@ -70,7 +70,7 @@ func sessionLogin(t *testing.T, h http.Handler, old string) (string, session.Inf
 		t.Fatal("cookie missing")
 	}
 	c := cookies[0]
-	if !c.HttpOnly || c.Path != "/admin/" || c.MaxAge != 86400 || c.SameSite != http.SameSiteStrictMode || c.Domain != "" || c.Secure {
+	if !c.HttpOnly || c.Path != "/admin/" || c.MaxAge != 604800 || c.SameSite != http.SameSiteStrictMode || c.Domain != "" || c.Secure {
 		t.Fatal(c)
 	}
 	var result struct{ Data session.Info }
