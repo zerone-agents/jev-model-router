@@ -149,7 +149,6 @@ func BuildState(in routing.DecisionInput, p BudgetPolicy) (json.RawMessage, erro
 // truncateState caps each text independently, keeping its own beginning and end.
 // All probes operate on fresh projections; generation history is never changed.
 func truncateState(s state, fits func([]byte) bool) (json.RawMessage, error) {
-	const marker = "\n[...truncated...]\n"
 	maxRunes := 0
 	project := func(limit int) []byte {
 		out := s
@@ -160,11 +159,7 @@ func truncateState(s state, fits func([]byte) bool) (json.RawMessage, error) {
 			if len(chars) > maxRunes {
 				maxRunes = len(chars)
 			}
-			if len(chars) <= limit || len(chars) <= 2 {
-				return text
-			}
-			keep := max(limit, 2)
-			return string(chars[:(keep+1)/2]) + marker + string(chars[len(chars)-keep/2:])
+			return middleTruncate(text, chars, limit)
 		}
 		for i := range out.Messages {
 			m := &out.Messages[i]
@@ -210,6 +205,23 @@ func truncateState(s state, fits func([]byte) bool) (json.RawMessage, error) {
 		}
 	}
 	return best, nil
+}
+
+// The encoded size is min(original, marked head/tail). As the cap grows,
+// head/tail only gains runes, so this minimum is monotone nondecreasing.
+// In particular, cap zero is a valid minimum-size feasibility probe.
+func middleTruncate(text string, chars []rune, limit int) string {
+	if len(chars) <= limit || len(chars) <= 2 {
+		return text
+	}
+	keep := max(limit, 2)
+	candidate := string(chars[:(keep+1)/2]) + "\n[...truncated...]\n" + string(chars[len(chars)-keep/2:])
+	originalJSON, _ := json.Marshal(text)
+	candidateJSON, _ := json.Marshal(candidate)
+	if len(candidateJSON) >= len(originalJSON) {
+		return text
+	}
+	return candidate
 }
 
 func question(in routing.DecisionInput) any {

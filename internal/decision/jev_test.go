@@ -268,3 +268,40 @@ func TestMiddleTruncationPreservesPartsAndShortText(t *testing.T) {
 		t.Fatal("generation input mutated")
 	}
 }
+
+func TestMinimumTruncationKeepsShortText(t *testing.T) {
+	in := input()
+	long, _ := json.Marshal(strings.Repeat("x", 10000))
+	in.Request.Messages = []routing.Message{{Role: "system", Content: json.RawMessage(`"abc"`)}, {Role: "user", Content: long}}
+	b, err := BuildState(in, BudgetPolicy{MaxBytes: 1373})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got state
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatal(err)
+	}
+	if string(got.Messages[0].Content) != `"abc"` {
+		t.Fatalf("short text changed: %s", got.Messages[0].Content)
+	}
+	q, _ := json.Marshal(question(in))
+	if len(b)+len(q)+512 > 1373 {
+		t.Fatal("over budget")
+	}
+}
+
+func TestMiddleTruncationSerializedSizeIsMonotone(t *testing.T) {
+	for _, text := range []string{"abc", strings.Repeat("x", 100), strings.Repeat("中🙂\"\n<>&", 30), "abc" + strings.Repeat("\u0000", 30) + "xyz"} {
+		original, _ := json.Marshal(text)
+		previous := 0
+		chars := []rune(text)
+		for cap := 0; cap <= len(chars)+1; cap++ {
+			got := middleTruncate(text, chars, cap)
+			encoded, _ := json.Marshal(got)
+			if len(encoded) < previous || len(encoded) > len(original) {
+				t.Fatalf("nonmonotone or expanded text at cap %d: previous=%d actual=%d original=%d", cap, previous, len(encoded), len(original))
+			}
+			previous = len(encoded)
+		}
+	}
+}
