@@ -88,13 +88,15 @@ func (g *bifrostGenerator) Complete(ctx context.Context, t routing.Target, r rou
 	defer release()
 	bc := schemas.NewBifrostContext(ctx, time.Time{})
 	defer bc.Cancel()
+	bc.SetValue(schemas.BifrostContextKeyAllowPerRequestRawOverride, true)
+	bc.SetValue(schemas.BifrostContextKeySendBackRawResponse, true)
 	req, e := encode(bc, t, r)
 	if e != nil {
 		return routing.Completion{}, e
 	}
 	out, fail := client.ChatCompletionRequest(bc, req)
 	if fail != nil {
-		return routing.Completion{}, safeError(ctx)
+		return routing.Completion{}, providerError(ctx, fail)
 	}
 	return completion(out)
 }
@@ -121,7 +123,7 @@ func (g *bifrostGenerator) Stream(ctx context.Context, t routing.Target, r routi
 	if fail != nil {
 		bc.Cancel()
 		release()
-		return nil, safeError(ctx)
+		return nil, providerError(ctx, fail)
 	}
 	return &stream{ctx: bc, ch: ch, release: release}, nil
 }
@@ -150,7 +152,7 @@ func (s *stream) Next(ctx context.Context) (routing.Event, error) {
 			return routing.Event{}, io.EOF
 		}
 		if chunk.BifrostError != nil {
-			return routing.Event{}, safeError(s.ctx)
+			return routing.Event{}, providerError(s.ctx, chunk.BifrostError)
 		}
 		if chunk.BifrostChatResponse == nil {
 			return routing.Event{}, routing.Fail("upstream_error", "invalid stream event")
@@ -204,6 +206,49 @@ func completion(in *schemas.BifrostChatResponse) (routing.Completion, error) {
 	}
 	return out, nil
 }
+
+// Only provider error fields cross the boundary. Do not serialize BifrostError:
+// its diagnostics can include raw requests, credentials and transport details.
+func providerError(ctx context.Context, fail *schemas.BifrostError) error {
+	if ctx.Err() != nil || fail == nil || fail.IsBifrostError || fail.Error == nil {
+		return safeError(ctx)
+	}
+	status := 502
+	if fail.StatusCode != nil && *fail.StatusCode >= 400 && *fail.StatusCode <= 599 {
+		status = *fail.StatusCode
+	}
+	// Bifrost also labels synthesized parse/network errors as provider errors.
+	// Verify provenance against the actual JSON envelope, never its diagnostics.
+	raw, err := json.Marshal(fail.ExtraFields.RawResponse)
+	if err != nil {
+		return safeError(ctx)
+	}
+	if text, ok := fail.ExtraFields.RawResponse.(string); ok {
+		raw = []byte(text)
+	}
+	var envelope struct {
+		Error map[string]json.RawMessage `json:"error"`
+	}
+	if json.Unmarshal(raw, &envelope) != nil || envelope.Error == nil {
+		return safeError(ctx)
+	}
+	var message string
+	if json.Unmarshal(envelope.Error["message"], &message) != nil || strings.TrimSpace(message) == "" {
+		return safeError(ctx)
+	}
+	body := map[string]any{"message": message, "type": nil, "code": nil, "param": nil}
+	for _, key := range []string{"type", "code", "param"} {
+		if value, ok := envelope.Error[key]; ok {
+			var text *string
+			if json.Unmarshal(value, &text) != nil {
+				return safeError(ctx)
+			}
+			body[key] = text
+		}
+	}
+	return &routing.UpstreamError{Status: status, Body: body}
+}
+
 func safeError(ctx context.Context) error {
 	if ctx.Err() == context.DeadlineExceeded {
 		return routing.Fail("timeout", "upstream request timed out")
