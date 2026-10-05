@@ -88,6 +88,8 @@ func (g *bifrostGenerator) Complete(ctx context.Context, t routing.Target, r rou
 	defer release()
 	bc := schemas.NewBifrostContext(ctx, time.Time{})
 	defer bc.Cancel()
+	bc.SetValue(schemas.BifrostContextKeyAllowPerRequestRawOverride, true)
+	bc.SetValue(schemas.BifrostContextKeySendBackRawResponse, true)
 	req, e := encode(bc, t, r)
 	if e != nil {
 		return routing.Completion{}, e
@@ -215,8 +217,36 @@ func providerError(ctx context.Context, fail *schemas.BifrostError) error {
 	if fail.StatusCode != nil && *fail.StatusCode >= 400 && *fail.StatusCode <= 599 {
 		status = *fail.StatusCode
 	}
-	field := fail.Error
-	return &routing.UpstreamError{Status: status, Body: map[string]any{"message": field.Message, "type": field.Type, "code": field.Code, "param": field.Param}}
+	// Bifrost also labels synthesized parse/network errors as provider errors.
+	// Verify provenance against the actual JSON envelope, never its diagnostics.
+	raw, err := json.Marshal(fail.ExtraFields.RawResponse)
+	if err != nil {
+		return safeError(ctx)
+	}
+	if text, ok := fail.ExtraFields.RawResponse.(string); ok {
+		raw = []byte(text)
+	}
+	var envelope struct {
+		Error map[string]json.RawMessage `json:"error"`
+	}
+	if json.Unmarshal(raw, &envelope) != nil || envelope.Error == nil {
+		return safeError(ctx)
+	}
+	var message string
+	if json.Unmarshal(envelope.Error["message"], &message) != nil || strings.TrimSpace(message) == "" {
+		return safeError(ctx)
+	}
+	body := map[string]any{"message": message, "type": nil, "code": nil, "param": nil}
+	for _, key := range []string{"type", "code", "param"} {
+		if value, ok := envelope.Error[key]; ok {
+			var text *string
+			if json.Unmarshal(value, &text) != nil {
+				return safeError(ctx)
+			}
+			body[key] = text
+		}
+	}
+	return &routing.UpstreamError{Status: status, Body: body}
 }
 
 func safeError(ctx context.Context) error {

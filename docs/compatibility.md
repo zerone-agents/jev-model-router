@@ -89,4 +89,6 @@ JEV_TEST_AGENT_SDK=/path/to/agent-sdk go test ./internal/transport/http -run Tes
 
 ## 生成上游错误
 
-生成供应商返回的 OpenAI 兼容错误保留 `error.message/type/code/param`，普通 JSON 与 SSE 建连失败保留上游 400–599 状态码。SSE 已发送响应头后无法更改 HTTP 状态，通过流内 `error` 对象返回相同字段；没有有效错误状态时使用 502。此处透传的是供应商结构化错误字段，不包含 Bifrost 内部诊断、原始请求或完整响应头；不承诺逐字节转发任意 HTML/非标准响应。网络异常、超时、取消及 SDK 内部错误仍使用 router 的稳定错误。内部记录和管理接口保留 `upstream_error` 分类及通用信息，不写入供应商错误内容。
+生成供应商返回的 OpenAI 兼容错误保留 `error.message/type/code/param`，普通 JSON 与 SSE 建连失败保留上游 400–599 状态码。SSE 已发送响应头后无法更改 HTTP 状态，错误通过流内 `error` 对象返回；没有有效错误状态时使用 502。此处透传的是供应商结构化错误字段，不包含 Bifrost 内部诊断、原始请求或完整响应头；不承诺逐字节转发任意 HTML/非标准响应。网络异常、超时、取消及 SDK 内部错误仍使用 router 的稳定错误。内部记录和管理接口保留 `upstream_error` 分类及通用信息，不写入供应商错误内容。
+
+仅在原始响应能验证为结构化 error 对象（非空字符串 message，type/code/param 为字符串或 null）时透传。纯文本、HTML、格式错误和连接故障使用 safeError。当前 Bifrost 不保留 HTTP 200 流内错误的原始帧，因此该路径无法验证来源，也返回通用错误；不依据 IsBifrostError=false 推断来源。

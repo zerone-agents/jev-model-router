@@ -37,7 +37,7 @@ func TestProviderErrorDetails(t *testing.T) {
 	}
 }
 
-func TestProviderStreamErrorDetails(t *testing.T) {
+func TestProviderStreamErrorWithoutProvenanceStaysPrivate(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		fmt.Fprint(w, "data: {\"error\":{\"message\":\"stream quota exceeded\",\"type\":\"rate_limit_error\",\"code\":\"quota\"}}\n\n")
@@ -49,7 +49,39 @@ func TestProviderStreamErrorDetails(t *testing.T) {
 		_, err = stream.Next(context.Background())
 	}
 	var upstream *routing.UpstreamError
-	if !errors.As(err, &upstream) || upstream.Body["message"] != "stream quota exceeded" {
+	if err == nil || errors.As(err, &upstream) {
 		t.Fatalf("stream error: %#v", err)
+	}
+}
+
+func TestUnstructuredProviderErrorsStayPrivate(t *testing.T) {
+	for _, body := range []string{"proxy Authorization: Bearer SECRET_SENTINEL", `{"message":"SECRET_SENTINEL"}`, `{"error":{"message":42}}`} {
+		for _, streaming := range []bool{false, true} {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(502); fmt.Fprint(w, body) }))
+			g := generator(t)
+			var err error
+			if streaming {
+				stream, e := g.Stream(context.Background(), target(server.URL), TestRequest())
+				err = e
+				if err == nil {
+					_, err = stream.Next(context.Background())
+					stream.Close()
+				}
+			} else {
+				_, err = g.Complete(context.Background(), target(server.URL), TestRequest())
+			}
+			server.Close()
+			var upstream *routing.UpstreamError
+			if err == nil || errors.As(err, &upstream) {
+				t.Fatalf("unstructured error entered passthrough: streaming=%v", streaming)
+			}
+		}
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	server.Close()
+	_, err := generator(t).Complete(context.Background(), target(server.URL), TestRequest())
+	var upstream *routing.UpstreamError
+	if err == nil || errors.As(err, &upstream) {
+		t.Fatal("connection failure entered passthrough")
 	}
 }
