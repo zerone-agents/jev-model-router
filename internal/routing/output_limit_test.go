@@ -36,8 +36,13 @@ func TestOutputLimitAliases(t *testing.T) {
 					t.Fatalf("%s: %v", model, err)
 				}
 				s.Models[0].Capabilities.ContextLimit = int64(limit)
-				if _, err := p.Plan(context.Background(), s, r); err == nil {
-					t.Fatal("output budget ignored")
+				plan, err := p.Plan(context.Background(), s, r)
+				if model == "auto" {
+					if err != nil || plan.Path != "context_estimate_fallback" {
+						t.Fatalf("missing fallback: %+v %v", plan, err)
+					}
+				} else if err != nil || plan.Path != "explicit" || plan.ContextEstimate != nil {
+					t.Fatalf("explicit budget not delegated: %+v %v", plan, err)
 				}
 			}
 		}

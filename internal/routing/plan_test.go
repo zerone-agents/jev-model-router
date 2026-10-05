@@ -99,8 +99,8 @@ func TestNoCandidateFitsContext(t *testing.T) {
 	calls := 0
 	p := counterPlanner(&calls)
 	p.Estimate = func(Model, Request) (int64, bool, error) { return 20000, false, nil }
-	if _, e := p.Plan(context.Background(), s, r); e == nil || calls != 0 {
-		t.Fatal("oversize selected")
+	if plan, e := p.Plan(context.Background(), s, r); e != nil || calls != 0 || plan.Path != "context_estimate_fallback" || plan.ModelID != "a" {
+		t.Fatalf("missing fallback: %+v %v", plan, e)
 	}
 }
 
@@ -124,8 +124,9 @@ func TestUnconfiguredIsDistinctFromFilteredCandidates(t *testing.T) {
 				s.Models[i].Enabled = false
 			}
 		case "filtered":
+			r.Tools = []Tool{{Type: "function", Function: Function{Name: "f", Parameters: json.RawMessage(`{"type":"object"}`)}}}
 			for i := range s.Models {
-				s.Models[i].Capabilities.ContextLimit = 1
+				s.Models[i].Capabilities.Tools = false
 			}
 		}
 		calls := 0
@@ -159,5 +160,61 @@ func TestToolHistoryFiltersCandidates(t *testing.T) {
 	plan, err := planner.Plan(context.Background(), s, r)
 	if err != nil || plan.ModelID != "b" || calls != 0 {
 		t.Fatalf("plan=%+v calls=%d err=%v", plan, calls, err)
+	}
+}
+
+func TestFallbackEligibilityAndStableSelection(t *testing.T) {
+	for _, mode := range []string{"largest", "tie", "partial", "capability", "disabled", "check", "exact", "explicit"} {
+		t.Run(mode, func(t *testing.T) {
+			s, r := planFixture()
+			s.Models[0].Capabilities.ContextLimit = 100
+			s.Models[1].Capabilities.ContextLimit = 200
+			calls := 0
+			p := counterPlanner(&calls)
+			p.Estimate = func(Model, Request) (int64, bool, error) { return 500, false, nil }
+			want, path := "b", "context_estimate_fallback"
+			switch mode {
+			case "tie":
+				s.Models[0].Capabilities.ContextLimit = 200
+				s.Models[0], s.Models[1] = s.Models[1], s.Models[0]
+				want = "a"
+			case "partial":
+				s.Models[0].Capabilities.ContextLimit = 1000
+				want = "a"
+				path = "single_candidate"
+			case "capability":
+				r.Tools = []Tool{{Type: "function", Function: Function{Name: "f", Parameters: json.RawMessage(`{"type":"object"}`)}}}
+				s.Models[0].Capabilities.Tools = true
+				want = "a"
+			case "disabled":
+				s.Models[1].Enabled = false
+				want = "a"
+			case "check":
+				p.Check = func(target Target, _ Request) error {
+					if target.Model.ID == "b" {
+						return Fail("unsupported_request", "blocked")
+					}
+					return nil
+				}
+				want = "a"
+			case "exact":
+				p.Estimate = func(Model, Request) (int64, bool, error) { return 500, true, nil }
+			case "explicit":
+				r.Model = "a"
+				want = "a"
+				path = "explicit"
+				p.Estimate = func(Model, Request) (int64, bool, error) { t.Fatal("explicit invoked estimator"); return 0, false, nil }
+			}
+			plan, err := p.Plan(context.Background(), s, r)
+			if mode == "exact" {
+				if err == nil {
+					t.Fatal("unexpected fallback")
+				}
+				return
+			}
+			if err != nil || plan.ModelID != want || plan.Path != path || calls != 0 || plan.ContextExact || (mode == "explicit" && plan.ContextEstimate != nil) {
+				t.Fatalf("%+v err=%v calls=%d", plan, err, calls)
+			}
+		})
 	}
 }
