@@ -94,7 +94,7 @@ func (g *bifrostGenerator) Complete(ctx context.Context, t routing.Target, r rou
 	}
 	out, fail := client.ChatCompletionRequest(bc, req)
 	if fail != nil {
-		return routing.Completion{}, safeError(ctx)
+		return routing.Completion{}, providerError(ctx, fail)
 	}
 	return completion(out)
 }
@@ -121,7 +121,7 @@ func (g *bifrostGenerator) Stream(ctx context.Context, t routing.Target, r routi
 	if fail != nil {
 		bc.Cancel()
 		release()
-		return nil, safeError(ctx)
+		return nil, providerError(ctx, fail)
 	}
 	return &stream{ctx: bc, ch: ch, release: release}, nil
 }
@@ -150,7 +150,7 @@ func (s *stream) Next(ctx context.Context) (routing.Event, error) {
 			return routing.Event{}, io.EOF
 		}
 		if chunk.BifrostError != nil {
-			return routing.Event{}, safeError(s.ctx)
+			return routing.Event{}, providerError(s.ctx, chunk.BifrostError)
 		}
 		if chunk.BifrostChatResponse == nil {
 			return routing.Event{}, routing.Fail("upstream_error", "invalid stream event")
@@ -204,6 +204,21 @@ func completion(in *schemas.BifrostChatResponse) (routing.Completion, error) {
 	}
 	return out, nil
 }
+
+// Only provider error fields cross the boundary. Do not serialize BifrostError:
+// its diagnostics can include raw requests, credentials and transport details.
+func providerError(ctx context.Context, fail *schemas.BifrostError) error {
+	if ctx.Err() != nil || fail == nil || fail.IsBifrostError || fail.Error == nil {
+		return safeError(ctx)
+	}
+	status := 502
+	if fail.StatusCode != nil && *fail.StatusCode >= 400 && *fail.StatusCode <= 599 {
+		status = *fail.StatusCode
+	}
+	field := fail.Error
+	return &routing.UpstreamError{Status: status, Body: map[string]any{"message": field.Message, "type": field.Type, "code": field.Code, "param": field.Param}}
+}
+
 func safeError(ctx context.Context) error {
 	if ctx.Err() == context.DeadlineExceeded {
 		return routing.Fail("timeout", "upstream request timed out")

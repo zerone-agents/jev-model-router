@@ -86,3 +86,7 @@ JEV_TEST_AGENT_SDK=/path/to/agent-sdk go test ./internal/transport/http -run Tes
 ```
 
 真实上游验收可运行 `TestSDKLiveSamples`，需设置 `JEV_RUN_LIVE_SAMPLES=1`、`JEV_TEST_AGENT_SDK`、`JEV_LIVE_KEY_FILE`、`JEV_LIVE_BASE_URL`、`JEV_LIVE_MODEL`。可选 `JEV_SAMPLE_LOG_DIR` 保存本地输出。此测试会产生模型费用并执行 sample 的真实工具；请在受控环境运行。工作目录使用临时 fixture；两个使用固定 `/tmp` 文件名的示例会拒绝覆盖已有文件。当前验收模型应支持 tools、thinking 和 low/medium/high effort。详见 [验收记录](acceptance/2026-10-02-sdk-samples.md)。
+
+## 生成上游错误
+
+生成供应商返回的 OpenAI 兼容错误保留 `error.message/type/code/param`，普通 JSON 与 SSE 建连失败保留上游 400–599 状态码。SSE 已发送响应头后无法更改 HTTP 状态，通过流内 `error` 对象返回相同字段；没有有效错误状态时使用 502。此处透传的是供应商结构化错误字段，不包含 Bifrost 内部诊断、原始请求或完整响应头；不承诺逐字节转发任意 HTML/非标准响应。网络异常、超时、取消及 SDK 内部错误仍使用 router 的稳定错误。内部记录和管理接口保留 `upstream_error` 分类及通用信息，不写入供应商错误内容。
