@@ -53,11 +53,14 @@ func TestLatestTaskOverflow(t *testing.T) {
 	i := input()
 	i.Request.Messages[0].Content, _ = json.Marshal(strings.Repeat("x", 40000))
 	calls := 0
-	s := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { calls++ }))
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Write([]byte(`{"answers":{"model":{"type":"choice","choice":"m0"}}}`))
+	}))
 	defer s.Close()
 	_, e := New(s.Client(), func(string) ([]byte, error) { return []byte("key"), nil }, DefaultBudget()).Choose(context.Background(), routing.DecisionConfig{BaseURL: s.URL}, i)
-	if e == nil || calls != 0 {
-		t.Fatal("overflow reached Jev")
+	if e != nil || calls != 1 {
+		t.Fatalf("truncated task should reach Jev: %v", e)
 	}
 }
 func TestImageExcludedFromDecision(t *testing.T) {
@@ -140,7 +143,7 @@ func TestReasoningRequirementsConsumeBudget(t *testing.T) {
 
 func TestConfigurableDecisionByteBudget(t *testing.T) {
 	in := input()
-	in.Request.Messages[0].Content, _ = json.Marshal(strings.Repeat("x", 25000))
+	in.Prompt = strings.Repeat("x", 25000)
 	small := DefaultBudget()
 	small.MaxBytes = 24000
 	if _, err := BuildState(in, small); err == nil {
@@ -149,7 +152,7 @@ func TestConfigurableDecisionByteBudget(t *testing.T) {
 	if _, err := BuildState(in, DefaultBudget()); err != nil {
 		t.Fatal(err)
 	}
-	in.Request.Messages[0].Content, _ = json.Marshal(strings.Repeat("x", 40000))
+	in.Prompt = strings.Repeat("x", 40000)
 	if _, err := BuildState(in, DefaultBudget()); err == nil {
 		t.Fatal("default should still bound input")
 	}
@@ -208,5 +211,97 @@ func TestDecisionOnlyKeepsToolRecords(t *testing.T) {
 	after, _ := json.Marshal(in)
 	if !bytes.Equal(before, after) {
 		t.Fatal("generation input mutated")
+	}
+}
+
+func TestIndependentMiddleTruncation(t *testing.T) {
+	in := input()
+	for _, role := range []string{"system", "developer", "user"} {
+		content, _ := json.Marshal(role + "-HEAD" + strings.Repeat("中🙂\"\n", 10000) + role + "-TAIL")
+		in.Request.Messages = append(in.Request.Messages, routing.Message{Role: role, Content: content})
+	}
+	before, _ := json.Marshal(in)
+	b, err := BuildState(in, DefaultBudget())
+	if err != nil {
+		t.Fatal(err)
+	}
+	q, _ := json.Marshal(question(in))
+	if len(b)+len(q)+512 > DefaultMaxBytes {
+		t.Fatal("over budget")
+	}
+	for _, role := range []string{"system", "developer", "user"} {
+		for _, end := range []string{"-HEAD", "-TAIL"} {
+			if !bytes.Contains(b, []byte(role+end)) {
+				t.Fatalf("lost %s%s", role, end)
+			}
+		}
+	}
+	if !bytes.Contains(b, []byte("[...truncated...]")) {
+		t.Fatal("missing truncation marker")
+	}
+	after, _ := json.Marshal(in)
+	if !bytes.Equal(before, after) {
+		t.Fatal("generation input mutated")
+	}
+}
+
+func TestMiddleTruncationPreservesPartsAndShortText(t *testing.T) {
+	in := input()
+	long := "HEAD" + strings.Repeat("x", 40000) + "TAIL"
+	parts, _ := json.Marshal([]map[string]any{{"type": "text", "text": long}, {"type": "image_url", "image_url": map[string]string{"url": "secret"}}, {"type": "text", "text": "short unchanged"}})
+	in.Request.Messages = []routing.Message{{Role: "system", Content: json.RawMessage(`"short system"`)}, {Role: "user", Content: parts}, {Role: "assistant", ReasoningContent: &long}}
+	before, _ := json.Marshal(in)
+	b, err := BuildState(in, DefaultBudget())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"short system", "short unchanged", "HEAD", "TAIL", "image_present"} {
+		if !bytes.Contains(b, []byte(want)) {
+			t.Fatalf("missing %s", want)
+		}
+	}
+	if bytes.Contains(b, []byte("secret")) {
+		t.Fatal("image payload leaked")
+	}
+	after, _ := json.Marshal(in)
+	if !bytes.Equal(before, after) {
+		t.Fatal("generation input mutated")
+	}
+}
+
+func TestMinimumTruncationKeepsShortText(t *testing.T) {
+	in := input()
+	long, _ := json.Marshal(strings.Repeat("x", 10000))
+	in.Request.Messages = []routing.Message{{Role: "system", Content: json.RawMessage(`"abc"`)}, {Role: "user", Content: long}}
+	b, err := BuildState(in, BudgetPolicy{MaxBytes: 1373})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got state
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatal(err)
+	}
+	if string(got.Messages[0].Content) != `"abc"` {
+		t.Fatalf("short text changed: %s", got.Messages[0].Content)
+	}
+	q, _ := json.Marshal(question(in))
+	if len(b)+len(q)+512 > 1373 {
+		t.Fatal("over budget")
+	}
+}
+
+func TestMiddleTruncationSerializedSizeIsMonotone(t *testing.T) {
+	for _, text := range []string{"abc", strings.Repeat("x", 100), strings.Repeat("中🙂\"\n<>&", 30), "abc" + strings.Repeat("\u0000", 30) + "xyz"} {
+		original, _ := json.Marshal(text)
+		previous := 0
+		chars := []rune(text)
+		for cap := 0; cap <= len(chars)+1; cap++ {
+			got := middleTruncate(text, chars, cap)
+			encoded, _ := json.Marshal(got)
+			if len(encoded) < previous || len(encoded) > len(original) {
+				t.Fatalf("nonmonotone or expanded text at cap %d: previous=%d actual=%d original=%d", cap, previous, len(encoded), len(original))
+			}
+			previous = len(encoded)
+		}
 	}
 }

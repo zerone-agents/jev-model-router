@@ -18,7 +18,7 @@ Jev 原生协议依据 [API reference](https://docs.typesafe.ai/api)：state/que
 
 生成参数需同时满足公布的 schema、模型能力声明和实际适配转换检查。此文件的 SDK 转换测试不是模型本身能力证明。本地测试已覆盖端到端取消、首包/空闲超时和有界事件缓冲；真实慢读 socket 的完整跨 SDK 压力场景仍待补充，实际模型质量需另行付费评测。
 
-Jev 决策默认限制为 255 个候选、32,000 UTF-8 序列化字节（包含问题和选项），可通过 decision_max_bytes / JEV_ROUTER_DECISION_MAX_BYTES 修改。默认值参照官方单问题 32k token 上限采用保守字节估算；官方未提供字节推荐值，这不是精确 token 计数，详见 [启动配置](configuration.md#jev-决策输入预算)。保留全部候选、偏好、system/developer 指令和最新 user query；较旧回合按完整组从近到远加入，溢出时标记省略。Jev 不接收工具定义，工具执行仅保留调用 ID、工具名称和结果关联记录，不保留参数、输出及执行消息附带文本。图片结构替换为 image_present，不保留 URL 或内联数据。必需部分超限直接失败，生成请求保持完整。
+Jev 决策默认限制为 255 个候选、32,000 UTF-8 序列化字节（包含问题和选项），可通过 decision_max_bytes / JEV_ROUTER_DECISION_MAX_BYTES 修改。默认值参照官方单问题 32k token 上限采用保守字节估算；官方未提供字节推荐值，这不是精确 token 计数，详见 [启动配置](configuration.md#jev-决策输入预算)。保留全部候选、偏好、system/developer 指令和最新 user query；较旧回合按完整组从近到远加入，溢出时标记省略。Jev 不接收工具定义，工具执行仅保留调用 ID、工具名称和结果关联记录，不保留参数、输出及执行消息附带文本。图片结构替换为 image_present，不保留 URL 或内联数据。system/developer 与最新 query 的各文本段超限时分别保留首尾、从中间截断，并标记 content_truncated；仅不可裁剪元数据与最小首尾结构仍超限时失败。生成请求保持完整。
 
 生成容量预检使用 UTF-8 字节数、每张图片额外 8192 估算单位、256 协议余量，以及请求输出限额（未指定时预留 4096）。`context_exact=false` 明确表示估算；图片实际 token 依模型和尺寸而异，上游仍可能拒绝。该预检不会裁剪或修改输入。
 
