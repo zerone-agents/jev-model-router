@@ -4,7 +4,7 @@ React/TypeScript application embedded in the Go binary at `/dashboard/`. `jev-ro
 
 The UI reads status, models, the prompt and routing records. Only model descriptions and the prompt are editable. Provider setup, model mapping, capability changes and enabling/disabling models remain CLI operations. All business operations use existing management capabilities discovered from the running instance.
 
-Settings credentials are exchanged once for a fixed 24-hour HttpOnly cookie session. Refresh/reopen restores login; explicit disconnect revokes the request session and clears drafts and loaded data only after success or confirmed expiry. Remote use requires HTTPS and the configured public dashboard origin; see [session configuration](../docs/configuration.md#dashboard-sessions). Unknown write outcomes retain an identical request for explicit retry within 24 hours; conflicts preserve drafts for deliberate reconciliation. Routing records are best-effort metadata, not audit logs or conversation history.
+Settings credentials are exchanged once for a fixed 7-day HttpOnly cookie session. Refresh/reopen restores login; explicit disconnect revokes the request session and clears drafts and loaded data only after success or confirmed expiry. Remote use requires HTTPS and the configured public dashboard origin; see [session configuration](../docs/configuration.md#dashboard-sessions). Unknown write outcomes retain an identical request for explicit retry within 24 hours; conflicts preserve drafts for deliberate reconciliation. Routing records include best-effort metadata and a whitespace-normalized excerpt of at most 120 Unicode characters from the last user message. Text parts only; no tool payloads or image URLs. Timing covers model selection only, excluding generation. Older records have no excerpt. The table uses numbered pages with totals and 10/20/50/100 rows per page (default 20); refresh returns to page one. Retention defaults to seven days and 100,000 records. These are not audit logs or complete conversation history.
 
 ## Development
 
@@ -20,6 +20,6 @@ npm --prefix web exec -- playwright install chromium
 npm --prefix web run test:e2e
 ```
 
-Browser tests start their own Go instance with temporary SQLite and synthetic credentials; they never call generation or decision endpoints. Port 18763 must be free. For manual development, rebuild and restart the Go binary to serve the latest same-origin assets.
+Browser tests start their own Go instance with temporary SQLite and synthetic credentials; they never contact upstream generation or decision services. Routing-record tests submit invalid-model requests to the local inference API. Port 18763 must be free. For manual development, rebuild and restart the Go binary to serve the latest same-origin assets.
 
 `dist/` is committed so a clean Go checkout builds without Node. Rebuild and commit assets with source changes; CI rebuilds and checks all changes, including new files. Do not edit generated files directly. Fonts are bundled locally; the Zerone logo is reused from the Zerone home-page project. Radix supplies dialog behavior, and Phosphor supplies navigation icons.

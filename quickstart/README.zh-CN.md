@@ -107,4 +107,4 @@ ROUTER_IMAGE=swr.cn-east-3.myhuaweicloud.com/zerone/jev-model-router:latest
 
 ### Dashboard 会话
 
-远程管理页面需在 `.env` 配置 `JEV_ROUTER_DASHBOARD_ORIGIN=https://router.example.com` 并重建容器。反向代理负责 TLS、保留原始 Host，后端保持私网访问。未配置 Origin 时，浏览器登录仅允许回环 HTTP。登录有效期固定为 24 小时，刷新和同凭证重启后保留；注销撤销当前请求会话。CLI 仍使用 Bearer。容量、凭证轮换及备份恢复见[会话部署说明](../docs/configuration.md#dashboard-sessions)。
+远程管理页面需在 `.env` 配置 `JEV_ROUTER_DASHBOARD_ORIGIN=https://router.example.com` 并重建容器。反向代理负责 TLS、保留原始 Host，后端保持私网访问。未配置 Origin 时，浏览器登录仅允许回环 HTTP。登录有效期固定为 7 天，刷新和同凭证重启后保留；注销撤销当前请求会话。CLI 仍使用 Bearer。容量、凭证轮换及备份恢复见[会话部署说明](../docs/configuration.md#dashboard-sessions)。

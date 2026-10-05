@@ -36,7 +36,7 @@ go build -o /tmp/jev-router ./cmd/jev-router
 /tmp/jev-router dashboard --no-open
 ```
 
-UI 由同一个 Go 可执行文件提供，路径为 `/dashboard/`。远程实例使用 `dashboard --url https://router.example.com`。该命令不会自动启动服务或向浏览器传递凭证。页面输入 Settings 凭证后交换为 24 小时 HttpOnly 会话，刷新与同凭证重启后保留登录，注销撤销当前会话。远程浏览器访问要求 HTTPS 并配置 `JEV_ROUTER_DASHBOARD_ORIGIN`；见[会话配置](docs/configuration.md#dashboard-sessions)。
+UI 由同一个 Go 可执行文件提供，路径为 `/dashboard/`。远程实例使用 `dashboard --url https://router.example.com`。该命令不会自动启动服务或向浏览器传递凭证。页面输入 Settings 凭证后交换为 7 天 HttpOnly 会话，刷新与同凭证重启后保留登录，注销撤销当前会话。远程浏览器访问要求 HTTPS 并配置 `JEV_ROUTER_DASHBOARD_ORIGIN`；见[会话配置](docs/configuration.md#dashboard-sessions)。
 
 中英文 UI 可查看实例状态、模型、路由提示词和路由记录，通过现有管理 API 修改模型描述及提示词，保留版本冲突和显式同键重试语义。供应商、模型映射与能力仍通过 CLI 配置。开发与能力边界见 [UI 说明](web/README.md)。
 
@@ -67,7 +67,7 @@ UI 由同一个 Go 可执行文件提供，路径为 `/dashboard/`。远程实�
 - `auto` 为保留 ID。完整生成请求不裁剪，参数不静默丢失，不重试或换模。
 - Jev 模式没有敏感路由保证；图片字段不送 Jev，文本和工具结果可能送往 Jev。
 - 配置写入立即影响新请求；禁用模型不撤销在途快照。
-- 记录默认保留 7 天，只存路由元数据，尽力写入并公开降级状态，不是审计日志。
+- 记录保存路由元数据和最后一条用户消息最多 120 字的文本摘要，默认保留 7 天且最多 10 万条，超限丢弃最旧记录，尽力写入并公开降级状态，不是审计日志。
 
 支持字段及估算局限见[兼容矩阵](docs/compatibility.md)，真实质量与费用的验证方式见[评测说明](docs/evaluation.md)。
 

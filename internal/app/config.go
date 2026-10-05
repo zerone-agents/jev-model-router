@@ -20,11 +20,11 @@ type Config struct {
 	Listen, Database, SettingsRef, InferenceRef                    string
 	DecisionTimeout, FirstEventTimeout, IdleTimeout, RecordTimeout time.Duration
 	MaxBodyBytes                                                   int64
-	StreamBuffer, RetentionDays                                    int
+	StreamBuffer, RetentionDays, RecordMaxCount                    int
 }
 
 func LoadConfig(path string, lookup func(string) (string, bool)) (Config, error) {
-	c := Config{DecisionMaxBytes: decision.DefaultMaxBytes, Listen: "127.0.0.1:8080", Database: ".data/router.sqlite", SettingsRef: "env:JEV_ROUTER_SETTINGS_TOKEN", InferenceRef: "env:JEV_ROUTER_INFERENCE_TOKEN", DecisionTimeout: 10 * time.Second, FirstEventTimeout: 60 * time.Second, IdleTimeout: 60 * time.Second, RecordTimeout: 100 * time.Millisecond, MaxBodyBytes: 16 << 20, StreamBuffer: 8, RetentionDays: 7}
+	c := Config{DecisionMaxBytes: decision.DefaultMaxBytes, Listen: "127.0.0.1:8080", Database: ".data/router.sqlite", SettingsRef: "env:JEV_ROUTER_SETTINGS_TOKEN", InferenceRef: "env:JEV_ROUTER_INFERENCE_TOKEN", DecisionTimeout: 10 * time.Second, FirstEventTimeout: 60 * time.Second, IdleTimeout: 60 * time.Second, RecordTimeout: 100 * time.Millisecond, MaxBodyBytes: 16 << 20, StreamBuffer: 8, RetentionDays: 7, RecordMaxCount: 100000}
 	values := map[string]json.RawMessage{}
 	if path != "" {
 		b, e := os.ReadFile(path)
@@ -38,7 +38,7 @@ func LoadConfig(path string, lookup func(string) (string, bool)) (Config, error)
 	}
 	stringsMap := map[string]*string{"dashboard_origin": &c.DashboardOrigin, "encryption_key_ref": &c.EncryptionKeyRef, "listen": &c.Listen, "database": &c.Database, "settings_token_ref": &c.SettingsRef, "inference_token_ref": &c.InferenceRef}
 	durations := map[string]*time.Duration{"decision_timeout": &c.DecisionTimeout, "first_event_timeout": &c.FirstEventTimeout, "idle_timeout": &c.IdleTimeout, "record_timeout": &c.RecordTimeout}
-	numbers := map[string]bool{"decision_max_bytes": true, "max_body_bytes": true, "stream_buffer": true, "retention_days": true}
+	numbers := map[string]bool{"decision_max_bytes": true, "max_body_bytes": true, "stream_buffer": true, "retention_days": true, "record_max_count": true}
 	for k := range values {
 		if stringsMap[k] == nil && durations[k] == nil && !numbers[k] {
 			return c, errors.New("unknown configuration field")
@@ -106,6 +106,11 @@ func LoadConfig(path string, lookup func(string) (string, bool)) (Config, error)
 				return c, errors.New("stream buffer too large")
 			}
 			c.StreamBuffer = int(n)
+		case "record_max_count":
+			if n > 10000000 {
+				return c, errors.New("record count too large")
+			}
+			c.RecordMaxCount = int(n)
 		case "retention_days":
 			if n > 3650 {
 				return c, errors.New("retention too large")

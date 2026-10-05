@@ -14,11 +14,7 @@ import (
 func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 	rec := routing.Record{RequestID: w.Header().Get("X-Request-ID"), CreatedAt: time.Now().UTC()}
 	var finalErr error
-	var generationStart time.Time
 	defer func() {
-		if !generationStart.IsZero() {
-			rec.GenerationMillis = time.Since(generationStart).Milliseconds()
-		}
 		rec.Outcome = "success"
 		if finalErr != nil {
 			rec.Outcome = "error"
@@ -43,6 +39,7 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 		fail(routing.Fail("invalid_request", "invalid chat body"))
 		return
 	}
+	rec.RequestSummary = routing.RequestSummary(req)
 	rec.Mode = "explicit"
 	if req.Model == "auto" {
 		rec.Mode = "auto"
@@ -66,7 +63,6 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 		fail(e)
 		return
 	}
-	generationStart = time.Now()
 	id := w.Header().Get("X-Request-ID")
 	if !req.Stream {
 		ctx, cancel := context.WithTimeout(r.Context(), s.limits.FirstEventTimeout)

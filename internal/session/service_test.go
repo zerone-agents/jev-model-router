@@ -61,7 +61,7 @@ func TestSessionLifecycle(t *testing.T) {
 		t.Fatal("missing sessions")
 	}
 	for _, r := range store.records {
-		if r.Hash == a.Token || !r.ExpiresAt.Equal(start.Add(24*time.Hour)) {
+		if r.Hash == a.Token || !r.ExpiresAt.Equal(start.Add(7*24*time.Hour)) {
 			t.Fatal("invalid record")
 		}
 	}
@@ -83,11 +83,11 @@ func TestSessionLifecycle(t *testing.T) {
 	if _, err := s.Status(ctx, "http://localhost", b.Token); err != nil {
 		t.Fatal("revoked other session")
 	}
-	now = start.Add(23 * time.Hour)
+	now = start.Add(7*24*time.Hour - time.Nanosecond)
 	if _, err := s.Status(ctx, "http://localhost", a.Token); err != nil {
 		t.Fatal(err)
 	}
-	now = start.Add(24 * time.Hour)
+	now = start.Add(7 * 24 * time.Hour)
 	if _, err := s.Status(ctx, "http://localhost", a.Token); err == nil {
 		t.Fatal("sliding expiry")
 	}

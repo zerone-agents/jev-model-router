@@ -171,6 +171,7 @@ export function Pager({
 
 export function NumberedPager({
   lang,
+  kind = "models",
   total,
   page,
   pageSize,
@@ -178,6 +179,7 @@ export function NumberedPager({
   onPageSize,
 }: {
   lang: Lang;
+  kind?: "models" | "records";
   total: number;
   page: number;
   pageSize: number;
@@ -196,10 +198,16 @@ export function NumberedPager({
   return (
     <nav
       className="numbered-pager"
-      aria-label={text(lang, "Model pagination", "模型分页")}
+      aria-label={text(
+        lang,
+        kind === "models" ? "Model pagination" : "Record pagination",
+        kind === "models" ? "模型分页" : "记录分页",
+      )}
     >
       <span className="pagination-total">
-        {text(lang, `${total} models`, `共 ${total} 个模型`)}
+        {kind === "models"
+          ? text(lang, `${total} models`, `共 ${total} 个模型`)
+          : text(lang, `${total} records`, `共 ${total} 条记录`)}
       </span>
       <div className="page-numbers">
         <button
@@ -233,17 +241,24 @@ export function NumberedPager({
           ›
         </button>
       </div>
-      <PageSizePicker lang={lang} value={pageSize} onChange={onPageSize} />
+      <PageSizePicker
+        kind={kind}
+        lang={lang}
+        value={pageSize}
+        onChange={onPageSize}
+      />
     </nav>
   );
 }
 
 function PageSizePicker({
   lang,
+  kind,
   value,
   onChange,
 }: {
   lang: Lang;
+  kind: "models" | "records";
   value: number;
   onChange: (size: number) => void;
 }) {
@@ -273,7 +288,11 @@ function PageSizePicker({
       <button
         ref={trigger}
         className="page-size-trigger"
-        aria-label={text(lang, "Models per page", "每页模型数")}
+        aria-label={text(
+          lang,
+          kind === "models" ? "Models per page" : "Records per page",
+          kind === "models" ? "每页模型数" : "每页记录数",
+        )}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
@@ -303,7 +322,11 @@ function PageSizePicker({
           id={id}
           className="page-size-menu"
           role="menu"
-          aria-label={text(lang, "Models per page", "每页模型数")}
+          aria-label={text(
+            lang,
+            kind === "models" ? "Models per page" : "Records per page",
+            kind === "models" ? "每页模型数" : "每页记录数",
+          )}
         >
           {sizes.map((size, index) => (
             <button

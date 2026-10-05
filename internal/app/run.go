@@ -37,6 +37,10 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 	if e != nil {
 		return nil, nil, e
 	}
+	if e = store.ConfigureRecordLimit(context.Background(), cfg.RecordMaxCount); e != nil {
+		store.Close()
+		return nil, nil, e
+	}
 	sessions, e := session.New(context.Background(), store, creds.settings, origin, time.Now)
 	if e != nil {
 		store.Close()
@@ -114,9 +118,12 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 		var in struct {
 			Cursor string
 			Limit  int
+			Offset int
 		}
-		json.Unmarshal(call.Input, &in)
-		page, e := store.ListRecords(ctx, in.Cursor, in.Limit)
+		if err := json.Unmarshal(call.Input, &in); err != nil {
+			return management.Result{}, routing.Fail("invalid_request", "invalid record pagination")
+		}
+		page, e := store.ListRecords(ctx, in.Cursor, in.Limit, in.Offset)
 		if e != nil {
 			return management.Result{}, e
 		}

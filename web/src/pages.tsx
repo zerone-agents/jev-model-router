@@ -4,7 +4,6 @@ import {
   Empty,
   ErrorBox,
   Loading,
-  Pager,
   NumberedPager,
   useRead,
   type PageProps,
@@ -391,25 +390,38 @@ export function PromptRead(props: PageProps) {
 }
 export function Records(props: PageProps) {
   const { lang } = props;
-  const [cursors, setCursors] = useState([""]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [refresh, setRefresh] = useState(0);
   const { data, error, loading } = useRead<{
     records: Array<Record<string, unknown>>;
     next_cursor: string;
-  }>(props, "records.list", { cursor: cursors.at(-1), limit: 20 }, refresh);
+    total: number;
+  }>(
+    props,
+    "records.list",
+    { offset: (page - 1) * pageSize, limit: pageSize },
+    refresh,
+  );
+  useEffect(() => {
+    if (data?.total !== undefined) {
+      const lastPage = Math.max(1, Math.ceil(data.total / pageSize));
+      if (page > lastPage) setPage(lastPage);
+    }
+  }, [data?.total, page, pageSize]);
   return (
     <>
       <PageTitle
         title={text(lang, "Routing records", "路由记录")}
         description={text(
           lang,
-          "Selection and execution metadata. No conversation content.",
-          "查看选择与执行元数据，不保存对话内容。",
+          "Request excerpts and selection timing. Up to 120 characters of user text are retained.",
+          "查看请求摘要与选模耗时，最多保留 120 字的用户消息文本。",
         )}
       >
         <button
           onClick={() => {
-            setCursors([""]);
+            setPage(1);
             setRefresh((x) => x + 1);
           }}
         >
@@ -438,9 +450,10 @@ export function Records(props: PageProps) {
                   <tr>
                     {[
                       text(lang, "Request / time", "请求 / 时间"),
+                      text(lang, "Request summary", "请求摘要"),
                       text(lang, "Selected model", "选定模型"),
                       text(lang, "Path", "选择路径"),
-                      text(lang, "Duration", "耗时"),
+                      text(lang, "Model selection time", "选模型耗时"),
                       text(lang, "Result", "结果"),
                     ].map((x) => (
                       <th key={x}>{x}</th>
@@ -459,28 +472,53 @@ export function Records(props: PageProps) {
                         </details>
                         <small>{String(r.created_at)}</small>
                       </td>
+                      <td className="request-summary">
+                        <span className="request-summary-text">
+                          {String(r.request_summary || "—")}
+                        </span>
+                      </td>
                       <td>{String(r.model_id || "—")}</td>
                       <td>
                         <span className="badge">{String(r.path || "—")}</span>
                       </td>
                       <td>
-                        {typeof r.decision_ms === "number" &&
-                        typeof r.generation_ms === "number"
-                          ? `${r.decision_ms + r.generation_ms} ms`
+                        {typeof r.decision_ms === "number"
+                          ? `${r.decision_ms} ms`
                           : "—"}
                       </td>
-                      <td>{String(r.outcome)}</td>
+                      <td>
+                        <span
+                          className={
+                            r.outcome === "success"
+                              ? "record-result-success"
+                              : r.outcome === "error"
+                                ? "record-result-error"
+                                : undefined
+                          }
+                        >
+                          {r.outcome === "success"
+                            ? text(lang, "Success", "成功")
+                            : r.outcome === "error"
+                              ? text(lang, "Failed", "失败")
+                              : String(r.outcome || "—")}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <Pager
+            <NumberedPager
               lang={lang}
-              next={data.next_cursor}
-              back={cursors.length > 1}
-              onNext={() => setCursors((x) => [...x, data.next_cursor])}
-              onBack={() => setCursors((x) => x.slice(0, -1))}
+              kind="records"
+              total={data.total ?? data.records.length}
+              page={page}
+              pageSize={pageSize}
+              onPage={setPage}
+              onPageSize={(size) => {
+                setPageSize(size);
+                setPage(1);
+              }}
             />
           </>
         )

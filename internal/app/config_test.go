@@ -83,3 +83,27 @@ func TestDecisionBudgetConfiguration(t *testing.T) {
 		}
 	}
 }
+
+func TestRecordRetentionConfiguration(t *testing.T) {
+	c, e := LoadConfig("", env(nil))
+	if e != nil || c.RecordMaxCount != 100000 || c.RetentionDays != 7 {
+		t.Fatalf("defaults %+v %v", c, e)
+	}
+	p := filepath.Join(t.TempDir(), "config.json")
+	if e = os.WriteFile(p, []byte(`{"record_max_count":500,"retention_days":2}`), 0600); e != nil {
+		t.Fatal(e)
+	}
+	c, e = LoadConfig(p, env(nil))
+	if e != nil || c.RecordMaxCount != 500 || c.RetentionDays != 2 {
+		t.Fatalf("file %+v %v", c, e)
+	}
+	c, e = LoadConfig(p, env(map[string]string{"JEV_ROUTER_RECORD_MAX_COUNT": "200"}))
+	if e != nil || c.RecordMaxCount != 200 {
+		t.Fatalf("env %+v %v", c, e)
+	}
+	for _, v := range []string{"0", "-1", "10000001", "abc"} {
+		if _, e = LoadConfig("", env(map[string]string{"JEV_ROUTER_RECORD_MAX_COUNT": v})); e == nil {
+			t.Fatalf("accepted %s", v)
+		}
+	}
+}

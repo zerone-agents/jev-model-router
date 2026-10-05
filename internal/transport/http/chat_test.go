@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/zerone-agents/jev-model-router/internal/management"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"github.com/zerone-agents/jev-model-router/internal/state"
@@ -310,7 +311,7 @@ func TestRecordFailureDoesNotFailGeneration(t *testing.T) {
 	}
 }
 
-func TestNoSensitivePersistence(t *testing.T) {
+func TestOnlyBoundedSummaryPersists(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "records.sqlite")
 	store, e := state.Open(path, time.Now)
 	if e != nil {
@@ -336,7 +337,7 @@ func TestNoSensitivePersistence(t *testing.T) {
 	}
 	store.Close()
 	b, e := os.ReadFile(path)
-	if e != nil || strings.Contains(string(b), "SENTINEL") {
+	if e != nil || strings.Contains(string(b), "IMAGE_SENTINEL") || strings.Contains(string(b), "UPSTREAM_SECRET_SENTINEL") || !strings.Contains(string(b), "TEXT_SENTINEL") {
 		t.Fatal("sensitive persistence", e)
 	}
 }
@@ -361,5 +362,30 @@ func TestCancelledBeforeFirstReadClosesSource(t *testing.T) {
 	}
 	// Wait for the pump to exit so the no-read assertion is observed.
 	for range buffer.ch {
+	}
+}
+
+type captureRecord struct{ record routing.Record }
+
+func (s *captureRecord) Append(_ context.Context, r routing.Record) error { s.record = r; return nil }
+func TestRecordSelectionTimeExcludesGeneration(t *testing.T) {
+	for _, stream := range []bool{false, true} {
+		t.Run(fmt.Sprint(stream), func(t *testing.T) {
+			sink := &captureRecord{}
+			var generationTime time.Duration
+			delay := func() { start := time.Now(); time.Sleep(60 * time.Millisecond); generationTime += time.Since(start) }
+			g := testGen{complete: func(context.Context) (routing.Completion, error) { delay(); return event(), nil }, stream: func(context.Context) (routing.EventStream, error) { delay(); return onceStream(), nil }}
+			w := chat(handler(g, Limits{Recorder: &routing.Recorder{Sink: sink}}), stream)
+			if w.Code != 200 || sink.record.RequestSummary != "hi" {
+				t.Fatalf("%d %+v", w.Code, sink.record)
+			}
+			if sink.record.DecisionMillis >= generationTime.Milliseconds() {
+				t.Fatalf("generation included: %+v generation %v", sink.record, generationTime)
+			}
+			b, _ := json.Marshal(sink.record)
+			if strings.Contains(string(b), "generation_ms") {
+				t.Fatal("generation timing persisted")
+			}
+		})
 	}
 }

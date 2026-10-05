@@ -300,3 +300,84 @@ it("shows reasoning combinations in model details without losing false", async (
   ).toBeInTheDocument();
   expect(screen.queryByText(/\[object Object\]/)).not.toBeInTheDocument();
 });
+
+it("shows selection time and summaries with numbered record pagination", async () => {
+  const { default: userEvent } = await import("@testing-library/user-event");
+  const user = userEvent.setup();
+  let total = 41;
+  const fetcher = vi.fn(async (_url, init) => {
+    const { input } = JSON.parse(init.body);
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        meta: {},
+        data: {
+          total,
+          next_cursor: "",
+          records:
+            input.offset >= total
+              ? []
+              : [
+                  {
+                    request_id: `request-${input.offset}`,
+                    created_at: "2026-10-05",
+                    request_summary: "<script>摘要</script>",
+                    model_id: "model-a",
+                    decision_ms: 12,
+                    generation_ms: 900,
+                    outcome: "success",
+                  },
+                ],
+        },
+      }),
+    );
+  });
+  render(
+    <Records
+      client={createManagementClient("x", fetcher)}
+      lang="en"
+      onError={() => {}}
+    />,
+  );
+  await screen.findByText("request-0");
+  expect(screen.getByText("12 ms")).toBeInTheDocument();
+  expect(screen.queryByText("912 ms")).toBeNull();
+  expect(document.querySelector("script")).toBeNull();
+  expect(screen.getByText("<script>摘要</script>")).toBeInTheDocument();
+  expect(screen.getAllByRole("columnheader").map((x) => x.textContent)).toEqual(
+    [
+      "Request / time",
+      "Request summary",
+      "Selected model",
+      "Path",
+      "Model selection time",
+      "Result",
+    ],
+  );
+  expect(screen.getByText("41 records")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Page 3" }));
+  await screen.findByText("request-40");
+  await user.click(screen.getByRole("button", { name: "Records per page" }));
+  await user.click(screen.getByRole("menuitemradio", { name: "10 / page" }));
+  await screen.findByText("request-0");
+  expect(JSON.parse(fetcher.mock.calls.at(-1)![1].body).input).toEqual({
+    offset: 0,
+    limit: 10,
+  });
+  // Cleanup shrinks the last page between requests; automatically recover.
+  total = 1;
+  await user.click(screen.getByRole("button", { name: "Page 5" }));
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Page 1" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    ),
+  );
+  expect(await screen.findByText("request-0")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Refresh" }));
+  await screen.findByText("request-0");
+  expect(JSON.parse(fetcher.mock.calls.at(-1)![1].body).input).toEqual({
+    offset: 0,
+    limit: 10,
+  });
+});

@@ -17,6 +17,7 @@
 | max_body_bytes | 16777216 |
 | stream_buffer | 8 |
 | retention_days | 7 |
+| record_max_count | 100000 |
 
 以上是通过本地边界测试的首版默认值，不代表真实模型延迟承诺。时长接受 Go duration 字符串；数值限额必须为正。
 
@@ -43,7 +44,7 @@ JSON 示例：
 
 first_event_timeout 覆盖流建立到首个有效 SSE 事件，非流式及固定连接测试则覆盖完整响应；之后以 idle_timeout 约束事件等待及下游写入，不设健康流总时长上限。生成客户端最多保留 16 组供应商地址/密钥快照，满载时明确拒绝额外目标，不偷换在途配置。
 
-记录每次尝试最多等待 record_timeout，保留清理在启动及每小时执行；失败令 status.get 的 records_degraded 置 true 并给出 warning，状态持续到重启。记录不是事务审计，不承诺无损。数据库用于单实例进程，请勿多进程共享同一文件。
+记录每次尝试最多等待 record_timeout。`retention_days`（1–3650，默认 7）限制保留天数；`record_max_count`（1–10000000，默认 100000）限制记录总数，对应环境变量 `JEV_ROUTER_RETENTION_DAYS` 和 `JEV_ROUTER_RECORD_MAX_COUNT`，重启生效。数量上限在每次写入事务内执行，超出后按写入顺序丢弃最旧记录；调低上限时启动阶段每批最多删除 1000 条。过期清理在启动及每小时分批执行，因此到期记录可能延迟至下一次清理移除。清理释放的 SQLite 页可供后续写入复用，不自动缩小数据库文件，也不承诺磁盘字节上限。后台清理或记录写入失败令 status.get 的 records_degraded 置 true 并给出 warning，状态持续到重启。记录不是事务审计，不承诺无损。数据库用于单实例进程，请勿多进程共享同一文件。
 
 
 ## 管理页面
@@ -52,7 +53,7 @@ first_event_timeout 覆盖流建立到首个有效 SSE 事件，非流式及固�
 
 普通模式先执行最多 5 秒、无凭证且不跟随重定向的 HTML 可达检查，再通过系统浏览器打开；失败以 JSON 返回错误及有效地址供手动打开。`--no-open` 仅返回 JSON 地址，不执行探测，不启动服务。该命令不需要 settings 凭证。
 
-浏览器单独输入 Settings 凭证并交换为固定 24 小时的 HttpOnly 会话，刷新或同凭证重启后可恢复；显式注销在服务端撤销当前请求会话。认证材料不写入 URL 或 Web Storage。UI 只访问同源 API，远程使用需部署 HTTPS 并配置公开 Origin，本机回环 HTTP 例外。UI 不管理账号、密钥或启动参数；完整生命周期与恢复规则见下方 Dashboard sessions。
+浏览器单独输入 Settings 凭证并交换为固定 7 天的 HttpOnly 会话，刷新或同凭证重启后可恢复；显式注销在服务端撤销当前请求会话。认证材料不写入 URL 或 Web Storage。UI 只访问同源 API，远程使用需部署 HTTPS 并配置公开 Origin，本机回环 HTTP 例外。UI 不管理账号、密钥或启动参数；完整生命周期与恢复规则见下方 Dashboard sessions。
 
 ## Docker Compose
 
@@ -72,7 +73,7 @@ Key revisions are retained so captured request snapshots and successful idempote
 
 ## Dashboard sessions
 
-The dashboard exchanges the Settings credential for a host-only HttpOnly, SameSite=Strict cookie scoped to `/admin/`. Sessions expire exactly 24 hours after login, without renewal. Refresh/reopen and server restarts with the same Settings credential and origin preserve valid sessions. CLI continues to use Bearer authentication. No browser authentication material is written to Web Storage.
+The dashboard exchanges the Settings credential for a host-only HttpOnly, SameSite=Strict cookie scoped to `/admin/`. Sessions expire exactly 7 days after login, without renewal. Refresh/reopen and server restarts with the same Settings credential and origin preserve valid sessions. CLI continues to use Bearer authentication. No browser authentication material is written to Web Storage.
 
 Set `JEV_ROUTER_DASHBOARD_ORIGIN=https://router.example.com` (or JSON `dashboard_origin`) for remote access. Use an origin only, with optional port. The environment overrides the configuration file. Without it only loopback HTTP browser sessions are allowed; remote CLI remains available. Remote origins require HTTPS; explicit HTTP is allowed only for localhost/literal loopback IPs.
 
