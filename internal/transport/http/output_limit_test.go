@@ -50,7 +50,7 @@ func outputLimitRouter(t *testing.T) (http.Handler, *atomic.Int32) {
 	cfg.Providers[0].BaseURL = upstream.URL
 	cfg.Models[0].UpstreamName = "gpt-4o-mini"
 	store := testStore{cfg}
-	h := NewHandler(management.New(store, nil), store, &routing.Planner{Check: provider.Check}, &routing.Executor{Generator: g}, func(string) (management.Principal, error) { return management.Principal{Role: "inference"}, nil }, Limits{})
+	h := NewHandler(management.New(store, nil), store, &routing.Planner{PrepareCheck: provider.PrepareCheck}, &routing.Executor{Generator: g}, func(string) (management.Principal, error) { return management.Principal{Role: "inference"}, nil }, Limits{})
 	return h, calls
 }
 

@@ -80,7 +80,7 @@ func TestContextFallbackInspectAndFullGeneration(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := testStore{cfg}
-	planner := &routing.Planner{Check: provider.Check}
+	planner := &routing.Planner{PrepareCheck: provider.PrepareCheck}
 	svc := management.New(store, nil)
 	checks := management.Checks{Store: store, Planner: planner}
 	checks.Register(svc)

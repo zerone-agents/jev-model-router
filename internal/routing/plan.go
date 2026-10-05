@@ -5,9 +5,10 @@ import (
 )
 
 type Planner struct {
-	Decider  Decider
-	Check    func(Target, Request) error
-	Estimate func(Model, Request) (int64, bool, error)
+	Decider      Decider
+	Check        func(Target, Request) error
+	PrepareCheck func(Request) func(Target) error
+	Estimate     func(Model, Request) (int64, bool, error)
 }
 type Plan struct {
 	ConfigVersion   int64            `json:"config_version"`
@@ -51,6 +52,11 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 		breakdown = &value
 		estimate = func(Model, Request) (int64, bool, error) { return value.TotalTokens, false, nil }
 	}
+	var check func(Target) error
+	if p.PrepareCheck != nil {
+		check = p.PrepareCheck(r)
+	}
+	hasImages, requiresTools, requiresStructured := HasImages(r), RequiresTools(r), RequiresStructuredOutput(r)
 	targets := []Target{}
 	var overflow []Target
 	exactOverflow := false
@@ -76,8 +82,11 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 		}
 		target := Target{Provider: provider, Model: m}
 		var e error
-		if HasImages(r) && !m.Capabilities.Images || RequiresTools(r) && !m.Capabilities.Tools || RequiresStructuredOutput(r) && !m.Capabilities.StructuredOutput {
+		if hasImages && !m.Capabilities.Images || requiresTools && !m.Capabilities.Tools || requiresStructured && !m.Capabilities.StructuredOutput {
 			e = Fail("unsupported_request", "model capabilities do not support request")
+		}
+		if e == nil && check != nil {
+			e = check(target)
 		}
 		if e == nil && p.Check != nil {
 			e = p.Check(target, r)

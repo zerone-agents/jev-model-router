@@ -75,7 +75,7 @@ func reasoningRouter(t *testing.T) (http.Handler, <-chan map[string]json.RawMess
 	cfg.Models = append(cfg.Models, other, unsupported)
 	cfg.Decision.Model = "jev-test"
 	store := testStore{cfg}
-	planner := &routing.Planner{Check: provider.Check, Decider: reasoningDecider{t}}
+	planner := &routing.Planner{PrepareCheck: provider.PrepareCheck, Decider: reasoningDecider{t}}
 	svc := management.New(store, nil)
 	(&management.Checks{Store: store, Planner: planner, Generator: g}).Register(svc)
 	return NewHandler(svc, store, planner, &routing.Executor{Generator: g}, func(token string) (management.Principal, error) {
