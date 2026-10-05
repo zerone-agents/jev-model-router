@@ -43,7 +43,7 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 
 	estimate := p.Estimate
 	var breakdown *ContextEstimate
-	if estimate == nil {
+	if r.Model == "auto" && estimate == nil {
 		value, err := EstimateRequestContext(r)
 		if err != nil {
 			return result, err
@@ -88,14 +88,19 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 			}
 			continue
 		}
+		// Explicit selection delegates context capacity entirely to the provider.
+		if r.Model != "auto" {
+			result.Target = target
+			result.ModelID = m.ID
+			result.CandidateIDs = []string{m.ID}
+			result.Path = "explicit"
+			return result, nil
+		}
 		units, isExact, e := estimate(m, r)
 		if e != nil {
 			return result, e
 		}
 		if units > m.Capabilities.ContextLimit {
-			if r.Model != "auto" {
-				return result, Fail("budget_exceeded", "generation context exceeds configured capacity")
-			}
 			if isExact {
 				exactOverflow = true
 			} else if overflow == nil || m.Capabilities.ContextLimit > overflow.Model.Capabilities.ContextLimit || (m.Capabilities.ContextLimit == overflow.Model.Capabilities.ContextLimit && m.ID < overflow.Model.ID) {

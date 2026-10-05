@@ -41,8 +41,8 @@ func TestOutputLimitAliases(t *testing.T) {
 					if err != nil || plan.Path != "context_estimate_fallback" {
 						t.Fatalf("missing fallback: %+v %v", plan, err)
 					}
-				} else if err == nil {
-					t.Fatal("explicit output budget ignored")
+				} else if err != nil || plan.Path != "explicit" || plan.ContextEstimate != nil {
+					t.Fatalf("explicit budget not delegated: %+v %v", plan, err)
 				}
 			}
 		}

@@ -201,15 +201,18 @@ func TestFallbackEligibilityAndStableSelection(t *testing.T) {
 				p.Estimate = func(Model, Request) (int64, bool, error) { return 500, true, nil }
 			case "explicit":
 				r.Model = "a"
+				want = "a"
+				path = "explicit"
+				p.Estimate = func(Model, Request) (int64, bool, error) { t.Fatal("explicit invoked estimator"); return 0, false, nil }
 			}
 			plan, err := p.Plan(context.Background(), s, r)
-			if mode == "exact" || mode == "explicit" {
+			if mode == "exact" {
 				if err == nil {
 					t.Fatal("unexpected fallback")
 				}
 				return
 			}
-			if err != nil || plan.ModelID != want || plan.Path != path || calls != 0 || plan.ContextExact {
+			if err != nil || plan.ModelID != want || plan.Path != path || calls != 0 || plan.ContextExact || (mode == "explicit" && plan.ContextEstimate != nil) {
 				t.Fatalf("%+v err=%v calls=%d", plan, err, calls)
 			}
 		})

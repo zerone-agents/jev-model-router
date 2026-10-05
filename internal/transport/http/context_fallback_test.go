@@ -97,16 +97,31 @@ func TestContextFallbackInspectAndFullGeneration(t *testing.T) {
 		t.Fatal("inspect called generator")
 	}
 	handler := NewHandler(svc, store, planner, &routing.Executor{Generator: g}, func(string) (management.Principal, error) { return management.Principal{Role: "inference"}, nil }, Limits{})
-	for _, stream := range []bool{false, true} {
-		input["stream"] = stream
-		body, _ := json.Marshal(input)
-		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, httptest.NewRequest("POST", "/v1/chat/completions", bytes.NewReader(body)))
-		if w.Code != 200 {
-			t.Fatalf("%d %s", w.Code, w.Body.String())
+	for _, model := range []string{"auto", "largest"} {
+		input["model"] = model
+		if model == "largest" {
+			body, _ := json.Marshal(input)
+			inspected, e := svc.Execute(context.Background(), "settings", management.Call{CapabilityID: "route.inspect", Input: body})
+			if e != nil {
+				t.Fatal(e)
+			}
+			var explicit routing.Plan
+			json.Unmarshal(inspected.Data, &explicit)
+			if explicit.Path != "explicit" || explicit.ContextEstimate != nil || explicit.ContextExact {
+				t.Fatalf("explicit estimate: %s", inspected.Data)
+			}
+		}
+		for _, stream := range []bool{false, true} {
+			input["stream"] = stream
+			body, _ := json.Marshal(input)
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, httptest.NewRequest("POST", "/v1/chat/completions", bytes.NewReader(body)))
+			if w.Code != 200 {
+				t.Fatalf("%d %s", w.Code, w.Body.String())
+			}
 		}
 	}
-	if calls.Load() != 2 {
+	if calls.Load() != 4 {
 		t.Fatalf("unexpected retries: %d", calls.Load())
 	}
 }
