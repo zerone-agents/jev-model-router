@@ -76,6 +76,10 @@ docs/adr/                本地架构决策记录（Git 忽略）
 
 `transport/http` 保持 `/v1/chat/completions` 和 `/v1/models` 的兼容格式。SSE 必须保留工具调用增量、usage 与错误，不把内部 SDK 元数据暴露为协议的一部分。取消从入口传到决策及生成服务；流开始后不拼接另一模型的输出。
 
+新增 `/v1/messages` 客户端侧 Anthropic 兼容入口，共享 `inference` 的配置快照、规划计时和路由记录生命周期。请求在 `provider` 内通过 Bifrost Anthropic→Responses→Chat 转换为当前 OpenAI 兼容上游请求；返回结果/增量通过 Bifrost 反向转换，完整生成结果不先经过精简的 Chat 响应类型。请求级 prepared 数据为不可变字节，规划投影、每个目标的检查与实际发送均从它构造独立副本；`PlanPrepared` 在容量检查及 Jev 前执行完整请求检查，不修改共享 Planner 字段。仅支持已公布的可由 Chat 表达的输入组合，原生 Anthropic 上游仍未接入。
+
+Messages 接受 inference 的 `x-api-key` 或 Bearer，同传时必须都有效且属于同一身份/角色；独立错误编码覆盖认证失败、流前 JSON 和流内 error。Anthropic `request-id` 与 `X-Request-ID` 为同一 Router ID。thinking 支持 adaptive/disabled 和显式 effort；独立预算和原生签名历史明确拒绝。未知 usage 不合成为零；SSE 初始 usage 为 `{}`，末尾补充实际报告值，这是经官方 SDK 0.52.0 验证的兼容差异。完整范围与未完成发布条件见 [兼容矩阵](compatibility.md#anthropic-messages-issue-23)。
+
 兼容承诺限定于公布的字段及供应商支持组合。生成请求不裁剪对话、不静默丢弃影响行为的参数；无法支持时明确报错。协议转换和上游模型名称替换允许进行，但不能改变已支持输入的语义。
 
 首版生成接入仅验证 OpenAI 兼容端点路径，可配置多个供应商和模型；原生 Anthropic、Gemini 等路径逐步加入，不因 Bifrost 提供适配即声明支持。端点自称兼容不替代本项目的字段组合验证。响应 `model` 使用选定的对外模型 ID，流式保持一致；请求 ID 放在响应头，路由元数据由管理接口查询，不向兼容响应体添加自定义字段。

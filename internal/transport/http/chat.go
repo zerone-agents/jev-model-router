@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/zerone-agents/jev-model-router/internal/management"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"io"
 	"net/http"
@@ -12,16 +11,9 @@ import (
 )
 
 func (s *server) chat(w http.ResponseWriter, r *http.Request) {
-	rec := routing.Record{RequestID: w.Header().Get("X-Request-ID"), CreatedAt: time.Now().UTC()}
+	execution := s.inference.Begin(r.Context(), w.Header().Get("X-Request-ID"))
 	var finalErr error
-	defer func() {
-		rec.Outcome = "success"
-		if finalErr != nil {
-			rec.Outcome = "error"
-			rec.ErrorCode = management.Failure(finalErr).Error.Code
-		}
-		s.limits.Recorder.Save(rec)
-	}()
+	defer func() { execution.Finish(finalErr) }()
 	fail := func(e error) { finalErr = e; writeError(w, e) }
 	r.Body = http.MaxBytesReader(w, r.Body, s.limits.MaxBodyBytes)
 	var req routing.Request
@@ -39,26 +31,7 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 		fail(routing.Fail("invalid_request", "invalid chat body"))
 		return
 	}
-	rec.RequestSummary = routing.RequestSummary(req)
-	rec.Mode = "explicit"
-	if req.Model == "auto" {
-		rec.Mode = "auto"
-	}
-	cfg, e := s.store.Snapshot(r.Context())
-	if e != nil {
-		fail(e)
-		return
-	}
-	rec.ConfigVersion = cfg.Version
-	decisionStart := time.Now()
-	ctx, cancel := context.WithTimeout(r.Context(), s.limits.DecisionTimeout)
-	plan, e := s.planner.Plan(ctx, cfg, req)
-	rec.DecisionMillis = time.Since(decisionStart).Milliseconds()
-	rec.CandidateIDs = plan.CandidateIDs
-	rec.Path = plan.Path
-	rec.ModelID = plan.ModelID
-	e = contextError(ctx, e)
-	cancel()
+	plan, e := execution.Plan(req, nil)
 	if e != nil {
 		fail(e)
 		return

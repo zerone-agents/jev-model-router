@@ -64,7 +64,7 @@ call body 为 `{"input":{...},"expected_version":1,"idempotency_key":"operation-
 
 ## Dashboard 会话认证
 
-`schemas/session.json` 是认证端点、有效期、容量、Cookie 和浏览器来源要求的机器契约，随 `call.protocol.session` 发布；认证端点不是配置能力，不消耗版本或幂等键。CLI 保持 Settings Bearer；普通管理请求仅在 Authorization 缺席时接受 Cookie，有效 Cookie 不会覆盖无效 Bearer。推理 API 仍只接受 inference Bearer。
+`schemas/session.json` 是认证端点、有效期、容量、Cookie 和浏览器来源要求的机器契约，随 `call.protocol.session` 发布；认证端点不是配置能力，不消耗版本或幂等键。CLI 保持 Settings Bearer；普通管理请求仅在 Authorization 缺席时接受 Cookie，有效 Cookie 不会覆盖无效 Bearer。推理 API 使用 inference 凭证。Chat 和 models 保持 Bearer；`/v1/messages` 另接受 `x-api-key`，同传时两个凭证必须都有效且属于同一身份/角色，Cookie 不授予推理权限。
 
 登录用 Settings Bearer 与空 JSON 对象换取 HttpOnly Cookie，返回 expires_at/csrf_token；状态查询恢复 CSRF，注销只撤销请求会话。所有 Cookie POST 校验精确 Origin、JSON 与绑定该会话的 CSRF；GET 要求 X-Jev-Session: 1。响应禁止缓存。只有成功登录写 Cookie，状态、注销和错误均不清 Cookie，避免迟到响应删除另一标签页的新会话。遇到 CSRF 不匹配，显式恢复后重新决定操作，不自动重放。`session_limit` 为 HTTP 429 / CLI 6，retryable=false。
 
@@ -89,3 +89,9 @@ call body 为 `{"input":{...},"expected_version":1,"idempotency_key":"operation-
 `route.inspect` 的可选 `context_estimate` 返回 semantic_bytes_v1 分项和输入/输出预留总量；新增 path `context_estimate_fallback` 表示 auto 全部合格候选估算超限后的最大上下文保底，不代表精确容量足够。最大容量候选只有一个时直接选用；多个并列时仅将这些候选交给 Jev 选择一轮，path 仍为 context_estimate_fallback，保留完整 candidate_ids 和决策 usage。
 
 显式模型的 route.inspect 不进行上下文估算，省略 context_estimate，context_exact=false 表示未计数；仍执行请求格式、启用及能力检查。
+
+## Anthropic Messages 推理契约
+
+`schemas/messages.json` 定义 POST /v1/messages 的输入形状；provider 还执行明确公布的内容组合及目标转换检查。`thinking.enabled` 的预算格式可识别，但当前 Chat adapter 无法执行独立预算，返回 unsupported_request；adaptive/disabled 和显式 output_config.effort 已实现。原生签名、带 is_error=true 的工具结果和不可保持顺序的混合块明确拒绝。版本固定 2023-06-01，beta 扩展拒绝。
+
+该入口使用独立 Anthropic 错误信封，认证失败也包含顶层 type:error、error.type/message、request_id；request-id 与 X-Request-ID 相同。400/401/403/404/405/413/422/429/500/502/503/504/529 的映射和流内失败范围见 [兼容文档](../docs/compatibility.md#anthropic-messages-issue-23)。Messages 不套管理信封，也不透传上游 OpenAI 错误体。

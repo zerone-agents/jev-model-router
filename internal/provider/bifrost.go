@@ -51,7 +51,7 @@ func (g *bifrostGenerator) acquire(t routing.Target) (*bifrost.Bifrost, func(), 
 				}
 			}
 			if oldest == nil {
-				return nil, nil, routing.Fail("upstream_error", "generation connection capacity reached")
+				return nil, nil, routing.ErrGenerationCapacity
 			}
 			delete(g.clients, victim)
 			oldest.client.Shutdown()

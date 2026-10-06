@@ -94,3 +94,39 @@ JEV_TEST_AGENT_SDK=/path/to/agent-sdk go test ./internal/transport/http -run Tes
 生成供应商返回的 OpenAI 兼容错误保留 `error.message/type/code/param`，普通 JSON 与 SSE 建连失败保留上游 400–599 状态码。SSE 已发送响应头后无法更改 HTTP 状态，错误通过流内 `error` 对象返回；没有有效错误状态时使用 502。此处透传的是供应商结构化错误字段，不包含 Bifrost 内部诊断、原始请求或完整响应头；不承诺逐字节转发任意 HTML/非标准响应。网络异常、超时、取消及 SDK 内部错误仍使用 router 的稳定错误。内部记录和管理接口保留 `upstream_error` 分类及通用信息，不写入供应商错误内容。
 
 仅在原始响应能验证为结构化 error 对象（非空字符串 message，type/code/param 为字符串或 null）时透传。纯文本、HTML、格式错误和连接故障使用 safeError。当前 Bifrost 不保留 HTTP 200 流内错误的原始帧，因此该路径无法验证来源，也返回通用错误；不依据 IsBifrostError=false 推断来源。
+
+## Anthropic Messages (Issue #23)
+
+2026-10-06：新增客户端侧 `POST /v1/messages`，当前仍调用已配置的 OpenAI-compatible Chat Completions 生成上游。使用锁定 Bifrost 的 Anthropic→Responses→Chat 和返回转换；只对实测转换缺口补充消息分组合并、并行控制、显式推理参数及 usage/终态保护。已有 Chat Completions 的供应商原始错误透传规则不适用于此新入口。
+
+| 能力 | 当前范围及证据 |
+| --- | --- |
+| 文本、顶层 system、auto/显式、JSON/SSE | 本地生产 Router/Bifrost 与模拟上游通过；官方 Anthropic SDK 0.52.0 四种模式通过 |
+| 图片 | HTTPS URL/base64 png/jpeg/webp/gif 转换；本地 fixture 检查字段保留，官方 SDK 续写回合含内联图片；不下载图片；真实视觉模型未验证 |
+| 普通 tools、tool_choice、disable_parallel_tool_use | 候选能力过滤和最终 wire 检查；官方 SDK 完整工具结果续写、SSE 参数增量和 ID/输入配对通过；is_error=true 明确拒绝 |
+| temperature/top_p、输出限额 | Messages temperature 为 0–1、top_p 为 0–1；max_tokens 必填，16–10000000，合法 JSON 整数形式归一化，不钳制 |
+| JSON Schema | output_config.format 转为现有 response_format；需要模型 structured_output 能力。无 schema 的 JSON object 可用 `{"type":"object"}` schema 表达；不新增非标准 json_object 字段 |
+| thinking/effort | adaptive→enable_thinking=true；disabled→false；显式 output_config.effort 的 low/medium/high/xhigh/max 原样转发，不由模型名改写，不注入默认 effort。官方 SDK unsigned thinking 历史、JSON/SSE 输出通过；真实模型未验证 |
+| 手动 thinking 预算 | enabled+budget_tokens 的形状可识别，但当前上游适配会丢掉独立预算，入口在任何网络调用前明确拒绝，不能称为预算支持 |
+| 原生签名/加密历史 | 明确拒绝。Bifrost 返回的空 payload Responses item 标记可回传，只用于关联，不宣称是 Claude 签名 |
+| usage | JSON 缺失则省略；SSE 初始 usage={}，最终 message_delta 补充真实报告的 input/output counts；真实零值保留；报告的缓存读写计数分别输出，普通 input_tokens 扣除这些计数，不把缓存输入算作普通输入。官方 SDK 0.52.0 能累积更新，这是与严格原生 Anthropic 初始数值 usage 的兼容差异；其他严格客户端未验证 |
+| stop_sequences | 请求原样转发；上游仅返回模糊 stop 且未给出匹配序列时明确失败，不猜测 end_turn/stop_sequence。已用模拟上游验证带 `stop:"END"` 的 JSON/SSE 匹配元数据；矛盾终态明确失败，真实供应商元数据仍未验证 |
+| 失败、取消、超时 | 本地测试通过流前 JSON、流内 error、无终态断流、首包/空闲超时、客户端取消；失败不发 message_stop，不换模；单请求不重试 |
+
+必须使用 `anthropic-version: 2023-06-01`、JSON Content-Type 和 inference x-api-key/Bearer；同时提供认证头时必须均有效且身份/角色一致。settings 和 Cookie 不授权推理。非空 beta、cache_control、文档、服务端工具、原生 redacted_thinking、不可保持顺序的 assistant 混合块明确拒绝。普通 assistant 块顺序为 thinking→text→tool_use；tool_result 在 user 额外文本/图片之前，结果必须与此前调用配对。thinking-only assistant 历史通过空文本结构载体保留；同角色的连续 assistant 消息也执行跨消息块顺序检查，不接受文本/工具之后的 thinking。不承诺全量 Messages。
+
+所有错误使用 `{"type":"error","error":{"type":"…","message":"安全诊断"},"request_id":"…"}`。响应头 request-id/X-Request-ID 与 body request_id 一致；流内为 event:error，不发送成功终态。凭证无效 401/authentication_error，角色不符 403/permission_error，校验或不支持 400/invalid_request_error，方法 405，体积超限 413/request_too_large，显式模型不可用 404/not_found_error，无候选/决策预算 422/invalid_request_error，配置/存储故障 503/api_error，生成/转换/决策故障 502/api_error，超时 504/timeout_error，仍可写连接上的取消 499/api_error。上游 429/529 分别保留并映射 rate_limit_error/overloaded_error；可信的请求相关失败与 5xx 按公布分类保留状态；上游 401/402/403 映射 502/api_error。上游错误内容、诊断及其请求 ID 不直接透传。
+
+复现未经修改的官方 SDK 集成（Node 项目需已有 @anthropic-ai/sdk，打印实际版本）：
+
+```sh
+JEV_TEST_ANTHROPIC_SDK=/absolute/path/to/node-project go test ./internal/transport/http -run TestUnmodifiedAnthropicSDK -count=1 -v
+go test ./internal/compat -run Anthropic -count=1 -v
+go test ./internal/provider ./internal/transport/http -run 'PreparedMessages|Messages' -count=1
+```
+
+SDK 测试不改写 fetch/请求；单次调用验证设置 maxRetries=0，四个完整回合共 8 次模拟生成请求；另有 1 次模拟断流验证 SDK 流内错误解析，认证失败和非法请求不外发。示例见 examples/anthropic-messages.mjs。官方 SDK 默认重试是客户端行为，不能误认为 Router 换模或重试。
+
+发布条件仍未全部完成：独立 thinking 预算、原生签名兼容、严格 initial usage、停止元数据、OpenAI 独有 effort 档位在标准 Anthropic 字段中的表达仍有差距；部署环境和真实模型验证未运行。不得据本地部分通过结论关闭 #23 或宣称已经覆盖当前 OpenAI 入口的全部语义。
+
+Messages SSE 在 Bifrost 累计状态之前执行总预算：序列化后的已解码帧累计最多 16 MiB、最多 65536 帧，原始捕获单次最多 16 MiB。包含文本、thinking、工具参数/名称、ID 等元数据；超限明确失败并取消上游，不截断成成功输出。每个工具参数另限 1 MiB。该预算限制 adapter/converter 的累计数据，不宣称约束 SDK 解析一个巨大原始帧之前的瞬时内存分配。

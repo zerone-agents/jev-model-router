@@ -67,6 +67,14 @@
     "session_limit": {
       "http_status": 429,
       "exit_code": 6
+    },
+    "request_too_large": {
+      "http_status": 413,
+      "exit_code": 2
+    },
+    "method_not_allowed": {
+      "http_status": 405,
+      "exit_code": 2
     }
   },
   "retention": {
