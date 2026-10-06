@@ -99,7 +99,7 @@ func TestNoCandidateFitsContext(t *testing.T) {
 	calls := 0
 	p := counterPlanner(&calls)
 	p.Estimate = func(Model, Request) (int64, bool, error) { return 20000, false, nil }
-	if plan, e := p.Plan(context.Background(), s, r); e != nil || calls != 0 || plan.Path != "context_estimate_fallback" || plan.ModelID != "a" {
+	if plan, e := p.Plan(context.Background(), s, r); e != nil || calls != 1 || plan.Path != "context_estimate_fallback" || plan.ModelID != "a" {
 		t.Fatalf("missing fallback: %+v %v", plan, e)
 	}
 }
@@ -177,7 +177,7 @@ func TestFallbackEligibilityAndStableSelection(t *testing.T) {
 			case "tie":
 				s.Models[0].Capabilities.ContextLimit = 200
 				s.Models[0], s.Models[1] = s.Models[1], s.Models[0]
-				want = "a"
+				want = "b"
 			case "partial":
 				s.Models[0].Capabilities.ContextLimit = 1000
 				want = "a"
@@ -212,8 +212,60 @@ func TestFallbackEligibilityAndStableSelection(t *testing.T) {
 				}
 				return
 			}
-			if err != nil || plan.ModelID != want || plan.Path != path || calls != 0 || plan.ContextExact || (mode == "explicit" && plan.ContextEstimate != nil) {
+			wantCalls := 0
+			if mode == "tie" {
+				wantCalls = 1
+			}
+			if err != nil || plan.ModelID != want || plan.Path != path || calls != wantCalls || plan.ContextExact || (mode == "explicit" && plan.ContextEstimate != nil) {
 				t.Fatalf("%+v err=%v calls=%d", plan, err, calls)
+			}
+		})
+	}
+}
+
+func TestFallbackJevChoosesOnlyLargestTies(t *testing.T) {
+	for _, mode := range []string{"selected", "unknown", "failure", "missing"} {
+		t.Run(mode, func(t *testing.T) {
+			s, r := planFixture()
+			s.Models[0].Capabilities.ContextLimit = 100
+			s.Models[1].Capabilities.ContextLimit = 200
+			c := s.Models[1]
+			c.ID = "c"
+			s.Models = append(s.Models, c)
+			calls := 0
+			p := Planner{Decider: chooseFunc(func(_ context.Context, _ DecisionConfig, in DecisionInput) (Decision, error) {
+				calls++
+				if len(in.Candidates) != 2 || in.Candidates[0].ID != "b" || in.Candidates[1].ID != "c" {
+					t.Fatalf("candidates: %+v", in.Candidates)
+				}
+				if string(in.Request.Messages[0].Content) != string(r.Messages[0].Content) {
+					t.Fatal("request changed")
+				}
+				if mode == "failure" {
+					return Decision{}, Fail("upstream_error", "failed")
+				}
+				if mode == "unknown" {
+					return Decision{ModelID: "a"}, nil
+				}
+				return Decision{ModelID: "c", Usage: &Usage{InputTokens: 7}}, nil
+			})}
+			if mode == "missing" {
+				p.Decider = nil
+			}
+			plan, err := p.Plan(context.Background(), s, r)
+			if mode == "selected" {
+				if err != nil || plan.ModelID != "c" || plan.Path != "context_estimate_fallback" || len(plan.CandidateIDs) != 2 || plan.DecisionUsage == nil || plan.DecisionUsage.InputTokens != 7 {
+					t.Fatalf("%+v %v", plan, err)
+				}
+			} else if err == nil {
+				t.Fatal("expected failure without arbitrary selection")
+			}
+			want := 1
+			if mode == "missing" {
+				want = 0
+			}
+			if calls != want {
+				t.Fatalf("calls=%d", calls)
 			}
 		})
 	}

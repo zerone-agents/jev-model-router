@@ -5,9 +5,10 @@ import (
 )
 
 type Planner struct {
-	Decider  Decider
-	Check    func(Target, Request) error
-	Estimate func(Model, Request) (int64, bool, error)
+	Decider      Decider
+	Check        func(Target, Request) error
+	PrepareCheck func(Request) func(Target) error
+	Estimate     func(Model, Request) (int64, bool, error)
 }
 type Plan struct {
 	ConfigVersion   int64            `json:"config_version"`
@@ -51,8 +52,13 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 		breakdown = &value
 		estimate = func(Model, Request) (int64, bool, error) { return value.TotalTokens, false, nil }
 	}
+	var check func(Target) error
+	if p.PrepareCheck != nil {
+		check = p.PrepareCheck(r)
+	}
+	hasImages, requiresTools, requiresStructured := HasImages(r), RequiresTools(r), RequiresStructuredOutput(r)
 	targets := []Target{}
-	var overflow *Target
+	var overflow []Target
 	exactOverflow := false
 	exact := map[string]bool{}
 	for _, m := range s.Models {
@@ -76,8 +82,11 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 		}
 		target := Target{Provider: provider, Model: m}
 		var e error
-		if HasImages(r) && !m.Capabilities.Images || RequiresTools(r) && !m.Capabilities.Tools || RequiresStructuredOutput(r) && !m.Capabilities.StructuredOutput {
+		if hasImages && !m.Capabilities.Images || requiresTools && !m.Capabilities.Tools || requiresStructured && !m.Capabilities.StructuredOutput {
 			e = Fail("unsupported_request", "model capabilities do not support request")
+		}
+		if e == nil && check != nil {
+			e = check(target)
 		}
 		if e == nil && p.Check != nil {
 			e = p.Check(target, r)
@@ -103,9 +112,12 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 		if units > m.Capabilities.ContextLimit {
 			if isExact {
 				exactOverflow = true
-			} else if overflow == nil || m.Capabilities.ContextLimit > overflow.Model.Capabilities.ContextLimit || (m.Capabilities.ContextLimit == overflow.Model.Capabilities.ContextLimit && m.ID < overflow.Model.ID) {
-				copy := target
-				overflow = &copy
+			} else {
+				if len(overflow) == 0 || m.Capabilities.ContextLimit > overflow[0].Model.Capabilities.ContextLimit {
+					overflow = []Target{target}
+				} else if m.Capabilities.ContextLimit == overflow[0].Model.Capabilities.ContextLimit {
+					overflow = append(overflow, target)
+				}
 			}
 			continue
 		}
@@ -113,10 +125,12 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 		exact[m.ID] = isExact
 		result.CandidateIDs = append(result.CandidateIDs, m.ID)
 	}
-	fallback := len(targets) == 0 && overflow != nil && !exactOverflow
+	fallback := len(targets) == 0 && len(overflow) > 0 && !exactOverflow
 	if fallback {
-		targets = append(targets, *overflow)
-		result.CandidateIDs = append(result.CandidateIDs, overflow.Model.ID)
+		targets = overflow
+		for _, target := range targets {
+			result.CandidateIDs = append(result.CandidateIDs, target.Model.ID)
+		}
 	}
 	if len(targets) == 0 {
 		if r.Model != "auto" {
@@ -133,6 +147,8 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 		result.Path = "single_candidate"
 	} else {
 		result.Path = "jev_choice"
+	}
+	if r.Model == "auto" && len(targets) > 1 {
 		if p.Decider == nil || s.Decision.Model == "" {
 			return result, Fail("config_missing", "decision configuration required")
 		}

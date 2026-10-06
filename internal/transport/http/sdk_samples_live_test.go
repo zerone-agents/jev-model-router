@@ -56,7 +56,7 @@ func TestSDKLiveSamples(t *testing.T) {
 	}
 	cfg.Models[0].Capabilities = routing.Capabilities{ContextLimit: 1000000, Tools: true, StructuredOutput: true, Reasoning: []routing.ReasoningCombination{{EnableThinking: new(true)}, {Effort: "low"}, {Effort: "medium"}, {Effort: "high"}}}
 	store := testStore{cfg}
-	h := NewHandler(management.New(store, nil), store, &routing.Planner{Check: provider.Check}, &routing.Executor{Generator: g}, func(string) (management.Principal, error) { return management.Principal{Role: "inference"}, nil }, Limits{})
+	h := NewHandler(management.New(store, nil), store, &routing.Planner{PrepareCheck: provider.PrepareCheck}, &routing.Executor{Generator: g}, func(string) (management.Principal, error) { return management.Principal{Role: "inference"}, nil }, Limits{})
 	for _, sample := range []string{"basic/01-simple-query.ts", "basic/02-multi-tool.ts", "basic/03-multi-turn.ts", "basic/04-prompt-api.ts", "basic/05-custom-system-prompt.ts", "tools/07-custom-tools.ts", "streaming/16-streaming.ts", "streaming/17-streaming-with-tools.ts", "advanced/13-hooks.ts", "advanced/15-openai-compat.ts", "advanced/32-reasoning-effort.ts", "sessions/31-session-query-limit.ts"} {
 		t.Run(sample, func(t *testing.T) {
 			// These two examples use fixed /tmp paths instead of their workdir.

@@ -57,6 +57,10 @@ func Check(target routing.Target, r routing.Request) error {
 	if routing.RequiresStructuredOutput(r) && !target.Model.Capabilities.StructuredOutput {
 		return routing.Fail("unsupported_request", "model does not support structured output")
 	}
+	return checkWire(target, r)
+}
+
+func checkWire(target routing.Target, r routing.Request) error {
 	ctx := schemas.NewBifrostContext(context.Background(), time.Time{})
 	defer ctx.Cancel()
 	req, e := encode(ctx, target, r)
@@ -108,5 +112,28 @@ func normalizeToolHistory(request map[string]any) {
 				delete(call, "index")
 			}
 		}
+	}
+}
+
+// PrepareCheck is scoped to one Plan call, after ValidateRequest and per-model
+// capability checks. The pinned OpenAI adapter converts message history without
+// consulting model capabilities; model-dependent rewrites affect parameters.
+// Check the full history once and retain per-target parameter checks. No result
+// is shared across requests. Check remains the standalone full validation path.
+func PrepareCheck(r routing.Request) func(routing.Target) error {
+	history := routing.Request{Model: r.Model, Messages: r.Messages}
+	parameters := r
+	parameters.Messages = []routing.Message{{Role: "user", Content: json.RawMessage(`"compatibility check"`)}}
+	checked := false
+	var historyError error
+	return func(target routing.Target) error {
+		if !checked {
+			historyError = checkWire(target, history)
+			checked = true
+		}
+		if historyError != nil {
+			return historyError
+		}
+		return checkWire(target, parameters)
 	}
 }

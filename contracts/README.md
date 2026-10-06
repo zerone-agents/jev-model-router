@@ -86,6 +86,6 @@ call body 为 `{"input":{...},"expected_version":1,"idempotency_key":"operation-
 
 `decision_ms` 只计选模阶段（请求验证、候选过滤及需要时的决策调用），不含生成耗时；不再输出 `generation_ms`。`request_summary` 为最后一条 user 消息的文本片段，合并空白后最多 120 个 Unicode 字符，本地提取，不额外调用模型；无文本或旧记录时缺省。工具消息、图片地址和更早的消息不进入摘要。默认保留 7 天且最多 100000 条，数量超限按写入顺序丢弃最旧记录；天数和数量均可通过启动配置调整，详见 configuration.md。
 
-`route.inspect` 的可选 `context_estimate` 返回 semantic_bytes_v1 分项和输入/输出预留总量；新增 path `context_estimate_fallback` 表示 auto 全部合格候选估算超限后的最大上下文保底，不代表精确容量足够。
+`route.inspect` 的可选 `context_estimate` 返回 semantic_bytes_v1 分项和输入/输出预留总量；新增 path `context_estimate_fallback` 表示 auto 全部合格候选估算超限后的最大上下文保底，不代表精确容量足够。最大容量候选只有一个时直接选用；多个并列时仅将这些候选交给 Jev 选择一轮，path 仍为 context_estimate_fallback，保留完整 candidate_ids 和决策 usage。
 
 显式模型的 route.inspect 不进行上下文估算，省略 context_estimate，context_exact=false 表示未计数；仍执行请求格式、启用及能力检查。

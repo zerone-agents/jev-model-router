@@ -110,7 +110,7 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 	service.ResolveSecret = resolve
 	budget := decision.DefaultBudget()
 	budget.MaxBytes = cfg.DecisionMaxBytes
-	planner := &routing.Planner{Decider: decision.New(nil, externalResolve, budget), Check: provider.Check}
+	planner := &routing.Planner{Decider: decision.New(nil, externalResolve, budget), PrepareCheck: provider.PrepareCheck}
 	checks := management.Checks{Store: store, Planner: planner, Generator: gen, DecisionTimeout: cfg.DecisionTimeout, FirstEventTimeout: cfg.FirstEventTimeout}
 	checks.Register(service)
 	service.RecordsDegraded = recorder.Degraded

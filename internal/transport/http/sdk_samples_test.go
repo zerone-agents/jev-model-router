@@ -149,7 +149,7 @@ func TestAgentSDKSimpleQuerySample(t *testing.T) {
 			cfg.Models = append(cfg.Models, other)
 			cfg.Decision = routing.DecisionConfig{BaseURL: decisionServer.URL, Model: "jev-1.13.0"}
 			store := testStore{cfg}
-			h := NewHandler(management.New(store, nil), store, &routing.Planner{Check: provider.Check, Decider: decision.New(decisionServer.Client(), func(string) ([]byte, error) { return []byte("local"), nil }, decision.DefaultBudget())}, &routing.Executor{Generator: g}, func(string) (management.Principal, error) { return management.Principal{Role: "inference"}, nil }, Limits{})
+			h := NewHandler(management.New(store, nil), store, &routing.Planner{PrepareCheck: provider.PrepareCheck, Decider: decision.New(decisionServer.Client(), func(string) ([]byte, error) { return []byte("local"), nil }, decision.DefaultBudget())}, &routing.Executor{Generator: g}, func(string) (management.Principal, error) { return management.Principal{Role: "inference"}, nil }, Limits{})
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				raw, _ := io.ReadAll(r.Body)
 				r.Body = io.NopCloser(bytes.NewReader(raw))
