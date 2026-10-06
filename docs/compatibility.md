@@ -22,7 +22,7 @@ Jev 决策默认限制为 255 个候选、32,000 UTF-8 序列化字节（包含�
 
 生成容量预检使用 `semantic_bytes_v1`：完整历史文本（含工具结果、reasoning/refusal）、工具名称和描述按 ceil(UTF-8 字节总数/4) 估算；工具参数按解码后的字符串字节数、工具 schema/response_format/tool_choice 按紧凑 JSON 字节数单独核算；每消息预留 4、每工具调用/定义预留 8、每张图片预留 8192。图片 URL/base64 不计作文本；model、stream、temperature 等非提示字段不计入。输入与输出分开，输出限额只加一次，未指定时仍预留 4096，但不会向上游注入该限额。`route.inspect.context_estimate` 返回方法、文本/结构化字节数、图片/framing、输入、输出预留及总估算；`context_exact=false` 表明它不是精确计数，也不保证多语言或视觉模型上界。
 
-`auto` 仅当所有通过非容量约束的模型都因非精确估算超限而被排除时，选择 ContextLimit 最大的模型继续执行，路径标记为 `context_estimate_fallback`，候选列表只含保底模型；并列按模型 ID 字典序选择。若任一模型正常通过容量检查，沿用原流程；精确超限不进入此保底。能力、启用状态、供应商配置检查不能被绕过；显式模型跳过本地上下文预算估算与拦截，由上游判断容量，不换模。保底不调用 Jev，不重试上游；完整生成输入和输出限额保持不变，实际超限由上游处理。
+`auto` 仅当所有通过非容量约束的模型都因非精确估算超限而被排除时，保留 ContextLimit 最大的全部模型作为保底候选，路径标记为 `context_estimate_fallback`；只有一个候选时直接执行，多个并列时仅将这些候选交给 Jev 选择一轮，候选列表和决策 usage 保留。若任一模型正常通过容量检查，沿用原流程；精确超限不进入此保底。能力、启用状态、供应商配置检查不能被绕过；显式模型跳过本地上下文预算估算与拦截，由上游判断容量，不换模。并列候选的 Jev 决策失败时明确报错，不任意选用模型；不重试上游；完整生成输入和输出限额保持不变，实际超限由上游处理。
 
 普通 `response_format.type=text` 不要求结构化输出能力，JSON 模式才要求。Jev 的必需输入同时包含输出格式/JSON Schema、tool_choice、parallel_tool_calls 和 max_completion_tokens，这些需求也占用决策预算。
 
