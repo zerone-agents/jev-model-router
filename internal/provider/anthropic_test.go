@@ -411,3 +411,96 @@ func TestPreparedMessagesMatchedStop(t *testing.T) {
 		})
 	}
 }
+
+func TestMessagesParallelToolsSameFrame(t *testing.T) {
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, `data: {"id":"x","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"a","type":"function","function":{"name":"first","arguments":"{\"x\":"}},{"index":1,"id":"b","type":"function","function":{"name":"second","arguments":"{\"y\":"}}]}}]}`+"\n\n")
+		fmt.Fprint(w, `data: {"id":"x","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"1}"}},{"index":1,"function":{"arguments":"2}"}}]},"finish_reason":"tool_calls"}]}`+"\n\ndata: [DONE]\n\n")
+	}))
+	defer s.Close()
+	p, err := PrepareMessages(json.RawMessage(`{"model":"external","max_tokens":1024,"stream":true,"messages":[{"role":"user","content":"query"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := generator(t).(*bifrostGenerator).StreamMessages(context.Background(), target(s.URL), p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stream.Close()
+	var output string
+	ids := map[int]string{}
+	args := map[string]string{}
+	for {
+		e, err := stream.Next(context.Background())
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		output += string(e.Data)
+		var event struct {
+			Index        int `json:"index"`
+			ContentBlock struct {
+				ID string `json:"id"`
+			} `json:"content_block"`
+			Delta struct {
+				PartialJSON string `json:"partial_json"`
+			} `json:"delta"`
+		}
+		if err := json.Unmarshal(e.Data, &event); err != nil {
+			t.Fatal(err)
+		}
+		if e.Type == "content_block_start" {
+			ids[event.Index] = event.ContentBlock.ID
+		}
+		if e.Type == "content_block_delta" {
+			args[ids[event.Index]] += event.Delta.PartialJSON
+		}
+	}
+	if args["a"] != `{"x":1}` || args["b"] != `{"y":2}` {
+		t.Fatalf("tool arguments not paired: %#v", args)
+	}
+	for _, want := range []string{`"id":"a"`, `"id":"b"`, `"name":"first"`, `"name":"second"`, `message_stop`} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("missing %s: %s", want, output)
+		}
+	}
+}
+
+func TestMessagesInvalidOutput(t *testing.T) {
+	for _, message := range []string{
+		`{"role":"assistant","content":null,"refusal":"cannot comply"}`,
+		`{"role":"assistant","tool_calls":[{"id":"same","type":"function","function":{"name":"a","arguments":"{}"}},{"id":"same","type":"function","function":{"name":"b","arguments":"{}"}}]}`,
+	} {
+		t.Run(message, func(t *testing.T) {
+			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				fmt.Fprintf(w, `{"id":"x","choices":[{"index":0,"message":%s,"finish_reason":"stop"}]}`, message)
+			}))
+			defer s.Close()
+			p, err := PrepareMessages(json.RawMessage(`{"model":"external","max_tokens":1024,"messages":[{"role":"user","content":"query"}]}`))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result, err := generator(t).(*bifrostGenerator).CompleteMessages(context.Background(), target(s.URL), p); err == nil {
+				t.Fatalf("invalid output accepted: %s", result)
+			}
+		})
+	}
+}
+
+func TestMessagesSummaryOriginalLastUser(t *testing.T) {
+	for _, tc := range []struct{ messages, want string }{
+		{`[{"role":"user","content":"earlier secret"},{"role":"assistant","content":[{"type":"tool_use","id":"a","name":"lookup","input":{}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"a","content":"tool secret"}]}]`, ""},
+		{`[{"role":"user","content":"earlier secret"},{"role":"user","content":"latest text"}]`, "latest text"},
+	} {
+		p, err := PrepareMessages(json.RawMessage(`{"model":"auto","max_tokens":1024,"messages":` + tc.messages + `}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := p.Summary(); got != tc.want {
+			t.Fatalf("want %q got %q", tc.want, got)
+		}
+	}
+}

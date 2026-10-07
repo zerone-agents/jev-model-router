@@ -111,6 +111,7 @@ JEV_TEST_AGENT_SDK=/path/to/agent-sdk go test ./internal/transport/http -run Tes
 | 原生签名/加密历史 | 明确拒绝。Bifrost 返回的空 payload Responses item 标记可回传，只用于关联，不宣称是 Claude 签名 |
 | usage | JSON 缺失则省略；SSE 初始 usage={}，最终 message_delta 补充真实报告的 input/output counts；真实零值保留；报告的缓存读写计数分别输出，普通 input_tokens 扣除这些计数，不把缓存输入算作普通输入。官方 SDK 0.52.0 能累积更新，这是与严格原生 Anthropic 初始数值 usage 的兼容差异；其他严格客户端未验证 |
 | stop_sequences | 请求原样转发；上游仅返回模糊 stop 且未给出匹配序列时明确失败，不猜测 end_turn/stop_sequence。已用模拟上游验证带 `stop:"END"` 的 JSON/SSE 匹配元数据；矛盾终态明确失败，真实供应商元数据仍未验证 |
+| refusal | 当前锁定转换器不能完整表达 refusal；JSON/SSE 明确返回安全的 upstream_error，禁止转换为空 content 的成功终态 |
 | 失败、取消、超时 | 本地测试通过流前 JSON、流内 error、无终态断流、首包/空闲超时、客户端取消；失败不发 message_stop，不换模；单请求不重试 |
 
 必须使用 `anthropic-version: 2023-06-01`、JSON Content-Type 和 inference x-api-key/Bearer；同时提供认证头时必须均有效且身份/角色一致。settings 和 Cookie 不授权推理。非空 beta、cache_control、文档、服务端工具、原生 redacted_thinking、不可保持顺序的 assistant 混合块明确拒绝。普通 assistant 块顺序为 thinking→text→tool_use；tool_result 在 user 额外文本/图片之前，结果必须与此前调用配对。thinking-only assistant 历史通过空文本结构载体保留；同角色的连续 assistant 消息也执行跨消息块顺序检查，不接受文本/工具之后的 thinking。不承诺全量 Messages。
@@ -130,3 +131,5 @@ SDK 测试不改写 fetch/请求；单次调用验证设置 maxRetries=0，四�
 发布条件仍未全部完成：独立 thinking 预算、原生签名兼容、严格 initial usage、停止元数据、OpenAI 独有 effort 档位在标准 Anthropic 字段中的表达仍有差距；部署环境和真实模型验证未运行。不得据本地部分通过结论关闭 #23 或宣称已经覆盖当前 OpenAI 入口的全部语义。
 
 Messages SSE 在 Bifrost 累计状态之前执行总预算：序列化后的已解码帧累计最多 16 MiB、最多 65536 帧，原始捕获单次最多 16 MiB。包含文本、thinking、工具参数/名称、ID 等元数据；超限明确失败并取消上游，不截断成成功输出。每个工具参数另限 1 MiB。该预算限制 adapter/converter 的累计数据，不宣称约束 SDK 解析一个巨大原始帧之前的瞬时内存分配。
+
+路由记录的摘要从原始 Messages 最后一条 user 提取，不从合并后的 Chat 投影提取；仅有工具结果/图片时摘要为空。JSON 与 SSE 都拒绝重复工具 ID。同帧并行工具调用逐个进入锁定转换器，结束信号在该帧所有工具片段之后转换，保留调用 ID、索引和参数配对。

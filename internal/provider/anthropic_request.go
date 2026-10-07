@@ -18,8 +18,9 @@ import (
 // PreparedMessages owns immutable request bytes. Projection returns a fresh
 // copy so planning and per-target checks cannot mutate another request.
 type PreparedMessages struct {
-	body  json.RawMessage
-	stops bool
+	body    json.RawMessage
+	stops   bool
+	summary string
 }
 
 func PrepareMessages(body json.RawMessage) (*PreparedMessages, error) {
@@ -171,7 +172,11 @@ func PrepareMessages(body json.RawMessage) (*PreparedMessages, error) {
 	if err := routing.ValidateRequest(projection); err != nil {
 		return nil, err
 	}
-	return &PreparedMessages{body: canonical, stops: len(in.StopSequences) > 0}, nil
+	var source struct {
+		Messages []routing.Message `json:"messages"`
+	}
+	_ = json.Unmarshal(body, &source)
+	return &PreparedMessages{body: canonical, stops: len(in.StopSequences) > 0, summary: routing.RequestSummary(routing.Request{Messages: source.Messages})}, nil
 }
 
 func (p *PreparedMessages) Projection() routing.Request {
@@ -283,3 +288,6 @@ func encodeMessageEvent(e *anthropic.AnthropicStreamEvent, usage *routing.Usage)
 	b, _ = json.Marshal(fields)
 	return MessageEvent{Type: string(e.Type), Data: b, Terminal: string(e.Type) == "message_stop"}, nil
 }
+
+// Summary uses the original protocol messages, before conversion merges roles or removes tool-only users.
+func (p *PreparedMessages) Summary() string { return p.summary }

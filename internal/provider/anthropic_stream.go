@@ -185,6 +185,9 @@ func (s *messagesStream) Next(ctx context.Context) (MessageEvent, error) {
 				continue
 			}
 			if choice.ChatStreamResponseChoice != nil && choice.Delta != nil {
+				if choice.Delta.Refusal != nil && *choice.Delta.Refusal != "" {
+					return MessageEvent{}, routing.Fail("upstream_error", "upstream refusal cannot be represented by the Messages converter")
+				}
 				for _, call := range choice.Delta.ToolCalls {
 					if call.Index >= 128 {
 						return MessageEvent{}, routing.Fail("upstream_error", "invalid upstream tool index")
@@ -230,7 +233,7 @@ func (s *messagesStream) Next(ctx context.Context) (MessageEvent, error) {
 		if !s.state.HasEmittedCreated && len(r.Choices) > 0 && r.Choices[0].ChatStreamResponseChoice != nil && r.Choices[0].Delta != nil {
 			r.Choices[0].Delta.Role = schemas.Ptr("assistant")
 		}
-		for _, converted := range r.ToBifrostResponsesStreamResponse(s.state) {
+		for _, converted := range messagesResponsesFrames(r, s.state) {
 			if converted.Response != nil {
 				converted.Response.Model = s.model
 			}
@@ -250,3 +253,34 @@ func (s *messagesStream) Next(ctx context.Context) (MessageEvent, error) {
 }
 
 func bytesReader(b []byte) *bytes.Reader { return bytes.NewReader(b) }
+
+// The pinned converter handles one tool delta per invocation. Split only the
+// tool array; emit content once and finish only after every tool fragment.
+func messagesResponsesFrames(r *schemas.BifrostChatResponse, state *schemas.ChatToResponsesStreamState) []*schemas.BifrostResponsesStreamResponse {
+	if len(r.Choices) != 1 || r.Choices[0].ChatStreamResponseChoice == nil || r.Choices[0].Delta == nil || len(r.Choices[0].Delta.ToolCalls) < 2 {
+		return r.ToBifrostResponsesStreamResponse(state)
+	}
+	original := r.Choices[0]
+	var result []*schemas.BifrostResponsesStreamResponse
+	for i := range original.Delta.ToolCalls {
+		frame := *r
+		choice := original
+		streamChoice := *original.ChatStreamResponseChoice
+		delta := *original.Delta
+		delta.ToolCalls = original.Delta.ToolCalls[i : i+1]
+		if i > 0 {
+			delta.Content = nil
+			delta.Reasoning = nil
+			delta.Role = nil
+			delta.Refusal = nil
+		}
+		if i < len(original.Delta.ToolCalls)-1 {
+			choice.FinishReason = nil
+		}
+		streamChoice.Delta = &delta
+		choice.ChatStreamResponseChoice = &streamChoice
+		frame.Choices = append(r.Choices[:0:0], choice)
+		result = append(result, frame.ToBifrostResponsesStreamResponse(state)...)
+	}
+	return result
+}

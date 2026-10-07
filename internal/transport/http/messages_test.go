@@ -242,3 +242,34 @@ func TestMessagesConnectionCapacityMapping(t *testing.T) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 }
+
+func TestMessagesRecordLastOriginalUser(t *testing.T) {
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"id":"x","choices":[{"index":0,"message":{"role":"assistant","content":"answer"},"finish_reason":"stop"}]}`)
+	}))
+	defer s.Close()
+	for _, tc := range []struct{ messages, want string }{
+		{`[{"role":"user","content":"earlier secret"},{"role":"assistant","content":[{"type":"tool_use","id":"a","name":"lookup","input":{}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"a","content":"tool secret"}]}]`, ""},
+		{`[{"role":"user","content":"earlier secret"},{"role":"user","content":"latest text"}]`, "latest text"},
+	} {
+		sink := &captureRecord{}
+		h := messagesHandler(t, s.URL, Limits{Recorder: &routing.Recorder{Sink: sink}})
+		w := messagesCall(h, `{"model":"external","max_tokens":1024,"messages":`+tc.messages+`}`, "router-key")
+		if w.Code != 200 || sink.record.RequestSummary != tc.want {
+			t.Fatalf("%d want %q record=%+v body=%s", w.Code, tc.want, sink.record, w.Body.String())
+		}
+	}
+}
+
+func TestMessagesRefusalStreamFails(t *testing.T) {
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, `data: {"id":"x","choices":[{"index":0,"delta":{"content":"prefix"}}]}`+"\n\n")
+		fmt.Fprint(w, `data: {"id":"x","choices":[{"index":0,"delta":{"refusal":"cannot comply"},"finish_reason":"stop"}]}`+"\n\ndata: [DONE]\n\n")
+	}))
+	defer s.Close()
+	w := messagesCall(messagesHandler(t, s.URL, Limits{}), `{"model":"external","max_tokens":1024,"stream":true,"messages":[{"role":"user","content":"query"}]}`, "router-key")
+	if !strings.Contains(w.Body.String(), `event: error`) || strings.Contains(w.Body.String(), `event: message_stop`) {
+		t.Fatalf("%d %s", w.Code, w.Body.String())
+	}
+}

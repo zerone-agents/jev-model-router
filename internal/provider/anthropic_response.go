@@ -40,10 +40,15 @@ func (g *bifrostGenerator) CompleteMessages(ctx context.Context, t routing.Targe
 		return nil, err
 	}
 	if choice.Message.ChatAssistantMessage != nil {
+		if choice.Message.Refusal != nil && *choice.Message.Refusal != "" {
+			return nil, routing.Fail("upstream_error", "upstream refusal cannot be represented by the Messages converter")
+		}
+		ids := map[string]bool{}
 		for _, call := range choice.Message.ToolCalls {
-			if call.ID == nil || *call.ID == "" || call.Function.Name == nil || *call.Function.Name == "" {
+			if call.ID == nil || *call.ID == "" || call.Function.Name == nil || *call.Function.Name == "" || ids[*call.ID] {
 				return nil, routing.Fail("upstream_error", "invalid upstream tool call")
 			}
+			ids[*call.ID] = true
 			if err = validateToolArguments(call.Function.Arguments); err != nil {
 				return nil, err
 			}

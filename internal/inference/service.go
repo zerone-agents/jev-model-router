@@ -28,11 +28,16 @@ func (s *Service) Begin(ctx context.Context, id string) *Request {
 	return &Request{service: s, ctx: ctx, record: routing.Record{RequestID: id, CreatedAt: time.Now().UTC()}}
 }
 func (r *Request) Plan(req routing.Request, check func(routing.Target) error) (routing.Plan, error) {
+	return r.PlanWithSummary(req, check, routing.RequestSummary(req))
+}
+
+// PlanWithSummary accepts a bounded summary extracted before protocol conversion.
+func (r *Request) PlanWithSummary(req routing.Request, check func(routing.Target) error, summary string) (routing.Plan, error) {
 	r.record.Mode = "explicit"
 	if req.Model == "auto" {
 		r.record.Mode = "auto"
 	}
-	r.record.RequestSummary = routing.RequestSummary(req)
+	r.record.RequestSummary = summary
 	snapshot, err := r.service.Store.Snapshot(r.ctx)
 	if err != nil {
 		return routing.Plan{}, err
