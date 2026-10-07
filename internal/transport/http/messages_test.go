@@ -273,3 +273,26 @@ func TestMessagesRefusalStreamFails(t *testing.T) {
 		t.Fatalf("%d %s", w.Code, w.Body.String())
 	}
 }
+
+func TestMessagesResumedThinkingFails(t *testing.T) {
+	for _, middle := range []string{
+		`{"content":"text"}`,
+		`{"tool_calls":[{"index":0,"id":"a","type":"function","function":{"name":"lookup","arguments":"{}"}}]}`,
+	} {
+		t.Run(middle, func(t *testing.T) {
+			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/event-stream")
+				fmt.Fprint(w, `data: {"id":"x","choices":[{"index":0,"delta":{"reasoning_content":"thinking A"}}]}`+"\n\n")
+				fmt.Fprintf(w, "data: {\"id\":\"x\",\"choices\":[{\"index\":0,\"delta\":%s}]}\n\n", middle)
+				fmt.Fprint(w, `data: {"id":"x","choices":[{"index":0,"delta":{"reasoning_content":"thinking B"}}]}`+"\n\n")
+				fmt.Fprint(w, `data: {"id":"x","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`+"\n\ndata: [DONE]\n\n")
+			}))
+			defer s.Close()
+			w := messagesCall(messagesHandler(t, s.URL, Limits{}), `{"model":"external","max_tokens":1024,"stream":true,"messages":[{"role":"user","content":"query"}]}`, "router-key")
+			body := w.Body.String()
+			if !strings.Contains(body, "thinking A") || !strings.Contains(body, "event: error") || strings.Contains(body, "event: message_stop") {
+				t.Fatalf("%d %s", w.Code, body)
+			}
+		})
+	}
+}

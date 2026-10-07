@@ -185,6 +185,11 @@ func (s *messagesStream) Next(ctx context.Context) (MessageEvent, error) {
 				continue
 			}
 			if choice.ChatStreamResponseChoice != nil && choice.Delta != nil {
+				// The pinned converter skips reasoning once its item is closed.
+				// Reject resumed output before conversion can silently discard it.
+				if choice.Delta.Reasoning != nil && *choice.Delta.Reasoning != "" && s.state.ReasoningItemClosed {
+					return MessageEvent{}, routing.Fail("upstream_error", "upstream thinking resumed after its block closed")
+				}
 				if choice.Delta.Refusal != nil && *choice.Delta.Refusal != "" {
 					return MessageEvent{}, routing.Fail("upstream_error", "upstream refusal cannot be represented by the Messages converter")
 				}
