@@ -1,0 +1,495 @@
+{
+  "type": "object",
+  "properties": {
+    "model": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "max_tokens": {
+      "type": "integer",
+      "minimum": 16,
+      "maximum": 10000000
+    },
+    "messages": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2048,
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "enum": [
+              "user",
+              "assistant"
+            ]
+          },
+          "content": {
+            "oneOf": [
+              {
+                "type": "string",
+                "maxLength": 1048576
+              },
+              {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "text"
+                        },
+                        "text": {
+                          "type": "string",
+                          "maxLength": 1048576
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "text"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "image"
+                        },
+                        "source": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "const": "url"
+                                },
+                                "url": {
+                                  "type": "string",
+                                  "pattern": "^https://",
+                                  "maxLength": 8388608
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "url"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "const": "base64"
+                                },
+                                "media_type": {
+                                  "enum": [
+                                    "image/png",
+                                    "image/jpeg",
+                                    "image/webp",
+                                    "image/gif"
+                                  ]
+                                },
+                                "data": {
+                                  "type": "string",
+                                  "maxLength": 8388608,
+                                  "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "media_type",
+                                "data"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "source"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "thinking"
+                        },
+                        "thinking": {
+                          "type": "string",
+                          "maxLength": 1048576
+                        },
+                        "signature": {
+                          "type": "string",
+                          "maxLength": 16384
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "thinking",
+                        "signature"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "tool_use"
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "input": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "id",
+                        "name",
+                        "input"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "tool_result"
+                        },
+                        "tool_use_id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "content": {
+                          "oneOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 1048576
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "const": "text"
+                                      },
+                                      "text": {
+                                        "type": "string",
+                                        "maxLength": 1048576
+                                      }
+                                    },
+                                    "required": [
+                                      "type",
+                                      "text"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "const": "image"
+                                      },
+                                      "source": {
+                                        "oneOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "type": {
+                                                "const": "url"
+                                              },
+                                              "url": {
+                                                "type": "string",
+                                                "pattern": "^https://",
+                                                "maxLength": 8388608
+                                              }
+                                            },
+                                            "required": [
+                                              "type",
+                                              "url"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "type": {
+                                                "const": "base64"
+                                              },
+                                              "media_type": {
+                                                "enum": [
+                                                  "image/png",
+                                                  "image/jpeg",
+                                                  "image/webp",
+                                                  "image/gif"
+                                                ]
+                                              },
+                                              "data": {
+                                                "type": "string",
+                                                "maxLength": 8388608,
+                                                "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+                                              }
+                                            },
+                                            "required": [
+                                              "type",
+                                              "media_type",
+                                              "data"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "type",
+                                      "source"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "maxItems": 128
+                            }
+                          ]
+                        },
+                        "is_error": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "tool_use_id",
+                        "content"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "maxItems": 128,
+                "minItems": 1
+              }
+            ]
+          }
+        },
+        "required": [
+          "role",
+          "content"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "system": {
+      "oneOf": [
+        {
+          "type": "string",
+          "maxLength": 1048576
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "text"
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 1048576
+              }
+            },
+            "required": [
+              "type",
+              "text"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 128
+        }
+      ]
+    },
+    "stream": {
+      "type": "boolean"
+    },
+    "temperature": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "top_p": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "stop_sequences": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      },
+      "minItems": 1,
+      "maxItems": 4
+    },
+    "tools": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "description": {
+            "type": "string"
+          },
+          "input_schema": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "input_schema"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "tool_choice": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "enum": [
+                "auto",
+                "any",
+                "none"
+              ]
+            },
+            "disable_parallel_tool_use": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "tool"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "disable_parallel_tool_use": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "type",
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "thinking": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "enum": [
+                "disabled",
+                "adaptive"
+              ]
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "enabled"
+            },
+            "budget_tokens": {
+              "type": "integer",
+              "minimum": 1024
+            }
+          },
+          "required": [
+            "type",
+            "budget_tokens"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "description": "Adaptive/disabled are supported. Enabled budget syntax is recognized, but the current Chat adapter returns unsupported_request because it cannot enforce an independent budget."
+    },
+    "output_config": {
+      "type": "object",
+      "properties": {
+        "effort": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        "format": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "json_schema"
+            },
+            "schema": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "type",
+            "schema"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "model",
+    "max_tokens",
+    "messages"
+  ],
+  "additionalProperties": false
+}

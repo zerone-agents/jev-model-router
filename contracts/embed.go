@@ -82,6 +82,8 @@ func initSchemas() {
 	}
 	b, _ = files.ReadFile("schemas/chat.json")
 	validators["chat"] = compile(b)
+	b, _ = files.ReadFile("schemas/messages.json")
+	validators["messages"] = compile(b)
 }
 func compile(b []byte) *jsonschema.Schema {
 	var v any

@@ -2,6 +2,7 @@ package routing
 
 import (
 	"context"
+	"errors"
 )
 
 type Planner struct {
@@ -22,9 +23,25 @@ type Plan struct {
 }
 
 func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error) {
+	return p.plan(ctx, s, r, nil, false)
+}
+
+// PlanPrepared checks the full request using a request-local adapter. Shared
+// default checks are intentionally not used for its planning projection.
+func (p *Planner) PlanPrepared(ctx context.Context, s Snapshot, r Request, check func(Target) error) (Plan, error) {
+	if check == nil {
+		return Plan{}, Fail("internal_error", "prepared request checker required")
+	}
+	return p.plan(ctx, s, r, check, true)
+}
+
+func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Target) error, prepared bool) (Plan, error) {
 	result := Plan{ConfigVersion: s.Version, CandidateIDs: []string{}}
 	if e := ValidateRequest(r); e != nil {
 		return result, e
+	}
+	if !prepared && p.PrepareCheck != nil {
+		check = p.PrepareCheck(r)
 	}
 	// Freeze all slices before any external decision call.
 	s.Models = append([]Model{}, s.Models...)
@@ -51,10 +68,6 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 		}
 		breakdown = &value
 		estimate = func(Model, Request) (int64, bool, error) { return value.TotalTokens, false, nil }
-	}
-	var check func(Target) error
-	if p.PrepareCheck != nil {
-		check = p.PrepareCheck(r)
 	}
 	hasImages, requiresTools, requiresStructured := HasImages(r), RequiresTools(r), RequiresStructuredOutput(r)
 	targets := []Target{}
@@ -87,8 +100,14 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 		}
 		if e == nil && check != nil {
 			e = check(target)
+			if e != nil && prepared {
+				var known *Error
+				if !errors.As(e, &known) || known.Code != "unsupported_request" {
+					return result, e
+				}
+			}
 		}
-		if e == nil && p.Check != nil {
+		if e == nil && !prepared && p.Check != nil {
 			e = p.Check(target, r)
 		}
 		if e != nil {
