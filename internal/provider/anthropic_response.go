@@ -40,7 +40,7 @@ func (g *bifrostGenerator) CompleteMessages(ctx context.Context, t routing.Targe
 		return nil, err
 	}
 	if choice.Message.ChatAssistantMessage != nil {
-		for _, call := range choice.Message.ChatAssistantMessage.ToolCalls {
+		for _, call := range choice.Message.ToolCalls {
 			if call.ID == nil || *call.ID == "" || call.Function.Name == nil || *call.Function.Name == "" {
 				return nil, routing.Fail("upstream_error", "invalid upstream tool call")
 			}
