@@ -123,6 +123,10 @@ func checkNativeWire(r routing.Request, w map[string]any, thinking, effort strin
 		case "text":
 		case "json_schema":
 			j, _ := f["json_schema"].(map[string]any)
+			// The native format has no equivalent for this model instruction.
+			if description, _ := j["description"].(string); description != "" {
+				return nativeUnsupported("response_format.json_schema.description")
+			}
 			o, _ := w["output_config"].(map[string]any)
 			format, _ := o["format"].(map[string]any)
 			if format["type"] != "json_schema" || !reflect.DeepEqual(format["schema"], j["schema"]) {
@@ -175,7 +179,8 @@ func checkNativeWire(r routing.Request, w map[string]any, thinking, effort strin
 	}
 	if v := r.Options["parallel_tool_calls"]; v != nil {
 		want, _ := decoded(v).(bool)
-		if choice["type"] != "none" && choice["disable_parallel_tool_use"] != !want {
+		disabled, _ := choice["disable_parallel_tool_use"].(bool)
+		if choice["type"] != "none" && disabled != !want {
 			return nativeUnsupported("parallel_tool_calls")
 		}
 	}

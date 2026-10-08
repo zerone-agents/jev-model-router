@@ -142,6 +142,14 @@ func (g *bifrostGenerator) Stream(ctx context.Context, t routing.Target, r routi
 		bc.Cancel()
 		release()
 		if validation != nil {
+			if ctx.Err() == nil {
+				validation.mu.Lock()
+				failure := validation.failure
+				validation.mu.Unlock()
+				if failure != nil {
+					return nil, failure
+				}
+			}
 			return nil, anthropicUpstreamError(ctx, fail)
 		}
 		return nil, providerError(ctx, fail)

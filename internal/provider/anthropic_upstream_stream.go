@@ -44,6 +44,18 @@ func (s *anthropicUpstreamStream) Next(ctx context.Context) (routing.Event, erro
 			s.Close()
 			return routing.Event{}, e
 		case chunk, ok := <-s.ch:
+			// A ready SDK channel may win select after cancellation. Classify
+			// the context before consuming its reader error or terminal result.
+			if ctx.Err() != nil || s.ctx.Err() != nil {
+				s.done = true
+				cause := ctx
+				if cause.Err() == nil {
+					cause = s.ctx
+				}
+				e := anthropicUpstreamError(cause, nil)
+				s.Close()
+				return routing.Event{}, e
+			}
 			if !ok {
 				s.done = true
 				out, e := s.finish()
