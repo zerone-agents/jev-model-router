@@ -128,3 +128,20 @@ func EstimateRequestContext(r Request) (ContextEstimate, error) {
 	e.TotalTokens = saturatedSum(e.InputTokens, e.OutputReserve)
 	return e, nil
 }
+
+// TargetRequest applies only protocol-required defaults to a private options map.
+func TargetRequest(t Target, r Request) Request {
+	if t.Provider.EffectiveProtocol() != ProtocolAnthropic || r.Options["max_completion_tokens"] != nil {
+		return r
+	}
+	options := make(map[string]json.RawMessage, len(r.Options)+1)
+	for k, v := range r.Options {
+		options[k] = v
+	}
+	options["max_completion_tokens"] = json.RawMessage(`65536`)
+	r.Options = options
+	return r
+}
+func EstimateTargetContext(t Target, r Request) (ContextEstimate, error) {
+	return EstimateRequestContext(TargetRequest(t, r))
+}

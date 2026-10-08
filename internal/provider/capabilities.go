@@ -15,6 +15,12 @@ func TestRequest() routing.Request {
 	return routing.Request{Model: "probe", Messages: []routing.Message{{Role: "user", Content: json.RawMessage(`"Reply OK."`)}}, Options: map[string]json.RawMessage{"max_completion_tokens": json.RawMessage(`16`)}}
 }
 func encode(ctx *schemas.BifrostContext, target routing.Target, r routing.Request) (*schemas.BifrostChatRequest, error) {
+	if target.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
+		return prepareAnthropicUpstream(ctx, target, r)
+	}
+	return encodeOpenAI(ctx, target, r)
+}
+func encodeOpenAI(ctx *schemas.BifrostContext, target routing.Target, r routing.Request) (*schemas.BifrostChatRequest, error) {
 	b, e := json.Marshal(r)
 	if e != nil {
 		return nil, e
@@ -61,6 +67,12 @@ func Check(target routing.Target, r routing.Request) error {
 }
 
 func checkWire(target routing.Target, r routing.Request) error {
+	if target.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
+		ctx := schemas.NewBifrostContext(context.Background(), time.Time{})
+		defer ctx.Cancel()
+		_, e := prepareAnthropicUpstream(ctx, target, r)
+		return e
+	}
 	ctx := schemas.NewBifrostContext(context.Background(), time.Time{})
 	defer ctx.Cancel()
 	req, e := encode(ctx, target, r)
@@ -127,6 +139,9 @@ func PrepareCheck(r routing.Request) func(routing.Target) error {
 	checked := false
 	var historyError error
 	return func(target routing.Target) error {
+		if target.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
+			return checkWire(target, r)
+		}
 		if !checked {
 			historyError = checkWire(target, history)
 			checked = true
