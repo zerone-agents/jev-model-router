@@ -97,7 +97,16 @@ func (g *bifrostGenerator) Complete(ctx context.Context, t routing.Target, r rou
 	}
 	out, fail := client.ChatCompletionRequest(bc, req)
 	if fail != nil {
+		if t.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
+			return routing.Completion{}, anthropicUpstreamError(ctx, fail)
+		}
 		return routing.Completion{}, providerError(ctx, fail)
+	}
+	if t.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
+		if out == nil {
+			return routing.Completion{}, nativeError(502)
+		}
+		return anthropicUpstreamCompletion(out, nativeRaw(out.ExtraFields.RawResponse), routing.RequiresTools(r))
 	}
 	return completion(out)
 }
