@@ -92,3 +92,15 @@ At most 128 active sessions are allowed. Expiry/logout frees capacity; replaceme
 预算包含候选、偏好、系统指令、最新 query、问题与序列化开销。Jev 不接收工具定义；工具历史仅保留调用 ID、工具名称及结果关联记录，不包含参数、输出或执行消息的附带文本。较旧历史按完整组省略；system/developer 与最新 query 的各文本段独立保留首尾、从中间截断，插入 [...truncated...] 并标记 content_truncated。按实际序列化字节数调整共同文本上限，小段保持完整，中文与 emoji 不拆分。生成请求不裁剪；候选、要求及最小首尾结构仍超限时返回 budget_exceeded。auto 多候选和 route.inspect 使用相同预算，显式模型与单候选不调用 Jev。
 
 Generation providers accept `protocol: "openai" | "anthropic"`. Omitted protocol defaults to `openai`, including replacement writes; preserve it when editing an Anthropic provider. Reads return the effective protocol. Existing stored rows need no migration or version increment. `base_url` is the API prefix (for example `https://api.anthropic.com/v1`).
+
+### Native Anthropic generation upstream
+
+Use a complete `providers.put` input such as:
+
+```json
+{"id":"claude","protocol":"anthropic","base_url":"https://api.anthropic.com/v1","secret_ref":"env:ANTHROPIC_API_KEY"}
+```
+
+The adapter appends `/messages`; OpenAI providers append `/chat/completions`. No hostname or version-path guessing occurs. `providers.get` returns the effective protocol and derived `endpoint`. Omission of protocol on replacement resets it to openai. Managed `api_key` writes support the same protocol field.
+
+Native requests without an output limit send **65536** tokens and reserve the same amount in automatic routing. Explicit limits are preserved, never clamped. Connectivity probes still use 16. Use `reasoning_effort:"none"` or `chat_template_kwargs:{"enable_thinking":false}` for tool requests, including continuation. Single-turn thinking can use true (adaptive), but signed thinking history and thinking+tools are unsupported. Test model support explicitly; a local conversion check does not guarantee the upstream model accepts its parameters.

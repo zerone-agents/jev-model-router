@@ -127,3 +127,7 @@ SKILL 说明“何时发现能力、如何选择操作、如何理解失败及�
 首版评测使用代表性任务及其可接受模型集合，分别评估 `auto` 与固定模型的生成质量和选模偏好。首版基线及验收见 docs/acceptance/2026-09-29.md；总费用与可比较延迟留给独立研究。先实测建立基线，再设质量门槛；程序约束测试独立要求通过，选模效果不能抵消协议错误。
 
 ArbiterOS 工具执行治理仍在后续阶段。当前架构不创建空治理接口、不宣称拥有执行沙箱或 AgentUse 认证。完整能力契约和风险分级遵循 [AgentUse 协议](https://www.zerone.run/zh/protocol)，以实现后的可重复检查验证。
+
+## 生成上游协议
+
+Provider.protocol 区分 openai 与 anthropic，旧配置默认 openai。OpenAI Chat 入口可在两种协议间选模；Messages 入口当前只允许 OpenAI 兼容上游（原生方向见 #51）。Bifrost 类型与转换保护留在 provider；请求级检查在候选容量过滤和 Jev 之前执行，只有 unsupported_request 可排除候选，内部故障直接返回。Anthropic 缺省输出限额和按目标估算预留均为 65536，OpenAI 保留 4096 估算且不注入限额。SDK 客户端缓存按协议、URL、凭证和配置隔离，不修改在途快照。
