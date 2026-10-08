@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	bifrost "github.com/maximhq/bifrost/core"
+	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"io"
@@ -129,11 +130,24 @@ func (g *bifrostGenerator) Stream(ctx context.Context, t routing.Target, r routi
 		release()
 		return nil, e
 	}
+	var validation *anthropicUpstreamValidation
+	if t.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
+		validation = &anthropicUpstreamValidation{tools: routing.RequiresTools(r)}
+		bc.SetValue(schemas.BifrostContextKeySSEReaderFactory, &providerUtils.SSEReaderFactory{NewEventReader: func(reader io.Reader) providerUtils.SSEEventReader {
+			return newAnthropicUpstreamReader(reader, validation)
+		}})
+	}
 	ch, fail := client.ChatCompletionStreamRequest(bc, req)
 	if fail != nil {
 		bc.Cancel()
 		release()
+		if validation != nil {
+			return nil, anthropicUpstreamError(ctx, fail)
+		}
 		return nil, providerError(ctx, fail)
+	}
+	if validation != nil {
+		return &anthropicUpstreamStream{ctx: bc, ch: ch, state: validation, release: release}, nil
 	}
 	return &stream{ctx: bc, ch: ch, release: release}, nil
 }
