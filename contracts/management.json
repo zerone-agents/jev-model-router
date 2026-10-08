@@ -190,6 +190,10 @@
             "null"
           ],
           "description": "First four characters plus ***; credentials of eight characters or fewer are fully masked. Null when unavailable. Never contains the complete credential."
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "Generation URL derived from protocol and base_url."
         }
       },
       "required": [

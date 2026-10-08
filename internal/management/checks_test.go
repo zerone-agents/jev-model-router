@@ -123,3 +123,21 @@ func TestInspectionFieldDiagnostics(t *testing.T) {
 		t.Fatal("inspection generated or mutated configuration")
 	}
 }
+
+func TestProviderProtocolEndpoint(t *testing.T) {
+	for _, tc := range []struct {
+		p    routing.ProviderProtocol
+		path string
+	}{{routing.ProtocolAnthropic, "/messages"}, {routing.ProtocolOpenAI, "/chat/completions"}} {
+		store := &memoryStore{routing.Snapshot{Providers: []routing.Provider{{ID: "p", Protocol: tc.p, BaseURL: "https://example.com/v1/"}}}}
+		result, e := management.New(store, nil).Execute(context.Background(), "settings", management.Call{CapabilityID: "providers.get", Input: json.RawMessage(`{"id":"p"}`)})
+		if e != nil {
+			t.Fatal(e)
+		}
+		var d struct{ Endpoint string }
+		json.Unmarshal(result.Data, &d)
+		if d.Endpoint != "https://example.com/v1"+tc.path {
+			t.Fatalf("endpoint %q", d.Endpoint)
+		}
+	}
+}

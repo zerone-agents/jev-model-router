@@ -140,7 +140,11 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 						}
 					}
 				}
-				result := Success(map[string]any{"version": cfg.Version, "resource": p, "api_key_masked": masked}, time.Now())
+				endpoint := strings.TrimRight(p.BaseURL, "/") + "/chat/completions"
+				if p.EffectiveProtocol() == routing.ProtocolAnthropic {
+					endpoint = strings.TrimRight(p.BaseURL, "/") + "/messages"
+				}
+				result := Success(map[string]any{"version": cfg.Version, "resource": p, "api_key_masked": masked, "endpoint": endpoint}, time.Now())
 				if masked == nil {
 					result.Warnings = append(result.Warnings, "provider_credential_unavailable")
 				}
