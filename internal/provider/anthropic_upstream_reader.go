@@ -163,14 +163,7 @@ func (s *anthropicUpstreamValidation) accept(typ string, raw []byte) error {
 		return nativeError(502)
 	}
 	if typ == "error" {
-		switch event.Error.Type {
-		case "rate_limit_error":
-			return nativeError(429)
-		case "overloaded_error":
-			return nativeError(529)
-		default:
-			return nativeError(502)
-		}
+		return nativeEventError(event.Error.Type)
 	}
 	if typ == "ping" {
 		return nil

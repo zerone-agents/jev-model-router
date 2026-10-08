@@ -67,15 +67,38 @@ func TestNativeRegressionCancellationStatus(t *testing.T) {
 		}
 	}
 }
-func TestNativeRegressionInitialSSEError(t *testing.T) {
+func TestNativeRegressionSSEErrorMapping(t *testing.T) {
 	for _, tc := range []struct {
 		typ    string
 		status int
-	}{{"overloaded_error", 529}, {"rate_limit_error", 429}} {
-		_, e := collectNative(t, nativeFrame("error", `{"type":"error","error":{"type":"`+tc.typ+`","message":"private"}}`))
-		var upstream *routing.UpstreamError
-		if !errors.As(e, &upstream) || upstream.Status != tc.status {
-			t.Errorf("%s: got %v (%+v); want status %d", tc.typ, e, upstream.Status, tc.status)
+	}{
+		{"invalid_request_error", 400}, {"authentication_error", 401}, {"billing_error", 402}, {"permission_error", 403}, {"not_found_error", 404}, {"conflict_error", 409}, {"request_too_large", 413}, {"rate_limit_error", 429}, {"api_error", 500}, {"timeout_error", 504}, {"overloaded_error", 529}, {"unknown_error", 502},
+	} {
+		for _, phase := range []string{"initial", "midstream"} {
+			t.Run(tc.typ+"/"+phase, func(t *testing.T) {
+				prefix := ""
+				if phase == "midstream" {
+					prefix = nativeStart() + nativeText()
+				}
+				events, err := collectNative(t, prefix+nativeFrame("error", `{"type":"error","error":{"type":"`+tc.typ+`","message":"private diagnostic"}}`))
+				var got *routing.UpstreamError
+				want := nativeError(tc.status).(*routing.UpstreamError)
+				if !errors.As(err, &got) {
+					t.Fatalf("expected upstream error, got %v", err)
+				}
+				actual, _ := json.Marshal(got.Body)
+				expected, _ := json.Marshal(want.Body)
+				if got.Status != want.Status || string(actual) != string(expected) {
+					t.Fatalf("got %d %s; want %d %s", got.Status, actual, want.Status, expected)
+				}
+				for _, event := range events {
+					for _, choice := range event.Choices {
+						if choice.FinishReason != nil {
+							t.Fatal("error stream emitted successful finish")
+						}
+					}
+				}
+			})
 		}
 	}
 }
