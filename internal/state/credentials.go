@@ -71,10 +71,11 @@ func (s *Store) prepareProvider(ctx context.Context, tx *sql.Tx, c management.Ca
 		return c, nil
 	}
 	var input struct {
-		ID        string  `json:"id"`
-		BaseURL   string  `json:"base_url"`
-		SecretRef string  `json:"secret_ref"`
-		APIKey    *string `json:"api_key"`
+		Protocol  routing.ProviderProtocol `json:"protocol"`
+		ID        string                   `json:"id"`
+		BaseURL   string                   `json:"base_url"`
+		SecretRef string                   `json:"secret_ref"`
+		APIKey    *string                  `json:"api_key"`
 	}
 	if json.Unmarshal(c.Input, &input) != nil {
 		return c, routing.Fail("invalid_request", "invalid provider input")
@@ -97,7 +98,7 @@ func (s *Store) prepareProvider(ctx context.Context, tx *sql.Tx, c management.Ca
 		}
 		input.SecretRef = "managed:" + revision
 	}
-	c.Input, _ = json.Marshal(routing.Provider{ID: input.ID, BaseURL: input.BaseURL, SecretRef: input.SecretRef})
+	c.Input, _ = json.Marshal(routing.Provider{Protocol: input.Protocol, ID: input.ID, BaseURL: input.BaseURL, SecretRef: input.SecretRef})
 	return c, nil
 }
 func (s *Store) validateManaged(ctx context.Context, q queryer, cfg routing.Snapshot) error {

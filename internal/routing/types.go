@@ -6,10 +6,32 @@ import (
 	"github.com/zerone-agents/jev-model-router/contracts"
 )
 
+type ProviderProtocol string
+
+const (
+	ProtocolOpenAI    ProviderProtocol = "openai"
+	ProtocolAnthropic ProviderProtocol = "anthropic"
+)
+
+func (p Provider) EffectiveProtocol() ProviderProtocol {
+	if p.Protocol == "" {
+		return ProtocolOpenAI
+	}
+	return p.Protocol
+}
+
+// MarshalJSON keeps legacy in-memory providers readable as the effective protocol.
+func (p Provider) MarshalJSON() ([]byte, error) {
+	type plain Provider
+	p.Protocol = p.EffectiveProtocol()
+	return json.Marshal(plain(p))
+}
+
 type Provider struct {
-	ID        string `json:"id"`
-	BaseURL   string `json:"base_url"`
-	SecretRef string `json:"secret_ref"`
+	Protocol  ProviderProtocol `json:"protocol"`
+	ID        string           `json:"id"`
+	BaseURL   string           `json:"base_url"`
+	SecretRef string           `json:"secret_ref"`
 }
 
 // ReasoningCombination is optional informational metadata retained for existing

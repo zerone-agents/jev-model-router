@@ -95,3 +95,5 @@ call body 为 `{"input":{...},"expected_version":1,"idempotency_key":"operation-
 `schemas/messages.json` 定义 POST /v1/messages 的输入形状；provider 还执行明确公布的内容组合及目标转换检查。`thinking.enabled` 的预算格式可识别，但当前 Chat adapter 无法执行独立预算，返回 unsupported_request；adaptive/disabled 和显式 output_config.effort 已实现。原生签名、带 is_error=true 的工具结果和不可保持顺序的混合块明确拒绝。版本固定 2023-06-01，beta 扩展拒绝。
 
 该入口使用独立 Anthropic 错误信封，认证失败也包含顶层 type:error、error.type/message、request_id；request-id 与 X-Request-ID 相同。400/401/403/404/405/413/422/429/500/502/503/504/529 的映射和流内失败范围见 [兼容文档](../docs/compatibility.md#anthropic-messages-issue-23)。Messages 不套管理信封，也不透传上游 OpenAI 错误体。
+
+Generation providers accept `protocol: "openai" | "anthropic"`. Omitted protocol defaults to `openai`, including replacement writes; preserve it when editing an Anthropic provider. Reads return the effective protocol. Existing stored rows need no migration or version increment. `base_url` is the API prefix (for example `https://api.anthropic.com/v1`).
