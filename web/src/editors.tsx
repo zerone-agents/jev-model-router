@@ -329,6 +329,7 @@ function Editor(props: Props & { initial: Snapshot }) {
 function ProviderDetails(props: PageProps & { providerId: string }) {
   const state = useRead<{
     resource: { base_url: string };
+    endpoint?: string;
     api_key_masked?: string | null;
   }>(props, "providers.get", { id: props.providerId });
   if (state.loading) return <Loading />;
@@ -336,7 +337,7 @@ function ProviderDetails(props: PageProps & { providerId: string }) {
   if (!state.data) return null;
   return (
     <div className="provider-details">
-      <div>Endpoint: {state.data.resource.base_url}</div>
+      <div>Endpoint: {state.data.endpoint ?? state.data.resource.base_url}</div>
       <div>
         API Key:{" "}
         {state.data.api_key_masked ?? text(props.lang, "Unavailable", "不可用")}

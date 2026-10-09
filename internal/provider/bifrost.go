@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	bifrost "github.com/maximhq/bifrost/core"
+	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"io"
@@ -33,7 +34,8 @@ func (g *bifrostGenerator) acquire(t routing.Target) (*bifrost.Bifrost, func(), 
 	if e != nil {
 		return nil, nil, routing.Fail("config_missing", "provider credential unavailable")
 	}
-	identity := sha256.Sum256(append([]byte(t.Provider.BaseURL+"\x00"), key...))
+	baseURL := strings.TrimRight(t.Provider.BaseURL, "/")
+	identity := sha256.Sum256(append([]byte(string(t.Provider.EffectiveProtocol())+"\x00"+baseURL+"\x00v1:timeout300:concurrency8:retries0\x00"), key...))
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.closed {
@@ -56,7 +58,7 @@ func (g *bifrostGenerator) acquire(t routing.Target) (*bifrost.Bifrost, func(), 
 			delete(g.clients, victim)
 			oldest.client.Shutdown()
 		}
-		c, e := bifrost.Init(context.Background(), schemas.BifrostConfig{Account: fixedAccount{url: t.Provider.BaseURL, key: string(key)}, Logger: quietLogger{}, InitialPoolSize: 8})
+		c, e := bifrost.Init(context.Background(), schemas.BifrostConfig{Account: fixedAccount{url: baseURL, key: string(key), protocol: t.Provider.EffectiveProtocol()}, Logger: quietLogger{}, InitialPoolSize: 8})
 		if e != nil {
 			return nil, nil, routing.Fail("upstream_error", "generation initialization failed")
 		}
@@ -96,7 +98,16 @@ func (g *bifrostGenerator) Complete(ctx context.Context, t routing.Target, r rou
 	}
 	out, fail := client.ChatCompletionRequest(bc, req)
 	if fail != nil {
+		if t.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
+			return routing.Completion{}, anthropicUpstreamError(ctx, fail)
+		}
 		return routing.Completion{}, providerError(ctx, fail)
+	}
+	if t.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
+		if out == nil {
+			return routing.Completion{}, nativeError(502)
+		}
+		return anthropicUpstreamCompletion(out, nativeRaw(out.ExtraFields.RawResponse), routing.RequiresTools(r))
 	}
 	return completion(out)
 }
@@ -119,11 +130,32 @@ func (g *bifrostGenerator) Stream(ctx context.Context, t routing.Target, r routi
 		release()
 		return nil, e
 	}
+	var validation *anthropicUpstreamValidation
+	if t.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
+		validation = &anthropicUpstreamValidation{tools: routing.RequiresTools(r)}
+		bc.SetValue(schemas.BifrostContextKeySSEReaderFactory, &providerUtils.SSEReaderFactory{NewEventReader: func(reader io.Reader) providerUtils.SSEEventReader {
+			return newAnthropicUpstreamReader(reader, validation)
+		}})
+	}
 	ch, fail := client.ChatCompletionStreamRequest(bc, req)
 	if fail != nil {
 		bc.Cancel()
 		release()
+		if validation != nil {
+			if ctx.Err() == nil {
+				validation.mu.Lock()
+				failure := validation.failure
+				validation.mu.Unlock()
+				if failure != nil {
+					return nil, failure
+				}
+			}
+			return nil, anthropicUpstreamError(ctx, fail)
+		}
 		return nil, providerError(ctx, fail)
+	}
+	if validation != nil {
+		return &anthropicUpstreamStream{ctx: bc, ch: ch, state: validation, release: release}, nil
 	}
 	return &stream{ctx: bc, ch: ch, release: release}, nil
 }
@@ -259,21 +291,35 @@ func safeError(ctx context.Context) error {
 	return routing.Fail("upstream_error", "generation provider failed")
 }
 
-type fixedAccount struct{ url, key string }
+type fixedAccount struct {
+	url, key string
+	protocol routing.ProviderProtocol
+}
+
+func (a fixedAccount) provider() schemas.ModelProvider {
+	if a.protocol == routing.ProtocolAnthropic {
+		return schemas.Anthropic
+	}
+	return schemas.OpenAI
+}
 
 func (a fixedAccount) GetConfiguredProviders() ([]schemas.ModelProvider, error) {
-	return []schemas.ModelProvider{schemas.OpenAI}, nil
+	return []schemas.ModelProvider{a.provider()}, nil
 }
 func (a fixedAccount) GetKeysForProvider(context.Context, schemas.ModelProvider) ([]schemas.Key, error) {
 	return []schemas.Key{{ID: "selected", Value: *schemas.NewSecretVar(a.key), Models: schemas.WhiteList{"*"}, Weight: 1}}, nil
 }
 func (a fixedAccount) GetConfigForProvider(schemas.ModelProvider) (*schemas.ProviderConfig, error) {
-	// Provider BaseURL already includes the compatible API prefix.
+	// Provider BaseURL is the API prefix for either protocol.
+	path := "/chat/completions"
+	if a.protocol == routing.ProtocolAnthropic {
+		path = "/messages"
+	}
 	return &schemas.ProviderConfig{CustomProviderConfig: &schemas.CustomProviderConfig{
-		BaseProviderType: schemas.OpenAI,
+		BaseProviderType: a.provider(),
 		RequestPathOverrides: map[schemas.RequestType]string{
-			schemas.ChatCompletionRequest:       "/chat/completions",
-			schemas.ChatCompletionStreamRequest: "/chat/completions",
+			schemas.ChatCompletionRequest:       path,
+			schemas.ChatCompletionStreamRequest: path,
 		},
 	}, NetworkConfig: schemas.NetworkConfig{BaseURL: a.url, MaxRetries: 0, DefaultRequestTimeoutInSeconds: 300}, ConcurrencyAndBufferSize: schemas.ConcurrencyAndBufferSize{Concurrency: 8, BufferSize: 8}}, nil
 }

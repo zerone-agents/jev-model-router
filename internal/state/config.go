@@ -48,6 +48,7 @@ func snapshot(ctx context.Context, q queryer) (routing.Snapshot, error) {
 					rows.Close()
 					return s, storageError()
 				}
+				p.Protocol = p.EffectiveProtocol()
 				s.Providers = append(s.Providers, p)
 			} else {
 				var m routing.Model
@@ -166,6 +167,7 @@ func mutate(s *routing.Snapshot, c management.Call) (any, error) {
 	case "providers.put":
 		var p routing.Provider
 		json.Unmarshal(c.Input, &p)
+		p.Protocol = p.EffectiveProtocol()
 		found := false
 		for i, x := range s.Providers {
 			if x.ID == p.ID {

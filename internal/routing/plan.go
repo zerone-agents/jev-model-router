@@ -60,15 +60,7 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 	}
 
 	estimate := p.Estimate
-	var breakdown *ContextEstimate
-	if r.Model == "auto" && estimate == nil {
-		value, err := EstimateRequestContext(r)
-		if err != nil {
-			return result, err
-		}
-		breakdown = &value
-		estimate = func(Model, Request) (int64, bool, error) { return value.TotalTokens, false, nil }
-	}
+	estimates := map[string]ContextEstimate{}
 	hasImages, requiresTools, requiresStructured := HasImages(r), RequiresTools(r), RequiresStructuredOutput(r)
 	targets := []Target{}
 	var overflow []Target
@@ -100,7 +92,7 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 		}
 		if e == nil && check != nil {
 			e = check(target)
-			if e != nil && prepared {
+			if e != nil {
 				var known *Error
 				if !errors.As(e, &known) || known.Code != "unsupported_request" {
 					return result, e
@@ -124,7 +116,16 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 			result.Path = "explicit"
 			return result, nil
 		}
-		units, isExact, e := estimate(m, r)
+		var units int64
+		var isExact bool
+		if estimate == nil {
+			value, err := EstimateTargetContext(target, r)
+			e = err
+			units = value.TotalTokens
+			estimates[m.ID] = value
+		} else {
+			units, isExact, e = estimate(m, TargetRequest(target, r))
+		}
 		if e != nil {
 			return result, e
 		}
@@ -195,6 +196,8 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 	result.Target = selected
 	result.ModelID = selected.Model.ID
 	result.ContextExact = exact[selected.Model.ID]
-	result.ContextEstimate = breakdown
+	if value, ok := estimates[selected.Model.ID]; ok {
+		result.ContextEstimate = &value
+	}
 	return result, nil
 }

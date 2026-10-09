@@ -184,7 +184,12 @@ func (p *PreparedMessages) Projection() routing.Request {
 	_ = json.Unmarshal(p.body, &r)
 	return r
 }
-func (p *PreparedMessages) Check(t routing.Target) error { return Check(t, p.Projection()) }
+func (p *PreparedMessages) Check(t routing.Target) error {
+	if t.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
+		return routing.Fail("unsupported_request", "Messages with native Anthropic upstream is not yet supported")
+	}
+	return Check(t, p.Projection())
+}
 
 // Anthropic combines consecutive turns of the same role. Bifrost splits blocks
 // into turns; coalesce adjacent turns without reordering text/images/tool use.

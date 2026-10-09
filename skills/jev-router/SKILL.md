@@ -40,9 +40,9 @@ Jev mode offers no sensitive-data routing guarantee. Image fields are excluded f
 
 Discover the current `models.put` and `route.inspect` schemas first. Chat requests support `chat_template_kwargs: {"enable_thinking": true|false}` and `reasoning_effort`; template kwargs cannot contain arbitrary provider overrides. SDK `thinking: {type: "enabled"}` becomes `chat_template_kwargs.enable_thinking=true` on the wire.
 
-No `capabilities.reasoning` declaration is required. Valid thinking and effort controls are forwarded unchanged, alone or together; the upstream decides whether they are supported. Existing reasoning metadata remains readable/writable for compatibility but does not gate requests or filter candidates.
+No `capabilities.reasoning` declaration is required. For OpenAI-compatible upstreams, valid thinking and effort controls are forwarded unchanged, alone or together; the upstream decides whether they are supported. Existing reasoning metadata remains readable/writable for compatibility but does not gate requests or filter candidates.
 
-Validate upstream behavior against the actual endpoint/model in JSON and SSE. Neither `auto` nor explicit selection requires reasoning metadata. Inspect uses the same checks as generation, and Jev receives the reasoning requirements within its input budget. No field dropping, reasoning downgrade, retry or fallback is used. Output limits are preserved independently of these controls. Responses preserve text `reasoning_content`, including thinking-only SSE events; assistant history can replay this text. Native signed/encrypted reasoning remains unsupported.
+Validate upstream behavior against the actual endpoint/model in JSON and SSE. Neither `auto` nor explicit selection requires reasoning metadata. Inspect uses the same checks as generation, and Jev receives the reasoning requirements within its input budget. No field dropping, reasoning downgrade, retry or fallback is used. Output limits are preserved independently of these controls. Responses preserve text `reasoning_content`, including thinking-only SSE events; OpenAI-compatible upstream history can replay this text. Native signed/encrypted reasoning remains unsupported.
 
 ## Anthropic Messages
 
@@ -71,3 +71,9 @@ Discover `records.list` for paginated routing records. Use `offset` and `limit` 
 ### Generation context estimate
 
 Inspect exposes optional `context_estimate` with semantic_bytes_v1 component accounting, separate input and output reserve, and total. This is heuristic (`context_exact=false`), independent of Jev decision bytes. Unspecified output reserves 4096 locally without injecting a limit upstream. If every otherwise eligible auto candidate exceeds capacity only by inexact estimation, `context_estimate_fallback` retains all candidates with the largest context window: one is selected directly, while multiple ties go through one Jev decision; the path remains context_estimate_fallback. Capability checks remain enforced; explicit models skip local context estimation/admission entirely and never switch; capacity is delegated to the upstream. Explicit inspect omits context_estimate and leaves context_exact=false (not counted). Generation requests remain complete and upstream errors do not trigger retries.
+
+## Native Anthropic upstreams
+
+Discover and preserve `Provider.protocol` on replacements: `openai` is the default; `anthropic` selects native Messages upstream for OpenAI Chat clients. Use an API-prefix base_url such as `https://api.anthropic.com/v1`; the adapter adds `/messages`. Read the derived endpoint with providers.get, and test connectivity before enabling a model. Omitted max_tokens/max_completion_tokens becomes 65536 on native targets, including routing capacity reservation.
+
+Native tools require normalized disabled thinking: enable_thinking=false or reasoning_effort=none. True means adaptive; low/medium/high/max effort remains exact; minimal/xhigh and conflicting controls are rejected. Thinking history and thinking+tools are unsupported. Inspect and generation reject fields the native adapter cannot preserve before selecting that candidate. Native `/v1/messages` clients targeting native Anthropic upstream are **planned**, tracked by #51; do not configure or report that direction as available. Local mocked SDK tests do not establish real upstream compatibility.

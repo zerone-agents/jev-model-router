@@ -60,7 +60,7 @@ Chat Completions 和 `route.inspect` 接受以下显式控制：
 - `reasoning_effort` 接受 `none`、`minimal`、`low`、`medium`、`high`、`xhigh`、`max`。这是入口词汇范围，不代表所有模型支持这些值。
 - SDK 的 `thinking: {type: "enabled"}` 对应上述 `chat_template_kwargs`；入口不接收 SDK 内部的顶层 `thinking` 对象。
 
-合法的 thinking / effort 参数不要求模型能力声明，单独或同时发送均原样转发，由上游判断是否支持。`auto`、显式选模和 `route.inspect` 都不依据推理能力声明拦截或过滤模型；格式、允许值及未知字段检查仍然保留。上游错误正常返回，不静默删除参数、降级或换模。
+对于 OpenAI-compatible 上游，合法的 thinking / effort 参数不要求模型能力声明，单独或同时发送均原样转发，由上游判断是否支持。`auto`、显式选模和 `route.inspect` 都不依据推理能力声明拦截或过滤模型；格式、允许值及未知字段检查仍然保留。上游错误正常返回，不静默删除参数、降级或换模。
 
 已有 `capabilities.reasoning` 数组保留读写兼容，仅作为说明性元数据；可省略，无需新增或更新配置。Jev state 的 requirements 仍包含实际请求的推理控制，计入必需部分字节预算。
 
@@ -135,3 +135,17 @@ Messages SSE 在 Bifrost 累计状态之前执行总预算：序列化后的已�
 路由记录的摘要从原始 Messages 最后一条 user 提取，不从合并后的 Chat 投影提取；仅有工具结果/图片时摘要为空。JSON 与 SSE 都拒绝重复工具 ID。同帧并行工具调用逐个进入锁定转换器，结束信号在该帧所有工具片段之后转换，保留调用 ID、索引和参数配对。
 
 SSE thinking 块被文本或工具输出关闭后，上游再次发送非空 thinking 时明确返回流内错误，不发送 message_stop；当前转换器无法重新打开该块，禁止静默丢弃恢复的片段。空 thinking 增量不触发此错误。
+
+## OpenAI clients with native Anthropic upstream (#50)
+
+Set provider protocol to `anthropic`. JSON and SSE use the same checked Bifrost conversion for messages, leading system/developer instructions, HTTPS/data images, ordinary function tools and tool results. Leading developer text maps to the same instruction level as system, preserving order. Mid-conversation instruction insertion, unsupported image detail, reasoning history and unrepresentable OpenAI fields are rejected before selection. JSON Schema requires the final native schema to preserve constraints; json_object is rejected. Sampling fields are rejected if the SDK would drop them, including model-name dependent rewrites. No retries or fallback occur.
+
+Thinking true maps to adaptive; false and effort none normalize to disabled. Tools require disabled on both initial and continuation requests. Low/medium/high/max effort is preserved; minimal/xhigh and conflicting controls are rejected. Standalone visible thinking is preserved; thinking+tools and signed/encrypted history are not supported. An unexpected thinking/tool response fails rather than yielding an unreplayable success.
+
+The default native max_tokens and routing reserve are 65536, while OpenAI retains its existing behavior. Native prompt usage includes ordinary input plus reported cache reads and writes; cumulative output usage is not added twice. Missing usage is not fabricated. Successful SSE completion requires a validated message_stop followed by response-body EOF. Malformed/unknown events, bad tool indexes or JSON, and events after message_stop fail without a successful finish_reason/[DONE]. Stream reads are bounded to 16 MiB total and 1 MiB per frame.
+
+Native errors use fixed safe messages: 400/404/413/422 retain status; upstream 401/403 map to 502; 429 and 529 remain rate-limit/overload errors; other 5xx retain status, unknown 4xx map to 502. Parsing/network failures use 502, timeouts 504, cancellation 499. Raw provider messages, types and IDs do not override Router errors or request IDs. Existing OpenAI upstream error behavior remains unchanged.
+
+Local production HTTP/Bifrost tests and unmodified OpenAI/Agent SDK tool roundtrips cover JSON/SSE. Reproduce with `JEV_TEST_OPENAI_SDK=<Node project with openai> JEV_TEST_AGENT_SDK=<agent-sdk checkout with tsx> go test ./internal/transport/http -run 'TestChatAnthropicUpstreamHTTP|TestNativeUpstreamSDKs' -v`. These use a simulated native upstream; real Anthropic-compatible deployment validation is still pending. `/v1/messages` to native upstream remains planned under [#51](https://github.com/zerone-agents/jev-model-router/issues/51).
+
+Anthropic 上游的 JSON Schema 格式不支持 OpenAI `json_schema.description` 指令；非空值在候选检查时返回 `unsupported_request`，避免静默丢失。格式名称不发送；schema 使用原生约束输出，`strict` 不作为原生字段发送。
