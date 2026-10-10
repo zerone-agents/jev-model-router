@@ -28,7 +28,7 @@ func (p *PreparedMessages) chatRequest() (routing.Request, error) {
 	body, _ = json.Marshal(original)
 	var in anthropic.AnthropicMessageRequest
 	if json.Unmarshal(body, &in) != nil {
-		return routing.Request{}, routing.Fail("invalid_request", "invalid Messages body")
+		return routing.Request{}, routing.Fail("unsupported_request", "Messages data cannot be represented by the Chat adapter")
 	}
 	if in.Thinking != nil && in.Thinking.Type == "enabled" {
 		return routing.Request{}, routing.Fail("unsupported_request", "thinking.budget_tokens cannot be enforced by the configured Chat adapter; use adaptive thinking without a token budget")
@@ -160,5 +160,6 @@ func (p *PreparedMessages) chatRequest() (routing.Request, error) {
 	if err := routing.ValidateRequest(projection); err != nil {
 		return routing.Request{}, err
 	}
+
 	return projection, nil
 }
