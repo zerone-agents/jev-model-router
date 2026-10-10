@@ -39,3 +39,9 @@ The effort example exercises low, medium, high and default requests. Successful 
 - Provider regressions cover actual sent thinking history, stream IDs, signature profile isolation, safe HTTP/SSE error statuses, malformed/truncated streams, trailing errors, gzip corruption, cancellation and usage handling.
 
 SDK example working directories were isolated temporary fixtures. Existing fixed-name `/tmp` example files were backed up/restored; temporary credential files were removed. Raw model responses and credentials are not committed. Repeating real examples requires explicit test credentials and incurs upstream usage.
+
+## 2026-10-10 precision and timeout follow-up
+
+The actual native request-body regressions now cover `9007199254740993`, its negative counterpart, high-precision decimals and nested arguments, with/without thinking history in JSON/SSE mode. Sending retains Bifrost's raw JSON; replacing messages uses `json.RawMessage`. Numeric comparisons use exact coefficient/exponent values, preserving equivalence such as `1`, `1.0` and `1e0` without float64 rounding or exponent expansion. Schema values already rounded by SDK conversion are rejected before sending.
+
+A deterministic HTTP error-encoding regression reproduced a pre-existing context classification race: a deadline published between repeated `Err()` reads produced 499 rather than 504. Classification now snapshots `Err()` once. The deterministic regression and actual Messages timeout/cancellation tests passed 30 repetitions. Full `go test -race ./... -count=1`, vet/build and all 24 local SDK roundtrips passed. The real-model examples above remain the 2026-10-09 run; this follow-up used local upstream regressions.
