@@ -233,3 +233,35 @@ test("sending keeps the page and composer stable", async ({ page }) => {
   expect(after.boxes[2].x).toBe(before.boxes[2].x);
   expect(after.boxes[2].width).toBe(before.boxes[2].width);
 });
+
+test("upstream error details render as inert text", async ({ page }) => {
+  await login(page);
+  await page.route("**/admin/v1/playground/completions", (route) =>
+    route.fulfill({
+      status: 451,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: {
+          code: "upstream_error",
+          message: "failed",
+          stage: "routing",
+          upstream_status: 451,
+          upstream_error: {
+            body: 'Typesafe is not available in your region. <img src="https://example.invalid/leak" onerror="alert(1)">',
+            truncated: true,
+          },
+        },
+      }),
+    }),
+  );
+  await send(page, "hello");
+  await page.getByText("Upstream error details", { exact: true }).click();
+  await expect(page.locator(".pg-upstream-details pre")).toContainText(
+    "Typesafe is not available in your region.",
+  );
+  await expect(page.locator(".pg-upstream-details pre")).toContainText("<img");
+  await expect(page.locator(".pg-upstream-details img")).toHaveCount(0);
+  await expect(
+    page.getByText("Details truncated due to size limit."),
+  ).toBeVisible();
+});

@@ -14,11 +14,12 @@ func (g *bifrostGenerator) CompleteMessages(ctx context.Context, t routing.Targe
 	if err := p.Check(t); err != nil {
 		return nil, err
 	}
-	client, release, err := g.acquire(t)
+	client, release, secret, err := g.acquire(t)
 	if err != nil {
 		return nil, err
 	}
 	defer release()
+	ctx = context.WithValue(ctx, upstreamSecretKey{}, secret)
 	bc := schemas.NewBifrostContext(ctx, time.Time{})
 	defer bc.Cancel()
 	bc.SetValue(schemas.BifrostContextKeyAllowPerRequestRawOverride, true)
@@ -29,7 +30,7 @@ func (g *bifrostGenerator) CompleteMessages(ctx context.Context, t routing.Targe
 	}
 	out, failure := client.ChatCompletionRequest(bc, r)
 	if failure != nil {
-		return nil, providerError(ctx, failure)
+		return nil, providerError(bc, failure)
 	}
 	if out == nil || len(out.Choices) != 1 || out.Choices[0].Message == nil {
 		return nil, routing.Fail("upstream_error", "invalid generation result")

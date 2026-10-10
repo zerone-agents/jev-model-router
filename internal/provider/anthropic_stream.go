@@ -53,10 +53,11 @@ func (g *bifrostGenerator) StreamMessages(ctx context.Context, t routing.Target,
 	if err := p.Check(t); err != nil {
 		return nil, err
 	}
-	client, release, err := g.acquire(t)
+	client, release, secret, err := g.acquire(t)
 	if err != nil {
 		return nil, err
 	}
+	ctx = context.WithValue(ctx, upstreamSecretKey{}, secret)
 	bc := schemas.NewBifrostContext(ctx, time.Time{})
 	bc.SetValue(schemas.BifrostContextKeyAllowPerRequestRawOverride, true)
 	bc.SetValue(schemas.BifrostContextKeySendBackRawResponse, true)
@@ -66,11 +67,13 @@ func (g *bifrostGenerator) StreamMessages(ctx context.Context, t routing.Target,
 		release()
 		return nil, err
 	}
+	captureStreamErrors(bc)
 	ch, failure := client.ChatCompletionStreamRequest(bc, r)
 	if failure != nil {
+		err := providerError(bc, failure)
 		bc.Cancel()
 		release()
-		return nil, providerError(ctx, failure)
+		return nil, err
 	}
 	return &messagesStream{ctx: bc, ch: ch, state: schemas.AcquireChatToResponsesStreamState(), release: release, model: t.Model.ID, stops: p.stops, tools: map[int]*toolFragments{}, byteLimit: maxMessagesStreamBytes}, nil
 }

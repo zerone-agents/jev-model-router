@@ -94,7 +94,7 @@ call body 为 `{"input":{...},"expected_version":1,"idempotency_key":"operation-
 
 `schemas/messages.json` 定义 POST /v1/messages 的输入形状；provider 还执行明确公布的内容组合及目标转换检查。`thinking.enabled` 的预算格式可识别，但当前 Chat adapter 无法执行独立预算，返回 unsupported_request；adaptive/disabled 和显式 output_config.effort 已实现。原生签名、带 is_error=true 的工具结果和不可保持顺序的混合块明确拒绝。版本固定 2023-06-01，beta 扩展拒绝。
 
-该入口使用独立 Anthropic 错误信封，认证失败也包含顶层 type:error、error.type/message、request_id；request-id 与 X-Request-ID 相同。400/401/403/404/405/413/422/429/500/502/503/504/529 的映射和流内失败范围见 [兼容文档](../docs/compatibility.md#anthropic-messages-issue-23)。Messages 不套管理信封，也不透传上游 OpenAI 错误体。
+该入口使用独立 Anthropic 错误信封，认证失败也包含顶层 type:error、error.type/message、request_id；request-id 与 X-Request-ID 相同。400/401/403/404/405/413/422/429/500/502/503/504/529 的映射和流内失败范围见 [兼容文档](../docs/compatibility.md#anthropic-messages-issue-23)。Messages 不套管理信封；上游错误的脱敏详情位于 error.diagnostic.upstream_error。
 
 Generation providers accept `protocol: "openai" | "anthropic"`. Omitted protocol defaults to `openai`, including replacement writes; preserve it when editing an Anthropic provider. Reads return the effective protocol. Existing stored rows need no migration or version increment. `base_url` is the API prefix (for example `https://api.anthropic.com/v1`).
 
@@ -104,10 +104,10 @@ Generation providers accept `protocol: "openai" | "anthropic"`. Omitted protocol
 
 两端点只接受 Dashboard Settings Cookie；GET 需要 X-Jev-Session，POST 需要 JSON、精确 Origin/Host 和绑定会话的 CSRF。任何 Authorization 替代均被拒绝，Cookie 不因此获得 /v1 推理权限。该能力是 Settings 角色的受限浏览器生成例外，Settings Bearer 及通用管理 call 不提供生成。
 
-准入前不调用上游，成功受理后费用/次数不退款，不自动重试或隐式换模。POST 直接复用一次实际推理规划，不能先 route.inspect 再生成。选模成功后立即发送 route，不等待上游首个事件；此后的生成失败均通过 SSE error 返回。SSE 按 route、delta、done/error 返回，delta 的 content/reasoning_content 分开；仅收到 finish_reason 后正常终止才发 done。EOF 无终态为中断；本端点不宣称 OpenAI SSE 兼容。HTTP 头前错误为 JSON error，流内错误为独立 error 事件；不回显供应商错误体。
+准入前不调用上游，成功受理后费用/次数不退款，不自动重试或隐式换模。POST 直接复用一次实际推理规划，不能先 route.inspect 再生成。选模成功后立即发送 route，不等待上游首个事件；此后的生成失败均通过 SSE error 返回。SSE 按 route、delta、done/error 返回，delta 的 content/reasoning_content 分开；仅收到 finish_reason 后正常终止才发 done。EOF 无终态为中断；本端点不宣称 OpenAI SSE 兼容。HTTP 头前错误为 JSON error，流内错误为独立 error 事件；供应商错误体经过共享脱敏后可作为 upstream_error 详情返回。
 
 429 返回 playground_rate_limited、limit_scope、retry_after_seconds、可用时 reset_at，并带 Retry-After。实例 UTC 日额度持久化，并发为单进程；配置和全部默认值见 configuration.md。只有真实执行元数据进入路由展示，不产生 Jev 自由文本理由。
 
-Playground JSON/SSE 错误提供 stage（request/routing/generation）、Router request_id，以及可用的 upstream_status 和白名单 upstream_code。摘要由本地固定分类生成，不回显上游自由文本、地址、凭证或请求内容。公开 Chat 错误保留原信封，并在上游 error 中附加同源 diagnostic 分类。
+Playground JSON/SSE 错误提供 stage（request/routing/generation）、Router request_id、可用的 upstream_status 和白名单 upstream_code。摘要仍使用稳定分类；新增可选 upstream_error 对象，包含 body（脱敏 JSON 或纯文本）、truncated（是否截断）及可用的 request_id（上游请求 ID，与 Router ID 分开）。公开 Chat 与 Messages 的 JSON/SSE 错误均通过 error.diagnostic.upstream_error 返回相同详情。供应商的未知错误码可保留在详情中，不冒充 Router 分类。
 
-Jev 决策接口失败同样保留真实上游 HTTP 状态和已识别错误码，Playground 标记为 routing；此时不发送选模成功事件，也不调用生成供应商。错误响应最多检查 64 KiB，未知格式或未知码不回显原文；上游响应体读取超时仍归类 timeout。
+Jev 决策失败同样保留详情，Playground 标记为 routing，不发送选模成功事件或调用生成供应商。嵌套 JSON 字符串会解码并递归脱敏。认证字段、API key、密码、Cookie、结构化请求回显以及本次使用的供应商凭证会被屏蔽；URL 用户信息、查询和片段被清除。详情不写入路由记录或浏览器存储，SDK 内部诊断和原始请求不作为错误正文来源。输入超过 64 KiB 时省略正文并标记 truncated，脱敏结果超过 16 KiB 时返回文本片段并标记 truncated；不能安全检查完整输入时不展示部分原文。HTML 仅作为文本显示。上游无可用正文或网络/解析错误时，保留通用错误。读取超时仍归类 timeout。
