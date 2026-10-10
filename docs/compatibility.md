@@ -5,7 +5,7 @@
 | 客户端入口 | OpenAI 兼容上游 | 原生 Anthropic 上游 |
 | --- | --- | --- |
 | Chat Completions | JSON / SSE | JSON / SSE，支持公布范围内的思考与工具续写 |
-| Anthropic Messages | JSON / SSE，经转换 | 未实现，见 [#51](https://github.com/zerone-agents/jev-model-router/issues/51) |
+| Anthropic Messages | JSON / SSE，经转换 | JSON / SSE，原生保真，见下文 #51 |
 
 ## 基础转换与路由
 
@@ -107,7 +107,7 @@ JEV_TEST_AGENT_SDK=/path/to/agent-sdk go test ./internal/transport/http -run Tes
 
 ## Anthropic Messages (Issue #23)
 
-2026-10-06：新增客户端侧 `POST /v1/messages`，当前仍调用已配置的 OpenAI-compatible Chat Completions 生成上游。使用锁定 Bifrost 的 Anthropic→Responses→Chat 和返回转换；只对实测转换缺口补充消息分组合并、并行控制、显式推理参数及 usage/终态保护。已有 Chat Completions 的供应商原始错误透传规则不适用于此新入口。
+本节描述 `/v1/messages` → OpenAI-compatible Chat Completions 的转换路径；原生 Anthropic 目标见下方 #51 专节。使用锁定 Bifrost 的 Anthropic→Responses→Chat 和返回转换；只对实测转换缺口补充消息分组合并、并行控制、显式推理参数及 usage/终态保护。已有 Chat Completions 的供应商原始错误透传规则不适用于此新入口。
 
 | 能力 | 当前范围及证据 |
 | --- | --- |
@@ -117,7 +117,7 @@ JEV_TEST_AGENT_SDK=/path/to/agent-sdk go test ./internal/transport/http -run Tes
 | temperature/top_p、输出限额 | Messages temperature 为 0–1、top_p 为 0–1；max_tokens 必填，16–10000000，合法 JSON 整数形式归一化，不钳制 |
 | JSON Schema | output_config.format 转为现有 response_format；需要模型 structured_output 能力。无 schema 的 JSON object 可用 `{"type":"object"}` schema 表达；不新增非标准 json_object 字段 |
 | thinking/effort | adaptive→enable_thinking=true；disabled→false；显式 output_config.effort 的 low/medium/high/xhigh/max 原样转发，不由模型名改写，不注入默认 effort。官方 SDK unsigned thinking 历史、JSON/SSE 输出通过；真实模型未验证 |
-| 手动 thinking 预算 | enabled+budget_tokens 的形状可识别，但当前上游适配会丢掉独立预算，入口在任何网络调用前明确拒绝，不能称为预算支持 |
+| 手动 thinking 预算 | enabled+budget_tokens 的形状可识别，但当前上游适配会丢掉独立预算，OpenAI 候选在任何生成调用前明确拒绝，不能称为预算支持 |
 | 原生签名/加密历史 | 明确拒绝。Bifrost 返回的空 payload Responses item 标记可回传，只用于关联，不宣称是 Claude 签名 |
 | usage | JSON 缺失则省略；SSE 初始 usage={}，最终 message_delta 补充真实报告的 input/output counts；真实零值保留；报告的缓存读写计数分别输出，普通 input_tokens 扣除这些计数，不把缓存输入算作普通输入。官方 SDK 0.52.0 能累积更新，这是与严格原生 Anthropic 初始数值 usage 的兼容差异；其他严格客户端未验证 |
 | stop_sequences | 请求原样转发；上游仅返回模糊 stop 且未给出匹配序列时明确失败，不猜测 end_turn/stop_sequence。已用模拟上游验证带 `stop:"END"` 的 JSON/SSE 匹配元数据；矛盾终态明确失败，真实供应商元数据仍未验证 |
@@ -138,7 +138,7 @@ go test ./internal/provider ./internal/transport/http -run 'PreparedMessages|Mes
 
 SDK 测试不改写 fetch/请求；单次调用验证设置 maxRetries=0，四个完整回合共 8 次模拟生成请求；另有 1 次模拟断流验证 SDK 流内错误解析，认证失败和非法请求不外发。示例见 examples/anthropic-messages.mjs。官方 SDK 默认重试是客户端行为，不能误认为 Router 换模或重试。
 
-Messages 仍有明确兼容差异：不支持独立 thinking 预算和原生签名历史，initial usage、停止元数据及 effort 词汇也与其他入口不同。以上 SDK 记录来自本地模拟上游，不应据此宣称覆盖全部 OpenAI 入口语义或所有线上模型；原生上游的 BigModel 验收见下节，不能作为此转换方向的验收。
+Messages → OpenAI 转换仍有明确兼容差异：不支持独立 thinking 预算和原生签名历史，initial usage、停止元数据及 effort 词汇也与其他入口不同。以上 SDK 记录来自本地模拟上游，不应据此宣称覆盖全部 OpenAI 入口语义或所有线上模型；原生上游的 BigModel 验收见下节，不能作为此转换方向的验收。
 
 Messages SSE 在 Bifrost 累计状态之前执行总预算：序列化后的已解码帧累计最多 16 MiB、最多 65536 帧，原始捕获单次最多 16 MiB。包含文本、thinking、工具参数/名称、ID 等元数据；超限明确失败并取消上游，不截断成成功输出。每个工具参数另限 1 MiB。该预算限制 adapter/converter 的累计数据，不宣称约束 SDK 解析一个巨大原始帧之前的瞬时内存分配。
 
@@ -156,6 +156,37 @@ The default native max_tokens and routing reserve are 65536, while OpenAI retain
 
 Native errors use fixed safe messages: 400/404/413/422 retain status; upstream 401/403 map to 502; 429 and 529 remain rate-limit/overload errors; other 5xx retain status, unknown 4xx map to 502. Parsing/network failures use 502, timeouts 504, cancellation 499. Raw provider messages, types and IDs do not override Router errors or request IDs. Existing OpenAI upstream error behavior remains unchanged.
 
-Local production HTTP/Bifrost tests and unmodified OpenAI/Agent SDK tool roundtrips cover JSON/SSE. Reproduce with `JEV_TEST_OPENAI_SDK=<Node project with openai> JEV_TEST_AGENT_SDK=<agent-sdk checkout with tsx> go test ./internal/transport/http -run 'TestChatAnthropicUpstreamHTTP|TestNativeUpstreamSDKs' -v`. These use a simulated native upstream. BigModel real-upstream checks used Agent SDK v3.5.1 through a local Router, covering simple queries, multi-turn history, custom tools, streaming, streaming tools and effort controls on glm-5.3 and glm-5.3-flash. All 12 example runs completed; this is a bounded compatibility check, not a benchmark or validation of all Anthropic-compatible deployments. Successful effort requests do not prove distinct internal reasoning behavior. Per-run logs remain local. `/v1/messages` to native upstream remains planned under [#51](https://github.com/zerone-agents/jev-model-router/issues/51).
+Local production HTTP/Bifrost tests and unmodified OpenAI/Agent SDK tool roundtrips cover JSON/SSE. Reproduce with `JEV_TEST_OPENAI_SDK=<Node project with openai> JEV_TEST_AGENT_SDK=<agent-sdk checkout with tsx> go test ./internal/transport/http -run 'TestChatAnthropicUpstreamHTTP|TestNativeUpstreamSDKs' -v`. These use a simulated native upstream. BigModel real-upstream checks used Agent SDK v3.5.1 through a local Router, covering simple queries, multi-turn history, custom tools, streaming, streaming tools and effort controls on glm-5.3 and glm-5.3-flash. All 12 example runs completed; this is a bounded compatibility check, not a benchmark or validation of all Anthropic-compatible deployments. Successful effort requests do not prove distinct internal reasoning behavior. Per-run logs remain local. Native Messages client support is documented separately below.
 
 Anthropic 上游的 JSON Schema 格式不支持 OpenAI `json_schema.description` 指令；非空值在候选检查时返回 `unsupported_request`，避免静默丢失。格式名称不发送；schema 使用原生约束输出，`strict` 不作为原生字段发送。
+
+## Native Messages clients with native Anthropic upstream (#51)
+
+`POST /v1/messages` supports `protocol=anthropic` and `protocol=openai` targets for explicit and auto selection. Native prepared JSON is immutable; candidate checks and execution share its body builder. Only the request model becomes upstream_name and response model becomes the external ID. Native requests/responses never traverse Chat conversion. Unsupported fields exclude only the incompatible candidate; internal errors abort planning. There is no retry, fallback, image download or signature rewriting.
+
+| Native field | Contract |
+| --- | --- |
+| Text/system/images/tools | Original block order and raw tool numbers preserved; HTTPS/base64 images are forwarded, not downloaded. Tool results preserve text/image content and is_error, and require unique matching IDs. |
+| Thinking | disabled/adaptive/enabled preserved. Enabled budget is an integer ≥1024 and below max_tokens. Signed thinking and redacted_thinking.data remain opaque. Strict native targets require nonempty history/response signatures; only the existing exact BigModel HTTPS endpoint and glm-5.3/glm-5.3-flash profile permits unsigned thinking. |
+| Cache | ephemeral on tools, system text and message text/image blocks; ttl omitted/5m/1h, at most four breakpoints; tools→system→messages order requires 1h before 5m. No top-level cache or thinking/redacted cache. |
+| Controls | max_tokens is required (16–10000000); temperature/top_p/top_k, stop_sequences, metadata.user_id, tool_choice, parallel control and output_config effort/JSON schema are preserved. Model support remains upstream-owned. |
+| Usage | Preserve native counters, missing fields versus zero, nested cache details and bounded optional extensions. Never add cache counts into input_tokens or sum cumulative message_delta counts. Known counters must be nonnegative integers. |
+| Stops | end_turn/max_tokens/stop_sequence/tool_use/refusal; stop_sequence must match a requested sequence. Unknown/pause_turn and unsupported content types fail. |
+
+Native streams preserve event JSON and order (including resumed thinking and signature fragments); only message_start.message.model changes. Bounds are 16 MiB each for compressed/decompressed bytes, 1 MiB per frame and 65536 frames. A valid message_stop is held until clean body EOF; malformed tails, gzip truncation, missing terminal events and errors never produce successful termination. Error bodies and upstream request IDs are not forwarded; HTTP and SSE share the safe error classification above.
+
+At max_tokens, only the last tool block may contain an unfinished but completable JSON object prefix, including empty argument deltas. Earlier tools must be complete; invalid syntax, duplicate keys/IDs and complete non-objects still fail. JSON responses must be syntactically complete and tool input must be an object, but missing business-required properties are preserved. Router never repairs or executes arguments. Clients must inspect stop_reason before using a tool input.
+
+Decision projection excludes thinking/signatures/redacted, tool arguments/results, cache and image data/addresses. The independent `native_messages_bytes_v1` estimate counts full content plus framing/image reserves and max_tokens once; it is heuristic. Explicit selection skips estimation. Auto retains the existing largest-context overflow fallback and has no model affinity: signature authenticity and cross-provider replay acceptance remain upstream responsibilities. Use an explicit stable model when replay compatibility matters.
+
+Beta headers, server tools, documents/audio/video, citations, unknown input fields, duplicate JSON keys and invalid UTF-8 are rejected. Native support does not widen the separate OpenAI Chat conversion contract.
+
+Reproduce production HTTP and unmodified official SDK acceptance:
+
+```sh
+JEV_TEST_ANTHROPIC_SDK=/absolute/path/to/node-project go test ./internal/transport/http -run TestNativeMessages -count=1 -v
+```
+
+SDK 0.52.0 passes auto/explicit × JSON/SSE signed thinking, redacted history, images, cache and is_error tool replay with maxRetries=0. Low-level streaming preserves max_tokens and incomplete partial_json. Its high-level finalMessage aggregates the tested incomplete input to `{}`; missing usage causes its high-level helper to throw, while JSON/low-level events preserve absence. These SDK behaviors do not alter Router output. Mock signatures establish preservation only; real Claude signature authenticity remains unverified.
+
+Real native Messages acceptance used a temporary local Router and official Anthropic SDK 0.52.0 against glm-5.3/glm-5.3-flash: two 14-call runs completed JSON/SSE text and tools/continuation, plus Flash image analysis. The replay run reused complete original assistant blocks and verified returned tool-result text. Flash identified the synthetic red square, blue circle and green triangle in both modes. GLM-5.3 text emitted signed thinking; these low-effort tool turns and Flash responses did not emit thinking. Cache counters were zero; cache hits and real Claude signature authenticity are not established. No production configuration was changed.
