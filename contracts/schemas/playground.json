@@ -143,23 +143,111 @@
     "content_type": "text/event-stream",
     "events": {
       "route": {
-        "request_id": "string",
-        "model_id": "string",
-        "path": "string",
-        "config_version": "integer",
-        "decision_ms": "integer"
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "request_id": {
+            "type": "string"
+          },
+          "model_id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "config_version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "decision_ms": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "request_id",
+          "model_id",
+          "path",
+          "config_version",
+          "decision_ms"
+        ]
       },
       "delta": {
-        "content": "optional string",
-        "reasoning_content": "optional string"
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "reasoning_content": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "minProperties": 1
       },
       "done": {
-        "finish_reason": "string",
-        "usage": "optional token usage object"
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "finish_reason": {
+            "enum": [
+              "stop",
+              "length",
+              "content_filter"
+            ]
+          },
+          "usage": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "input_tokens": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "output_tokens": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "total_tokens": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "input_details": {
+                "type": "object"
+              },
+              "output_details": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "input_tokens",
+              "output_tokens"
+            ]
+          }
+        },
+        "required": [
+          "finish_reason"
+        ]
       },
       "error": {
-        "code": "string",
-        "message": "string"
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ]
       }
     },
     "terminal": "Exactly one done or error; EOF without terminal is interrupted."

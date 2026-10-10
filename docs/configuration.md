@@ -104,3 +104,29 @@ Use a complete `providers.put` input such as:
 The adapter appends `/messages`; OpenAI providers append `/chat/completions`. No hostname or version-path guessing occurs. `providers.get` returns the effective protocol and derived `endpoint`. Omission of protocol on replacement resets it to openai. Managed `api_key` writes support the same protocol field.
 
 Native requests without an output limit send **65536** tokens and reserve the same amount in automatic routing. Explicit limits are preserved, never clamped. Connectivity probes still use 16. Use `reasoning_effort:"none"` or `chat_template_kwargs:{"enable_thinking":false}` for tool requests, including continuation. Single-turn thinking can use true (adaptive), but signed thinking history and thinking+tools are unsupported. Test model support explicitly; a local conversion check does not guarantee the upstream model accepts its parameters.
+
+## Playground
+
+Dashboard 登录后可使用独立的 Cookie-only Playground 文本生成入口，无需另填 inference 凭证。它复用真实路由和生成服务，会向供应商发送内容并可能产生费用。现有 CLI / SDK 推理端点的权限及限制不变。
+
+启动配置（环境变量为 `JEV_ROUTER_` 加字段大写）如下：
+
+| 字段 | 默认值 | 范围 |
+| --- | --- | --- |
+| `playground_enabled` | `true` | `true` / `false` |
+| `playground_session_rpm` | 6 | 1–1000000 |
+| `playground_instance_rpm` | 20 | 1–1000000 |
+| `playground_session_concurrency` | 1 | 1–128 |
+| `playground_instance_concurrency` | 3 | 1–128 |
+| `playground_daily_requests` | 200 | 1–1000000 |
+| `playground_input_bytes` | 32768 | 1–16777216，不能超过 body 上限 |
+| `playground_body_bytes` | 262144 | 1–16777216 |
+| `playground_max_messages` | 100 | 1–1000 |
+| `playground_output_tokens` | 4096 | 16–10000000 |
+| `playground_timeout` | `120s` | `1s`–`10m` |
+
+RPM 是任意滚动 60 秒内的受理次数；每日按 UTC 零点重置。会话窗口、实例窗口与日额度原子提交并保存到 SQLite，刷新页面、重新登录或重启不会重置实例额度。已受理的失败、取消和超时仍计数；认证及输入校验失败不计数。数据库准入失败时禁止调用上游。
+
+并发限制作用于单实例单服务进程，多副本没有共享并发协调保证。取消会传播到上游，但不能撤销已产生的费用。限额约束调用量及输出，不是精确费用上限。输入字节包括完整正文和协议携带的 reasoning 历史；超限明确拒绝，不自动截断。
+
+页面仅在内存保存对话，刷新或离开后丢失；失败、停止或截断的回合不会自动加入下一轮历史。思考正文不展示、不落浏览器持久存储；按协议需要携带的 reasoning 历史仍保留在当前页面内存。正文通过 Streamdown 渲染，原始 HTML 不执行、图片不加载，既有 CSP 不放宽。

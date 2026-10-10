@@ -63,7 +63,7 @@ export function Playground({ client, lang, onError }: PageProps) {
       try {
         do {
           const r = await client.call<{
-            models: { id: string; enabled: boolean }[];
+            items: { id: string; enabled: boolean }[];
             next_cursor?: string;
           }>(
             "models.list",
@@ -71,7 +71,7 @@ export function Playground({ client, lang, onError }: PageProps) {
             abort.signal,
           );
           all = all.concat(
-            r.data.models.filter((m) => m.enabled).map((m) => m.id),
+            r.data.items.filter((m) => m.enabled).map((m) => m.id),
           );
           cursor = r.data.next_cursor || "";
           if (seen.has(cursor)) throw new APIError("invalid_response");
@@ -373,7 +373,22 @@ export function Playground({ client, lang, onError }: PageProps) {
                 <dt>{text(lang, "Selected model", "选定模型")}</dt>
                 <dd>{route.model_id}</dd>
                 <dt>{text(lang, "Selection path", "选择路径")}</dt>
-                <dd>{route.path}</dd>
+                <dd>
+                  {{
+                    explicit: text(lang, "Selected manually", "手动指定"),
+                    single_candidate: text(
+                      lang,
+                      "Only eligible model",
+                      "唯一合格模型",
+                    ),
+                    decision: text(lang, "Selected by Jev", "Jev 选模"),
+                    context_estimate_fallback: text(
+                      lang,
+                      "Largest context fallback",
+                      "最大上下文保底",
+                    ),
+                  }[route.path] || route.path}
+                </dd>
                 <dt>{text(lang, "Routing time", "选模耗时")}</dt>
                 <dd>{route.decision_ms} ms</dd>
                 <dt>{text(lang, "Configuration", "配置版本")}</dt>

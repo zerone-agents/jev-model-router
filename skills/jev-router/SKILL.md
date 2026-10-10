@@ -77,3 +77,9 @@ Inspect exposes optional `context_estimate` with semantic_bytes_v1 component acc
 Discover and preserve `Provider.protocol` on replacements: `openai` is the default; `anthropic` selects native Messages upstream for OpenAI Chat clients. Use an API-prefix base_url such as `https://api.anthropic.com/v1`; the adapter adds `/messages`. Read the derived endpoint with providers.get, and test connectivity before enabling a model. Omitted max_tokens/max_completion_tokens becomes 65536 on native targets, including routing capacity reservation.
 
 Native tools require normalized disabled thinking: enable_thinking=false or reasoning_effort=none. True means adaptive; low/medium/high/max effort remains exact; minimal/xhigh and conflicting controls are rejected. Thinking history and thinking+tools are unsupported. Inspect and generation reject fields the native adapter cannot preserve before selecting that candidate. Native `/v1/messages` clients targeting native Anthropic upstream are **planned**, tracked by #51; do not configure or report that direction as available. Local mocked SDK tests do not establish real upstream compatibility.
+
+### Browser Playground
+
+Runtime discovery exposes `call.protocol.playground` for a browser-only, rate-limited text generation experience. Open the dashboard and use its Settings Cookie session; this is not a capability callable through `jev-router call`, and Settings Bearer does not grant generation access. Existing CLI/SDK inference remains unchanged.
+
+Playground makes real decision/generation calls and can incur charges. Discover the effective limits through its authenticated status endpoint. Do not bypass exhausted Playground quotas by switching credentials, sessions, or endpoints. Do not automatically retry a generated request after cancellation, a 429, or a partial stream.

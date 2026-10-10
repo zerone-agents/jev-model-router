@@ -3,10 +3,12 @@ package httptransport
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/zerone-agents/jev-model-router/internal/inference"
 	"github.com/zerone-agents/jev-model-router/internal/playground"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"github.com/zerone-agents/jev-model-router/internal/state"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -177,5 +179,89 @@ func TestPlaygroundInputBoundaries(t *testing.T) {
 	}
 	if g.calls.Load() != 1 {
 		t.Fatal("invalid input reached upstream")
+	}
+}
+
+type pgDecider struct{ calls int }
+
+func (d *pgDecider) Choose(_ context.Context, _ routing.DecisionConfig, _ routing.DecisionInput) (routing.Decision, error) {
+	d.calls++
+	return routing.Decision{ModelID: "external"}, nil
+}
+func TestPlaygroundSingleDecisionAndRecord(t *testing.T) {
+	l := playground.DefaultLimits()
+	g := &pgGenerator{t: t}
+	h, token, csrf, _ := pgFixture(t, l, g)
+	p := h.(*playgroundHTTP)
+	cfg := snapshot()
+	cfg.Decision = routing.DecisionConfig{BaseURL: "http://decision.invalid", Model: "jev", SecretRef: "env:TEST"}
+	second := cfg.Models[0]
+	second.ID = "second"
+	cfg.Models = append(cfg.Models, second)
+	p.inference.Store = testStore{cfg}
+	d := &pgDecider{}
+	p.inference.Planner.Decider = d
+	st, e := state.Open(filepath.Join(t.TempDir(), "records.db"), nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer st.Close()
+	p.inference.Recorder = &routing.Recorder{Sink: st}
+	w := sessionRequest(h, "POST", "/admin/v1/playground/completions", pgInput, token, csrf)
+	if w.Code != 200 || d.calls != 1 || g.calls.Load() != 1 {
+		t.Fatal(w.Code, w.Body.String(), d.calls, g.calls.Load())
+	}
+	page, e := st.ListRecords(context.Background(), "", 50)
+	if e != nil {
+		t.Fatal(e)
+	}
+	b, _ := json.Marshal(page)
+	if strings.Count(string(b), `"request_id"`) != 1 || !strings.Contains(string(b), `"model_id":"external"`) {
+		t.Fatal(string(b))
+	}
+}
+func TestPlaygroundFailurePathsRelease(t *testing.T) {
+	for _, kind := range []string{"panic", "upstream", "incomplete", "tool"} {
+		t.Run(kind, func(t *testing.T) {
+			l := playground.DefaultLimits()
+			g := &pgGenerator{t: t, stream: func(context.Context) (routing.EventStream, error) {
+				if kind == "panic" {
+					panic("fixture panic")
+				}
+				if kind == "upstream" {
+					return nil, errors.New("sensitive-provider-text")
+				}
+				return &testStream{next: func(context.Context) (routing.Event, error) {
+					if kind == "tool" {
+						return routing.Event{Choices: []routing.Choice{{Delta: &routing.Message{ToolCalls: []routing.ToolCall{{ID: "t"}}}}}}, nil
+					}
+					return routing.Event{}, io.EOF
+				}}, nil
+			}}
+			h, token, csrf, svc := pgFixture(t, l, g)
+			func() {
+				defer func() {
+					if v := recover(); v != nil && kind != "panic" {
+						t.Error(v)
+					}
+				}()
+				w := sessionRequest(h, "POST", "/admin/v1/playground/completions", pgInput, token, csrf)
+				if strings.Contains(w.Body.String(), "event: done") || strings.Contains(w.Body.String(), "sensitive-provider-text") {
+					t.Error(w.Body.String())
+				}
+			}()
+			r := httptest.NewRequest("GET", "http://localhost/admin/v1/playground", nil)
+			r.Header.Set("X-Jev-Session", "1")
+			r.AddCookie(&http.Cookie{Name: "jev_router_session", Value: token})
+			id, e := h.(*playgroundHTTP).sessions.AuthenticatePlayground(r)
+			if e != nil {
+				t.Fatal(e)
+			}
+			lease, e := svc.Acquire(context.Background(), id)
+			if e != nil {
+				t.Fatal(e)
+			}
+			lease.Release()
+		})
 	}
 }

@@ -22,3 +22,14 @@ func TestPlaygroundContract(t *testing.T) {
 		}
 	}
 }
+
+func TestPlaygroundEventSchemas(t *testing.T) {
+	for id, body := range map[string]string{"playground.route": `{"request_id":"r","model_id":"m","path":"explicit","config_version":1,"decision_ms":0}`, "playground.delta": `{"reasoning_content":"hidden"}`, "playground.done": `{"finish_reason":"stop"}`, "playground.error": `{"code":"timeout","message":"request timed out"}`} {
+		if e := Validate(id, json.RawMessage(body)); e != nil {
+			t.Fatalf("%s: %v", id, e)
+		}
+		if e := Validate(id, json.RawMessage(`{"unexpected":true}`)); e == nil {
+			t.Fatal("accepted invalid event", id)
+		}
+	}
+}

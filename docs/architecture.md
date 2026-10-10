@@ -131,3 +131,9 @@ ArbiterOS 工具执行治理仍在后续阶段。当前架构不创建空治理�
 ## 生成上游协议
 
 Provider.protocol 区分 openai 与 anthropic，旧配置默认 openai。OpenAI Chat 入口可在两种协议间选模；Messages 入口当前只允许 OpenAI 兼容上游（原生方向见 #51）。Bifrost 类型与转换保护留在 provider；请求级检查在候选容量过滤和 Jev 之前执行，只有 unsupported_request 可排除候选，内部故障直接返回。Anthropic 缺省输出限额和按目标估算预留均为 65536，OpenAI 保留 4096 估算且不注入限额。SDK 客户端缓存按协议、URL、凭证和配置隔离，不修改在途快照。
+
+## Playground
+
+Dashboard 的受限文本生成采用独立 Cookie-only 端点，复用 `internal/inference` 的快照、规划与记录以及现有 Executor。`internal/playground` 管理短时原子准入和单进程并发；`internal/state` 保存会话/实例滚动窗口与 UTC 日额度。准入先于模型调用，数据库失败不绕过额度，取消/失败不退款，执行退出才释放并发。
+
+这是 Settings 会话的明确权限扩展：管理员无需 inference 凭证即可通过 Playground 体验生成；普通 Settings Bearer、管理 call 和 /v1 推理认证不变。机器契约发布浏览器专用请求/流式协议，UI 没有隐藏的选模实现。首版输入仅文本，不执行工具。生成正文由 Streamdown 渲染，reasoning 仅驱动“正在思考”提示并按协议保留内存历史，CSP 保持不变。

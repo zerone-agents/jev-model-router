@@ -78,6 +78,15 @@ func initSchemas() {
 	}
 	json.Unmarshal(PlaygroundPolicy(), &pg)
 	validators["playground"] = compile(pg.InputSchema)
+	var events struct {
+		Stream struct {
+			Events map[string]json.RawMessage `json:"events"`
+		} `json:"stream"`
+	}
+	json.Unmarshal(PlaygroundPolicy(), &events)
+	for name, schema := range events.Stream.Events {
+		validators["playground."+name] = compile(schema)
+	}
 	envelope, _ := json.Marshal(callSchema(true))
 	validators["write_envelope"] = compile(envelope)
 	policy := SessionLimits()

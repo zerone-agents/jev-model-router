@@ -15,7 +15,7 @@ it("defaults to auto and renders a completed routed response", async () => {
             JSON.stringify({
               ok: true,
               data: {
-                models: [{ id: "flash", enabled: true }],
+                items: [{ id: "flash", enabled: true }],
                 next_cursor: "",
               },
               meta: {},
