@@ -9,20 +9,6 @@ import (
 	"strings"
 )
 
-func nativeRaw(v any) json.RawMessage {
-	switch v := v.(type) {
-	case string:
-		return []byte(v)
-	case []byte:
-		return v
-	case json.RawMessage:
-		return v
-	default:
-		b, _ := json.Marshal(v)
-		return b
-	}
-}
-
 type nativeUsage struct {
 	Input  *int64 `json:"input_tokens"`
 	Output *int64 `json:"output_tokens"`
@@ -87,7 +73,7 @@ func nativeFinish(stop string) (string, error) {
 		return "", nativeError(502)
 	}
 }
-func anthropicUpstreamCompletion(in *schemas.BifrostChatResponse, raw json.RawMessage, tools bool) (routing.Completion, error) {
+func anthropicUpstreamCompletion(in *schemas.BifrostChatResponse, raw json.RawMessage, tools, signatureOptional bool) (routing.Completion, error) {
 	var body nativeResponse
 	if json.Unmarshal(raw, &body) != nil || body.Type != "message" || body.Role != "assistant" || body.ID == "" {
 		return routing.Completion{}, nativeError(502)
@@ -100,6 +86,7 @@ func anthropicUpstreamCompletion(in *schemas.BifrostChatResponse, raw json.RawMe
 	var calls []routing.ToolCall
 	ids := map[string]bool{}
 	hasThinking := false
+	hasSignature := false
 	hasText := false
 	for _, b := range body.Content {
 		switch b.Type {
@@ -114,6 +101,7 @@ func anthropicUpstreamCompletion(in *schemas.BifrostChatResponse, raw json.RawMe
 				return routing.Completion{}, nativeError(502)
 			}
 			hasThinking = true
+			hasSignature = hasSignature || (b.Signature != nil && *b.Signature != "")
 			reason.WriteString(*b.Thinking)
 		case "tool_use":
 			var object map[string]any
@@ -126,7 +114,7 @@ func anthropicUpstreamCompletion(in *schemas.BifrostChatResponse, raw json.RawMe
 			return routing.Completion{}, nativeError(502)
 		}
 	}
-	if len(body.Content) == 0 || hasThinking && (tools || len(calls) > 0) || (finish == "tool_calls") != (len(calls) > 0) {
+	if len(body.Content) == 0 || hasSignature && !signatureOptional && (tools || len(calls) > 0) || (finish == "tool_calls") != (len(calls) > 0) {
 		return routing.Completion{}, nativeError(502)
 	}
 	out, e := completion(in)

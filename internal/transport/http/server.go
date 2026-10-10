@@ -110,10 +110,12 @@ func (s *server) models(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{"object": "list", "data": items})
 }
 func contextError(ctx context.Context, e error) error {
-	if ctx.Err() == context.DeadlineExceeded || context.Cause(ctx) == context.DeadlineExceeded {
+	// Read Err once: a timer can fire between successive classification checks.
+	state := ctx.Err()
+	if state == context.DeadlineExceeded || context.Cause(ctx) == context.DeadlineExceeded {
 		return routing.Fail("timeout", "request timed out")
 	}
-	if ctx.Err() != nil {
+	if state != nil {
 		return routing.Fail("cancelled", "request cancelled")
 	}
 	// Bifrost watches the inherited deadline with a separate timer. Its failure

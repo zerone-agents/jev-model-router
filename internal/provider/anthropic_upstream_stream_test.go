@@ -1,6 +1,8 @@
 package provider
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
@@ -206,5 +208,55 @@ func TestAnthropicUpstreamReaderIdleTimeout(t *testing.T) {
 			}
 			break
 		}
+	}
+}
+
+func TestAnthropicUpstreamCompressedStream(t *testing.T) {
+	for _, corrupt := range []bool{false, true} {
+		t.Run(fmt.Sprint(corrupt), func(t *testing.T) {
+			var compressed bytes.Buffer
+			zip := gzip.NewWriter(&compressed)
+			fmt.Fprint(zip, nativeStart()+nativeText()+nativeEnd())
+			if err := zip.Close(); err != nil {
+				t.Fatal(err)
+			}
+			body := compressed.Bytes()
+			if corrupt {
+				body[len(body)-1] ^= 1
+			}
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/event-stream")
+				w.Header().Set("Content-Encoding", "gzip")
+				w.Write(body)
+			}))
+			defer server.Close()
+			r := TestRequest()
+			r.Stream = true
+			stream, err := generator(t).Stream(context.Background(), nativeTarget(server.URL), r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer stream.Close()
+			terminals := 0
+			for {
+				event, err := stream.Next(context.Background())
+				for _, c := range event.Choices {
+					if c.FinishReason != nil {
+						terminals++
+					}
+				}
+				if err == nil {
+					continue
+				}
+				if corrupt {
+					if err == io.EOF || terminals != 0 {
+						t.Fatal("corrupt gzip accepted")
+					}
+				} else if err != io.EOF || terminals != 1 {
+					t.Fatalf("terminals=%d error=%v", terminals, err)
+				}
+				break
+			}
+		})
 	}
 }

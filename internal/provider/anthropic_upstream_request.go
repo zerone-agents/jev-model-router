@@ -46,11 +46,8 @@ func prepareAnthropicUpstream(ctx *schemas.BifrostContext, t routing.Target, r r
 	default:
 		return nil, nativeUnsupported("reasoning_effort")
 	}
-	if routing.RequiresTools(r) && thinking != "disabled" {
-		return nil, nativeUnsupported("tools require disabled thinking (false or reasoning_effort=none)")
-	}
 	for _, m := range r.Messages {
-		if m.ReasoningContent != nil || m.Refusal != nil || m.Name != "" {
+		if m.Refusal != nil || m.Name != "" {
 			return nil, nativeUnsupported("messages")
 		}
 	}
@@ -59,6 +56,15 @@ func prepareAnthropicUpstream(ctx *schemas.BifrostContext, t routing.Target, r r
 		return nil, routing.Fail("internal_error", "cannot prepare generation request")
 	}
 	in.Provider = schemas.Anthropic
+	// Chat clients replay plain thinking as reasoning_content. The SDK's
+	// Anthropic serializer consumes structured details, not the summary field.
+	// Preserve the text without manufacturing a native integrity signature.
+	for i := range in.Input {
+		m := &in.Input[i]
+		if m.ChatAssistantMessage != nil && m.Reasoning != nil && *m.Reasoning != "" {
+			m.ReasoningDetails = []schemas.ChatReasoningDetails{{Type: schemas.BifrostReasoningDetailsTypeText, Text: m.Reasoning}}
+		}
+	}
 	in.Params.ExtraParams = map[string]any{}
 	if in.Params.MaxCompletionTokens == nil {
 		in.Params.MaxCompletionTokens = schemas.Ptr(65536)
@@ -73,20 +79,43 @@ func prepareAnthropicUpstream(ctx *schemas.BifrostContext, t routing.Target, r r
 	if fail != nil {
 		return nil, nativeUnsupported("request conversion")
 	}
-	var wire map[string]any
-	if json.Unmarshal(body, &wire) != nil {
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(body, &fields) != nil {
 		return nil, routing.Fail("internal_error", "invalid prepared generation request")
 	}
+	// The final Chat builder strips unsigned thinking for Claude. Compatible
+	// native providers can require it on replay. Reuse the SDK conversion but
+	// send these checked bytes through its public passthrough transport.
+	hasReasoning := false
+	for _, m := range r.Messages {
+		hasReasoning = hasReasoning || (m.ReasoningContent != nil && *m.ReasoningContent != "")
+	}
+	if hasReasoning {
+		native, err := anthropic.ToAnthropicChatRequest(ctx, in)
+		if err != nil {
+			return nil, nativeUnsupported("messages")
+		}
+		messages, err := json.Marshal(native.Messages)
+		if err != nil {
+			return nil, nativeUnsupported("messages")
+		}
+		fields["messages"] = messages
+		body, err = json.Marshal(fields)
+		if err != nil {
+			return nil, routing.Fail("internal_error", "invalid prepared generation request")
+		}
+	}
+	wire, _ := decoded(body).(map[string]any)
 	if e = checkNativeWire(r, wire, thinking, effort); e != nil {
 		return nil, e
 	}
+	in.RawRequestBody = body
 	return in, nil
 }
-func decoded(raw json.RawMessage) any { var v any; json.Unmarshal(raw, &v); return v }
 func checkNativeWire(r routing.Request, w map[string]any, thinking, effort string) error {
-	limit := float64(65536)
+	limit := json.Number("65536")
 	if v := r.Options["max_completion_tokens"]; v != nil {
-		limit = decoded(v).(float64)
+		limit = decoded(v).(json.Number)
 	}
 	if w["max_tokens"] != limit {
 		return nativeUnsupported("max_completion_tokens")
@@ -212,6 +241,9 @@ func checkNativeMessages(r routing.Request, w map[string]any) error {
 			expected = append(expected, atom("user", map[string]any{"type": "tool_result", "tool_use_id": m.ToolCallID, "content": decoded(m.Content)}))
 			continue
 		}
+		if m.ReasoningContent != nil && *m.ReasoningContent != "" {
+			expected = append(expected, atom(m.Role, map[string]any{"type": "thinking", "thinking": *m.ReasoningContent}))
+		}
 		content := decoded(m.Content)
 		if text, ok := content.(string); ok && text != "" {
 			expected = append(expected, atom(m.Role, map[string]any{"type": "text", "text": text}))
@@ -243,8 +275,8 @@ func checkNativeMessages(r routing.Request, w map[string]any) error {
 			}
 		}
 		for _, c := range m.ToolCalls {
-			var args map[string]any
-			if json.Unmarshal([]byte(c.Function.Arguments), &args) != nil || args == nil {
+			args, _ := decoded([]byte(c.Function.Arguments)).(map[string]any)
+			if args == nil {
 				return nativeUnsupported("messages.tool_calls.arguments")
 			}
 			expected = append(expected, atom(m.Role, map[string]any{"type": "tool_use", "id": c.ID, "name": c.Function.Name, "input": args}))

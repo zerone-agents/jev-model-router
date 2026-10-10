@@ -33,17 +33,14 @@ func nativeChatHandler(t *testing.T) http.Handler {
 			blocks = []map[string]any{{"type": "tool_use", "id": "c1", "name": "lookup", "input": map[string]any{"q": "value"}}}
 			stop = "tool_use"
 		}
-		if len(tools) > 0 {
-			thinking, _ := b["thinking"].(map[string]any)
-			if thinking["type"] != "disabled" {
-				t.Error("tool thinking not disabled")
-			}
-		}
 		if history && !strings.Contains(string(raw), "tool-result-value") {
 			t.Error("tool result lost")
 		}
-		if thinking, ok := b["thinking"].(map[string]any); ok && thinking["type"] == "adaptive" {
-			blocks = append([]map[string]any{{"type": "thinking", "thinking": "thought", "signature": "sig"}}, blocks...)
+		if thinking, _ := b["thinking"].(map[string]any); thinking["type"] != "disabled" {
+			if history && !strings.Contains(string(raw), `"thinking":"thought"`) {
+				t.Error("thinking history lost")
+			}
+			blocks = append([]map[string]any{{"type": "thinking", "thinking": "thought"}}, blocks...)
 		}
 		if b["stream"] != true {
 			w.Header().Set("Content-Type", "application/json")
