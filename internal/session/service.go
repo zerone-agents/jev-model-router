@@ -122,3 +122,11 @@ func (s *Service) Logout(ctx context.Context, origin, token, csrf string) error 
 	h, _ := tokenHash(token)
 	return s.store.DeleteSession(ctx, h, s.generation)
 }
+
+// Identity validates a session before exposing its irreversible internal ID.
+func (s *Service) Identity(ctx context.Context, origin, token string) (string, error) {
+	if _, err := s.Status(ctx, origin, token); err != nil {
+		return "", err
+	}
+	return tokenHash(token)
+}

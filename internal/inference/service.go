@@ -72,3 +72,15 @@ func (r *Request) Finish(err error) {
 	}
 	r.service.Recorder.Save(r.record)
 }
+
+type RouteMetadata struct {
+	RequestID      string `json:"request_id"`
+	ModelID        string `json:"model_id"`
+	Path           string `json:"path"`
+	ConfigVersion  int64  `json:"config_version"`
+	DecisionMillis int64  `json:"decision_ms"`
+}
+
+func (r *Request) Metadata() RouteMetadata {
+	return RouteMetadata{RequestID: r.record.RequestID, ModelID: r.record.ModelID, Path: r.record.Path, ConfigVersion: r.record.ConfigVersion, DecisionMillis: r.record.DecisionMillis}
+}
