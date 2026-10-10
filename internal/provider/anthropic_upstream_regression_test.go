@@ -86,6 +86,13 @@ func TestNativeRegressionSSEErrorMapping(t *testing.T) {
 				if !errors.As(err, &got) {
 					t.Fatalf("expected upstream error, got %v", err)
 				}
+				wantCode := tc.typ
+				if tc.typ == "unknown_error" {
+					wantCode = ""
+				}
+				if d := routing.Diagnose(err); d.UpstreamCode != wantCode {
+					t.Fatalf("reported code: %+v", d)
+				}
 				actual, _ := json.Marshal(got.Body)
 				expected, _ := json.Marshal(want.Body)
 				if got.Status != want.Status || string(actual) != string(expected) {

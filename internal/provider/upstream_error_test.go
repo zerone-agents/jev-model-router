@@ -33,6 +33,9 @@ func TestProviderErrorDetails(t *testing.T) {
 		if !errors.As(err, &upstream) || upstream.Status != 429 || upstream.Body["message"] != "quota exceeded" {
 			t.Fatalf("stream=%v error=%#v", streaming, err)
 		}
+		if d := routing.Diagnose(err); d.UpstreamCode != "rate_limit_error" {
+			t.Fatalf("reported code: %+v", d)
+		}
 		server.Close()
 	}
 }

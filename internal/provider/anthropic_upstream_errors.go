@@ -76,7 +76,9 @@ func nativeEventError(typ string) error {
 	case "overloaded_error":
 		status = 529
 	}
-	return nativeError(status)
+	err := nativeError(status).(*routing.UpstreamError)
+	err.ReportedCode = routing.ReportedErrorCode(map[string]any{"type": typ})
+	return err
 }
 
 // Inspect only recognized codes in the actual envelope, never SDK messages.
@@ -100,9 +102,6 @@ func nativeReportedError(status int, raw any) error {
 	if json.Unmarshal(b, &envelope) != nil {
 		return err
 	}
-	d := routing.Diagnose(&routing.UpstreamError{Status: status, Body: envelope.Error})
-	if d.UpstreamCode != "" {
-		err.Body["code"] = d.UpstreamCode
-	}
+	err.ReportedCode = routing.ReportedErrorCode(envelope.Error)
 	return err
 }

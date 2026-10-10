@@ -270,7 +270,7 @@ func TestPlaygroundFailurePathsRelease(t *testing.T) {
 func TestPlaygroundFailureRetainsSelectedModel(t *testing.T) {
 	for _, late := range []bool{false, true} {
 		t.Run(fmt.Sprint(late), func(t *testing.T) {
-			failure := &routing.UpstreamError{Status: 429, Body: map[string]any{"message": "SECRET", "code": "insufficient_quota"}}
+			failure := &routing.UpstreamError{Status: 429, ReportedCode: "insufficient_quota", Body: map[string]any{"message": "SECRET", "code": "insufficient_quota"}}
 			var w *httptest.ResponseRecorder
 			g := &pgGenerator{t: t, stream: func(context.Context) (routing.EventStream, error) {
 				// Planning must be visible even while upstream has not responded.
@@ -312,7 +312,7 @@ func TestPlaygroundFailureRetainsSelectedModel(t *testing.T) {
 }
 
 func TestPublicAndPlaygroundDiagnosticParity(t *testing.T) {
-	err := &routing.UpstreamError{Status: 401, Body: map[string]any{"message": "provider supplied", "code": "invalid_api_key"}}
+	err := &routing.UpstreamError{Status: 401, ReportedCode: "invalid_api_key", Body: map[string]any{"message": "provider supplied", "code": "invalid_api_key"}}
 	public := errorBody(err)["error"].(map[string]any)["diagnostic"].(routing.Diagnostic)
 	pg := playgroundDiagnostic(err, "request", "generation")
 	if public != pg.Diagnostic {

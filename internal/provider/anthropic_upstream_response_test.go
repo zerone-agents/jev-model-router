@@ -80,6 +80,9 @@ func TestAnthropicUpstreamSafeErrors(t *testing.T) {
 				if !errors.As(e, &up) || up.Status != tc.want {
 					t.Fatalf("stream=%v error %#v", streaming, e)
 				}
+				if d := routing.Diagnose(e); d.UpstreamCode != "" {
+					t.Fatalf("unrecognized code exposed: %+v", d)
+				}
 				b, _ := json.Marshal(up.Body)
 				if strings.Contains(string(b), "secret") || strings.Contains(string(b), "SECRET") {
 					t.Fatalf("unsafe error %s", b)
@@ -100,5 +103,29 @@ func TestNativeReportedErrorCodes(t *testing.T) {
 		if code != "SECRET" && d.UpstreamCode != code {
 			t.Fatal(d)
 		}
+	}
+}
+
+func TestNativeDiagnosticCodeProvenance(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"status only", nativeError(429), ""},
+		{"HTTP without code", nativeReportedError(429, `{"error":{"message":"limited"}}`), ""},
+		{"HTTP unknown code", nativeReportedError(429, `{"error":{"code":"secret-unknown"}}`), ""},
+		{"SSE rate limit", nativeEventError("rate_limit_error"), "rate_limit_error"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := routing.Diagnose(tc.err)
+			if d.Code != "upstream_rate_limit" || d.UpstreamCode != tc.want {
+				t.Fatalf("got %+v, want upstream_code %q", d, tc.want)
+			}
+			b, _ := json.Marshal(d)
+			if tc.want == "" && strings.Contains(string(b), "upstream_code") {
+				t.Fatal(string(b))
+			}
+		})
 	}
 }

@@ -253,7 +253,7 @@ func providerError(ctx context.Context, fail *schemas.BifrostError) error {
 			body[key] = text
 		}
 	}
-	return &routing.UpstreamError{Status: status, Body: body}
+	return &routing.UpstreamError{Status: status, Body: body, ReportedCode: routing.ReportedErrorCode(body)}
 }
 
 func safeError(ctx context.Context) error {

@@ -39,27 +39,18 @@ func Diagnose(err error) Diagnostic {
 		case 499:
 			d.Code, d.Message = "cancelled", "Request cancelled"
 		}
-		for _, field := range []string{"code", "type"} {
-			v := up.Body[field]
-			value, _ := v.(string)
-			if ptr, ok := v.(*string); ok && ptr != nil {
-				value = *ptr
-			}
-			switch value {
-			case "insufficient_quota", "billing_error":
-				d.Code, d.Message = "upstream_quota", "Provider billing or quota limit reached"
-			case "content_filter", "content_policy_violation":
-				d.Code, d.Message = "upstream_content_rejected", "Provider rejected the content"
-			case "authentication_error", "invalid_api_key":
-				d.Code, d.Message = "upstream_authentication", "Provider authentication failed"
-			case "rate_limit_error", "rate_limit_exceeded":
-				d.Code, d.Message = "upstream_rate_limit", "Provider rate limit reached"
-			default:
-				continue
-			}
-			d.UpstreamCode = value
-			break
+		value := ReportedErrorCode(map[string]any{"code": up.ReportedCode})
+		switch value {
+		case "insufficient_quota", "billing_error":
+			d.Code, d.Message = "upstream_quota", "Provider billing or quota limit reached"
+		case "content_filter", "content_policy_violation":
+			d.Code, d.Message = "upstream_content_rejected", "Provider rejected the content"
+		case "authentication_error", "invalid_api_key":
+			d.Code, d.Message = "upstream_authentication", "Provider authentication failed"
+		case "rate_limit_error", "rate_limit_exceeded":
+			d.Code, d.Message = "upstream_rate_limit", "Provider rate limit reached"
 		}
+		d.UpstreamCode = value
 		return d
 	}
 	var known *Error
@@ -68,4 +59,24 @@ func Diagnose(err error) Diagnostic {
 		d.Message = "Request failed (" + known.Code + ")"
 	}
 	return d
+}
+
+// ReportedErrorCode selects only recognized values from a real upstream error.
+// Never pass locally synthesized protocol error bodies to this function.
+func ReportedErrorCode(body map[string]any) string {
+	for _, field := range []string{"code", "type"} {
+		v := body[field]
+		value, _ := v.(string)
+		if ptr, ok := v.(*string); ok && ptr != nil {
+			value = *ptr
+		}
+		switch value {
+		case "insufficient_quota", "billing_error", "content_filter", "content_policy_violation",
+			"authentication_error", "invalid_api_key", "rate_limit_error", "rate_limit_exceeded",
+			"invalid_request_error", "permission_error", "not_found_error", "conflict_error",
+			"request_too_large", "api_error", "timeout_error", "overloaded_error":
+			return value
+		}
+	}
+	return ""
 }

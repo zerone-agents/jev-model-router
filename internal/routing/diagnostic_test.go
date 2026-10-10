@@ -20,7 +20,7 @@ func TestDiagnosticSafeClassification(t *testing.T) {
 		}
 	}
 	code := "insufficient_quota"
-	d := Diagnose(&UpstreamError{Status: 429, Body: map[string]any{"code": &code}})
+	d := Diagnose(&UpstreamError{Status: 429, ReportedCode: ReportedErrorCode(map[string]any{"code": &code}), Body: map[string]any{"code": "local"}})
 	if d.Code != "upstream_quota" || d.UpstreamCode != code {
 		t.Fatal(d)
 	}
