@@ -30,6 +30,8 @@ export function Playground({ client, lang, onError }: PageProps) {
     [models, setModels] = useState<string[]>([]),
     [prompt, setPrompt] = useState("");
   const lifetime = useRef(new AbortController());
+  const [modelsError, setModelsError] = useState<unknown>();
+  const [modelsLoading, setModelsLoading] = useState(false);
   const [statusError, setStatusError] = useState<unknown>();
   const [statusLoading, setStatusLoading] = useState(false);
   const [sentBytes, setSentBytes] = useState<number | null>(null);
@@ -68,12 +70,11 @@ export function Playground({ client, lang, onError }: PageProps) {
     },
     [client, onError],
   );
-  useEffect(() => {
-    mounted.current = true;
-    const abort = new AbortController();
-    lifetime.current = abort;
-    void refresh(abort.signal);
-    void (async () => {
+  const refreshModels = useCallback(
+    async (owner: AbortSignal) => {
+      if (owner.aborted) return;
+      setModelsLoading(true);
+      setModelsError(undefined);
       let cursor = "",
         all: string[] = [];
       const seen = new Set<string>();
@@ -85,7 +86,7 @@ export function Playground({ client, lang, onError }: PageProps) {
           }>(
             "models.list",
             { input: { limit: 200, ...(cursor ? { cursor } : {}) } },
-            abort.signal,
+            owner,
           );
           all = all.concat(
             r.data.items.filter((m) => m.enabled).map((m) => m.id),
@@ -94,13 +95,24 @@ export function Playground({ client, lang, onError }: PageProps) {
           if (seen.has(cursor)) throw new APIError("invalid_response");
           seen.add(cursor);
         } while (cursor);
-        if (!abort.signal.aborted) setModels(all);
+        if (!owner.aborted) setModels(all);
       } catch (e) {
-        if (!abort.signal.aborted) {
+        if (!owner.aborted) {
+          setModelsError(e);
           onError(e);
         }
+      } finally {
+        if (!owner.aborted) setModelsLoading(false);
       }
-    })();
+    },
+    [client, onError],
+  );
+  useEffect(() => {
+    mounted.current = true;
+    const abort = new AbortController();
+    lifetime.current = abort;
+    void refresh(abort.signal);
+    void refreshModels(abort.signal);
     return () => {
       mounted.current = false;
       abort.abort();
@@ -108,7 +120,7 @@ export function Playground({ client, lang, onError }: PageProps) {
       current.current = null;
       sequence.current++;
     };
-  }, [client, onError, refresh]);
+  }, [client, onError, refresh, refreshModels]);
   useEffect(() => {
     if (until <= Date.now()) return;
     const timer = setInterval(() => setNow(Date.now()), 250);
@@ -252,6 +264,23 @@ export function Playground({ client, lang, onError }: PageProps) {
               ]}
             />
           </div>
+          {modelsLoading && (
+            <p role="status">
+              {text(lang, "Loading models…", "正在读取模型…")}
+            </p>
+          )}
+          {modelsError != null && (
+            <div>
+              <ErrorBox error={modelsError} lang={lang} />
+              <button
+                type="button"
+                disabled={modelsLoading}
+                onClick={() => void refreshModels(lifetime.current.signal)}
+              >
+                {text(lang, "Retry models", "重试读取模型")}
+              </button>
+            </div>
+          )}
           <div
             className="pg-transcript"
             ref={transcript}

@@ -101,3 +101,78 @@ it("recovers from initial limits timeout and completes a routed response", async
   await user.type(input, "a");
   expect(screen.getByText("36 / 32,768 bytes")).toBeInTheDocument();
 });
+
+it.each(["server", "network"])(
+  "retries model loading after %s failure",
+  async (failure) => {
+    let attempts = 0;
+    const fetcher = vi.fn(async (path: RequestInfo | URL) => {
+      if (String(path).endsWith("models.list")) {
+        if (++attempts === 1) {
+          if (failure === "network") throw new TypeError("Network failed");
+          return new Response(
+            JSON.stringify({
+              ok: false,
+              error: { code: "internal_error", message: "failed" },
+            }),
+            { status: 500 },
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            data: {
+              items: [{ id: "recovered-model", enabled: true }],
+              next_cursor: "",
+            },
+            meta: {},
+          }),
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          enabled: true,
+          limits: {
+            input_bytes: 32768,
+            max_messages: 100,
+            output_tokens: 4096,
+            daily_requests: 200,
+            session_rpm: 6,
+            instance_rpm: 20,
+          },
+          timeout_seconds: 120,
+          quota: {
+            day_remaining: 200,
+            session_remaining: 6,
+            instance_remaining: 20,
+            reset_at: "2030-01-01T00:00:00Z",
+          },
+        }),
+      );
+    });
+    render(
+      <Playground
+        client={createManagementClient("csrf", fetcher)}
+        lang="en"
+        onError={() => {}}
+      />,
+    );
+    const retry = await screen.findByRole("button", { name: "Retry models" });
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "Message" }), {
+      target: { value: "keep draft" },
+    });
+    fireEvent.click(retry);
+    await screen.findByRole("button", { name: "Model" });
+    await userEvent.click(screen.getByRole("button", { name: "Model" }));
+    expect(
+      await screen.findByRole("menuitemradio", { name: "recovered-model" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Retry models" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue(
+      "keep draft",
+    );
+  },
+);
