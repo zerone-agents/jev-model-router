@@ -71,8 +71,12 @@ it("defaults to auto and renders a completed routed response", async () => {
   expect(
     fetcher.mock.calls.filter(([path]) => String(path).endsWith("completions")),
   ).toHaveLength(0);
+  expect(screen.getByText("11 / 32,768 bytes")).toBeInTheDocument();
   await user.keyboard("{Enter}");
   expect(await screen.findByText("Hello there")).toBeInTheDocument();
   expect(screen.queryByText("hidden-secret")).not.toBeInTheDocument();
   expect(screen.queryByText("Completed")).not.toBeInTheDocument();
+  expect(screen.getByText("11 / 32,768 bytes")).toBeInTheDocument();
+  await user.type(input, "a");
+  expect(screen.getByText("36 / 32,768 bytes")).toBeInTheDocument();
 });

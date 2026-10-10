@@ -29,6 +29,7 @@ export function Playground({ client, lang, onError }: PageProps) {
   const [model, setModel] = useState("auto"),
     [models, setModels] = useState<string[]>([]),
     [prompt, setPrompt] = useState("");
+  const [sentBytes, setSentBytes] = useState<number | null>(null);
   const [status, setStatus] = useState<PlaygroundStatus>(),
     [error, setError] = useState<unknown>(),
     [until, setUntil] = useState(0),
@@ -122,6 +123,7 @@ export function Playground({ client, lang, onError }: PageProps) {
     stop();
     sequence.current++;
     dispatch({ type: "reset" });
+    setSentBytes(null);
     setPrompt("");
     setError(undefined);
   };
@@ -138,6 +140,7 @@ export function Playground({ client, lang, onError }: PageProps) {
       abort = new AbortController(),
       input = prompt;
     current.current = abort;
+    setSentBytes(bytes);
     setPrompt("");
     setError(undefined);
     setDayLimited(false);
@@ -312,7 +315,10 @@ export function Playground({ client, lang, onError }: PageProps) {
             <textarea
               id="pg-message"
               value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
+              onChange={(e) => {
+                setSentBytes(null);
+                setPrompt(e.target.value);
+              }}
               onKeyDown={(e) => {
                 if (
                   e.key === "Enter" &&
@@ -340,7 +346,7 @@ export function Playground({ client, lang, onError }: PageProps) {
                 </p>
                 <small className={tooLarge ? "pg-danger" : "muted"}>
                   {status
-                    ? `${bytes.toLocaleString()} / ${status.limits.input_bytes.toLocaleString()} bytes`
+                    ? `${(sentBytes ?? bytes).toLocaleString()} / ${status.limits.input_bytes.toLocaleString()} bytes`
                     : text(lang, "Loading limits…", "正在读取限额…")}
                 </small>
               </div>
