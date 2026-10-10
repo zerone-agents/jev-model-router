@@ -242,6 +242,26 @@
           },
           "retryable": {
             "type": "boolean"
+          },
+          "stage": {
+            "enum": [
+              "request",
+              "routing",
+              "generation"
+            ]
+          },
+          "request_id": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "upstream_status": {
+            "type": "integer",
+            "minimum": 400,
+            "maximum": 599
+          },
+          "upstream_code": {
+            "type": "string",
+            "maxLength": 128
           }
         },
         "required": [
@@ -250,7 +270,8 @@
         ]
       }
     },
-    "terminal": "Exactly one done or error; EOF without terminal is interrupted."
+    "terminal": "Exactly one done or error; EOF without terminal is interrupted.",
+    "route_timing": "Route is flushed immediately after successful planning, before provider invocation. Subsequent failures are error events, including failures before the first content delta."
   },
   "errors": {
     "playground_rate_limited": {
@@ -268,5 +289,39 @@
     "request_too_large": {
       "http_status": 413
     }
+  },
+  "error_diagnostics": {
+    "fields": {
+      "code": {
+        "type": "string"
+      },
+      "message": {
+        "type": "string"
+      },
+      "retryable": {
+        "type": "boolean"
+      },
+      "stage": {
+        "enum": [
+          "request",
+          "routing",
+          "generation"
+        ]
+      },
+      "request_id": {
+        "type": "string",
+        "maxLength": 128
+      },
+      "upstream_status": {
+        "type": "integer",
+        "minimum": 400,
+        "maximum": 599
+      },
+      "upstream_code": {
+        "type": "string",
+        "maxLength": 128
+      }
+    },
+    "policy": "Optional diagnostic fields apply to JSON errors and SSE error events. Summaries are local fixed text; only recognized upstream codes are exposed, never raw provider messages."
   }
 }

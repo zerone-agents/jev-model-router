@@ -7,6 +7,45 @@ export function replyErrorText(
   scope: string | undefined,
   lang: Lang,
 ) {
+  const upstream: Record<string, [string, string]> = {
+    upstream_authentication: [
+      "Provider authentication failed. Check the provider API key.",
+      "供应商认证失败，请检查供应商 API Key。",
+    ],
+    upstream_permission: [
+      "Provider denied access. Check model permissions.",
+      "供应商拒绝访问，请检查模型权限。",
+    ],
+    upstream_quota: [
+      "Provider billing or quota limit reached.",
+      "供应商余额不足或额度已用尽。",
+    ],
+    upstream_rate_limit: [
+      "Provider rate limit reached. Try again later.",
+      "供应商请求限流，请稍后重试。",
+    ],
+    upstream_invalid_request: [
+      "Provider rejected the request. Check model and protocol compatibility.",
+      "供应商拒绝请求，请检查模型与协议兼容性。",
+    ],
+    upstream_content_rejected: [
+      "Provider rejected the content.",
+      "供应商拒绝了请求内容。",
+    ],
+    upstream_not_found: [
+      "Provider model or endpoint unavailable.",
+      "供应商模型或接口不存在。",
+    ],
+    upstream_unavailable: [
+      "Provider service unavailable. Try again later.",
+      "供应商服务暂不可用，请稍后重试。",
+    ],
+    upstream_error: [
+      "Upstream request failed. Use the request ID to locate the failure.",
+      "上游调用失败，请使用请求 ID 定位。",
+    ],
+  };
+  if (upstream[code]) return text(lang, ...upstream[code]);
   if (code === "no_candidates")
     return text(
       lang,

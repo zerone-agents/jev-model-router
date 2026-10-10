@@ -30,6 +30,7 @@ func decodeChatRequest(body io.Reader) (routing.Request, error) {
 }
 
 type chatOutput struct {
+	planned  func(routing.Plan) error
 	complete func(routing.Completion, routing.Plan) error
 	stream   func(context.Context, routing.EventStream, routing.Plan) error
 }
@@ -42,6 +43,11 @@ func executeChat(ctx context.Context, execution *inference.Request, executor *ro
 	plan, err := execution.Plan(req, nil)
 	if err != nil {
 		return contextError(ctx, err)
+	}
+	if output.planned != nil {
+		if err := output.planned(plan); err != nil {
+			return err
+		}
 	}
 	if !req.Stream {
 		callCtx, cancel := context.WithTimeout(ctx, firstTimeout)

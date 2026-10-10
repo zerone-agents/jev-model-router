@@ -11,24 +11,10 @@ import (
 )
 
 func writePlaygroundStream(ctx context.Context, w http.ResponseWriter, s routing.EventStream, route inference.RouteMetadata) error {
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("X-Accel-Buffering", "no")
-	send := func(name string, value any) error {
-		b, e := json.Marshal(value)
-		if e != nil {
-			return e
-		}
-		if _, e = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", name, b); e != nil {
-			return e
-		}
-		return http.NewResponseController(w).Flush()
-	}
-	if e := send("route", route); e != nil {
-		return e
-	}
+	send := func(name string, value any) error { return sendPlaygroundEvent(w, name, value) }
 	finish := ""
 	var usage *routing.Usage
-	fail := func(e error) error { send("error", playgroundFailure(e)); return e }
+	fail := func(e error) error { send("error", playgroundDiagnostic(e, route.RequestID, "generation")); return e }
 	for {
 		event, e := s.Next(ctx)
 		e = contextError(ctx, e)
@@ -87,4 +73,27 @@ func writePlaygroundStream(ctx context.Context, w http.ResponseWriter, s routing
 			}
 		}
 	}
+}
+
+func sendPlaygroundEvent(w http.ResponseWriter, name string, value any) error {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("X-Accel-Buffering", "no")
+	b, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	if _, err = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", name, b); err != nil {
+		return err
+	}
+	return http.NewResponseController(w).Flush()
+}
+
+type playgroundDiagnosticBody struct {
+	routing.Diagnostic
+	RequestID string `json:"request_id"`
+	Stage     string `json:"stage"`
+}
+
+func playgroundDiagnostic(e error, id, stage string) playgroundDiagnosticBody {
+	return playgroundDiagnosticBody{routing.Diagnose(e), id, stage}
 }

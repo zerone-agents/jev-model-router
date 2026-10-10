@@ -192,6 +192,7 @@ export function Playground({ client, lang, onError }: PageProps) {
           id,
           errorCode: e instanceof APIError ? e.code : "internal_error",
           limitScope: e instanceof PlaygroundError ? e.scope : undefined,
+          diagnostic: e instanceof PlaygroundError ? e.diagnostic : undefined,
         });
         if (!abort.signal.aborted) {
           onError(e);
@@ -325,6 +326,28 @@ export function Playground({ client, lang, onError }: PageProps) {
                       {t.errorCode
                         ? replyErrorText(t.errorCode, t.limitScope, lang)
                         : label(t.phase)}
+                      {t.diagnostic?.stage && (
+                        <div>
+                          {text(lang, "Stage", "失败阶段")}:{" "}
+                          {t.diagnostic.stage === "generation"
+                            ? text(lang, "Generation", "生成")
+                            : t.diagnostic.stage === "routing"
+                              ? text(lang, "Routing", "选模")
+                              : text(lang, "Request", "请求")}
+                        </div>
+                      )}
+                      {t.diagnostic?.upstream_status && (
+                        <div>HTTP {t.diagnostic.upstream_status}</div>
+                      )}
+                      {t.diagnostic?.upstream_code && (
+                        <div>{t.diagnostic.upstream_code}</div>
+                      )}
+                      {(t.diagnostic?.request_id || t.route?.request_id) && (
+                        <div>
+                          {text(lang, "Request ID", "请求 ID")}:{" "}
+                          {t.diagnostic?.request_id || t.route?.request_id}
+                        </div>
+                      )}
                     </div>
                   )}
                   {t.phase !== "failed" && label(t.phase) && (

@@ -27,7 +27,7 @@ func completeNativePassthrough(ctx *schemas.BifrostContext, client *bifrost.Bifr
 		return routing.Completion{}, nativeError(502)
 	}
 	if out.StatusCode != 200 {
-		return routing.Completion{}, nativeError(out.StatusCode)
+		return routing.Completion{}, nativeReportedError(out.StatusCode, out.Body)
 	}
 	var native anthropic.AnthropicMessageResponse
 	if json.Unmarshal(out.Body, &native) != nil {
@@ -64,7 +64,7 @@ func (r *nativeTransportReader) fill() error {
 				return nativeError(502)
 			}
 			if out.StatusCode != 200 {
-				return nativeError(out.StatusCode)
+				return nativeReportedError(out.StatusCode, out.Body)
 			}
 			r.pending = out.Body
 		}

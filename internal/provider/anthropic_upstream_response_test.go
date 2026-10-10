@@ -53,7 +53,7 @@ func TestAnthropicUpstreamUsage(t *testing.T) {
 	}
 }
 func TestAnthropicUpstreamSafeErrors(t *testing.T) {
-	for _, tc := range []struct{ status, want int }{{400, 400}, {401, 502}, {403, 502}, {404, 404}, {413, 413}, {422, 422}, {429, 429}, {529, 529}, {418, 502}, {503, 503}} {
+	for _, tc := range []struct{ status, want int }{{400, 400}, {401, 401}, {402, 402}, {403, 403}, {409, 409}, {404, 404}, {413, 413}, {422, 422}, {429, 429}, {529, 529}, {418, 502}, {503, 503}} {
 		t.Run(fmt.Sprint(tc.status), func(t *testing.T) {
 			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
@@ -86,5 +86,19 @@ func TestAnthropicUpstreamSafeErrors(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestNativeReportedErrorCodes(t *testing.T) {
+	for _, code := range []string{"insufficient_quota", "content_policy_violation", "SECRET"} {
+		e := nativeReportedError(400, []byte(`{"error":{"code":"`+code+`","message":"SECRET https://internal"}}`))
+		d := routing.Diagnose(e)
+		b, _ := json.Marshal(d)
+		if strings.Contains(string(b), "SECRET") || strings.Contains(string(b), "internal") {
+			t.Fatal(string(b))
+		}
+		if code != "SECRET" && d.UpstreamCode != code {
+			t.Fatal(d)
+		}
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/zerone-agents/jev-model-router/internal/inference"
 	"github.com/zerone-agents/jev-model-router/internal/playground"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
@@ -263,5 +264,61 @@ func TestPlaygroundFailurePathsRelease(t *testing.T) {
 			}
 			lease.Release()
 		})
+	}
+}
+
+func TestPlaygroundFailureRetainsSelectedModel(t *testing.T) {
+	for _, late := range []bool{false, true} {
+		t.Run(fmt.Sprint(late), func(t *testing.T) {
+			failure := &routing.UpstreamError{Status: 429, Body: map[string]any{"message": "SECRET", "code": "insufficient_quota"}}
+			var w *httptest.ResponseRecorder
+			g := &pgGenerator{t: t, stream: func(context.Context) (routing.EventStream, error) {
+				// Planning must be visible even while upstream has not responded.
+				if w == nil || !strings.Contains(w.Body.String(), `"model_id":"external"`) {
+					t.Error("route not flushed before generation")
+				}
+				if !late {
+					return nil, failure
+				}
+				n := 0
+				return &testStream{next: func(context.Context) (routing.Event, error) {
+					n++
+					if n == 1 {
+						return routing.Event{Choices: []routing.Choice{{Index: 0, Delta: &routing.Message{Content: json.RawMessage(`"partial"`)}}}}, nil
+					}
+					return routing.Event{}, failure
+				}}, nil
+			}}
+			h, token, csrf, _ := pgFixture(t, playground.DefaultLimits(), g)
+			// Reuse the session fixture's authenticated request, but retain its recorder
+			// before handler invocation so the upstream can assert flush ordering.
+			req := httptest.NewRequest("POST", "/admin/v1/playground/completions", strings.NewReader(pgInput))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Origin", "http://localhost")
+			req.Host = "localhost"
+			req.Header.Set("X-CSRF-Token", csrf)
+			req.AddCookie(&http.Cookie{Name: "jev_router_session", Value: token})
+			w = httptest.NewRecorder()
+			h.ServeHTTP(w, req)
+			body := w.Body.String()
+			if !strings.Contains(body, "upstream_quota") || !strings.Contains(body, `"upstream_status":429`) || !strings.Contains(body, `"stage":"generation"`) || strings.Contains(body, "SECRET") || strings.Count(body, "event: error") != 1 || strings.Contains(body, "event: done") {
+				t.Fatal(body)
+			}
+			if late && !strings.Contains(body, "partial") {
+				t.Fatal(body)
+			}
+		})
+	}
+}
+
+func TestPublicAndPlaygroundDiagnosticParity(t *testing.T) {
+	err := &routing.UpstreamError{Status: 401, Body: map[string]any{"message": "provider supplied", "code": "invalid_api_key"}}
+	public := errorBody(err)["error"].(map[string]any)["diagnostic"].(routing.Diagnostic)
+	pg := playgroundDiagnostic(err, "request", "generation")
+	if public != pg.Diagnostic {
+		t.Fatalf("public=%+v playground=%+v", public, pg)
+	}
+	if _, ok := err.Body["diagnostic"]; ok {
+		t.Fatal("mutated upstream error")
 	}
 }

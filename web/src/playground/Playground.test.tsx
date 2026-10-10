@@ -176,3 +176,56 @@ it.each(["server", "network"])(
     );
   },
 );
+
+it("shows the selected model and actionable provider failure", async () => {
+  const fetcher = vi.fn(async (path: RequestInfo | URL) => {
+    if (String(path).endsWith("completions"))
+      return new Response(
+        'event: route\ndata: {"model_id":"glm-test","request_id":"req-test","path":"explicit","config_version":1,"decision_ms":2}\n\nevent: error\ndata: {"code":"upstream_authentication","message":"Provider authentication failed","stage":"generation","request_id":"req-test","upstream_status":401}\n\n',
+        { headers: { "Content-Type": "text/event-stream" } },
+      );
+    if (String(path).endsWith("models.list"))
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          data: { items: [], next_cursor: "" },
+          meta: {},
+        }),
+      );
+    return new Response(
+      JSON.stringify({
+        enabled: true,
+        limits: {
+          input_bytes: 32768,
+          max_messages: 100,
+          output_tokens: 4096,
+          daily_requests: 200,
+          session_rpm: 6,
+          instance_rpm: 20,
+        },
+        timeout_seconds: 120,
+        quota: {
+          day_remaining: 200,
+          session_remaining: 6,
+          instance_remaining: 20,
+          reset_at: "2030-01-01T00:00:00Z",
+        },
+      }),
+    );
+  });
+  render(
+    <Playground
+      client={createManagementClient("csrf", fetcher)}
+      lang="en"
+      onError={() => {}}
+    />,
+  );
+  await screen.findByText("0 / 32,768 bytes");
+  await userEvent.type(screen.getByRole("textbox", { name: "Message" }), "hi");
+  await userEvent.click(screen.getByRole("button", { name: "Send" }));
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("Provider authentication failed");
+  expect(alert).toHaveTextContent("HTTP 401");
+  expect(alert).toHaveTextContent("req-test");
+  expect(screen.getAllByText("glm-test").length).toBeGreaterThan(0);
+});

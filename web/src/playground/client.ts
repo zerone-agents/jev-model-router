@@ -16,6 +16,12 @@ export type Route = {
   config_version: number;
   decision_ms: number;
 };
+export type Diagnostic = {
+  stage?: "request" | "routing" | "generation";
+  request_id?: string;
+  upstream_status?: number;
+  upstream_code?: string;
+};
 export type PlaygroundEvent =
   | ({ type: "route" } & Route)
   | { type: "delta"; content?: string; reasoning_content?: string }
@@ -28,7 +34,7 @@ export type PlaygroundEvent =
         total_tokens?: number;
       };
     }
-  | { type: "error"; code: string; message: string };
+  | ({ type: "error"; code: string; message: string } & Diagnostic);
 export type PlaygroundStatus = {
   enabled: boolean;
   limits: {
@@ -53,12 +59,35 @@ export class PlaygroundError extends APIError {
     status = 0,
     public retryAfter = 0,
     public scope = "",
+    public diagnostic: Diagnostic = {},
   ) {
     super(code, status);
   }
 }
 function object(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
+}
+function diagnostic(v: Record<string, unknown>): Diagnostic {
+  if (
+    (v.stage !== undefined &&
+      !["request", "routing", "generation"].includes(String(v.stage))) ||
+    (v.request_id !== undefined &&
+      (typeof v.request_id !== "string" || v.request_id.length > 128)) ||
+    (v.upstream_code !== undefined &&
+      (typeof v.upstream_code !== "string" || v.upstream_code.length > 128)) ||
+    (v.upstream_status !== undefined &&
+      (typeof v.upstream_status !== "number" ||
+        !Number.isInteger(v.upstream_status) ||
+        v.upstream_status < 400 ||
+        v.upstream_status > 599))
+  )
+    throw new APIError("invalid_response");
+  return {
+    stage: v.stage,
+    request_id: v.request_id,
+    upstream_status: v.upstream_status,
+    upstream_code: v.upstream_code,
+  } as Diagnostic;
 }
 function decodeEvent(type: string, data: string): PlaygroundEvent {
   let v: unknown;
@@ -89,7 +118,12 @@ function decodeEvent(type: string, data: string): PlaygroundEvent {
   )
     return { ...v, type } as PlaygroundEvent;
   if (type === "error" && strings(["code", "message"]))
-    return { ...v, type } as PlaygroundEvent;
+    return {
+      type,
+      code: v.code as string,
+      message: v.message as string,
+      ...diagnostic(v),
+    };
   throw new APIError("invalid_response");
 }
 export async function consumePlayground(
@@ -113,6 +147,7 @@ export async function consumePlayground(
       response.status,
       Number.isFinite(retry) ? Math.max(0, retry) : 0,
       typeof b.error.limit_scope === "string" ? b.error.limit_scope : "",
+      diagnostic(b.error),
     );
   }
   if (

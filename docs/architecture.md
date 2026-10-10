@@ -134,6 +134,6 @@ Provider.protocol 区分 openai 与 anthropic，旧配置默认 openai。OpenAI 
 
 ## Playground
 
-Dashboard 的受限文本生成采用独立 Cookie-only 端点，与公开 `/v1/chat/completions` 共用请求解码、规划、上游调用和首事件检查。入口分别保留认证、限额与响应编码；不通过回环 HTTP 调用自身，也不向浏览器暴露 inference 凭证。Playground 仍限制为文本流式输入，新能力需显式开放。两条路径复用 `internal/inference` 的快照、规划与记录以及现有 Executor。`internal/playground` 管理短时原子准入和单进程并发；`internal/state` 保存会话/实例滚动窗口与 UTC 日额度。准入先于模型调用，数据库失败不绕过额度，取消/失败不退款，执行退出才释放并发。
+Dashboard 的受限文本生成采用独立 Cookie-only 端点，与公开 `/v1/chat/completions` 共用请求解码、规划、上游调用和首事件检查。Playground 在规划成功后立即发出 route，公开 Chat 仍等待首个有效事件提交流响应。入口分别保留认证、限额与响应编码；不通过回环 HTTP 调用自身，也不向浏览器暴露 inference 凭证。Playground 仍限制为文本流式输入，新能力需显式开放。两条路径复用 `internal/inference` 的快照、规划与记录以及现有 Executor。`internal/playground` 管理短时原子准入和单进程并发；`internal/state` 保存会话/实例滚动窗口与 UTC 日额度。准入先于模型调用，数据库失败不绕过额度，取消/失败不退款，执行退出才释放并发。
 
 这是 Settings 会话的明确权限扩展：管理员无需 inference 凭证即可通过 Playground 体验生成；普通 Settings Bearer、管理 call 和 /v1 推理认证不变。机器契约发布浏览器专用请求/流式协议，UI 没有隐藏的选模实现。首版输入仅文本，不执行工具。生成正文由 Streamdown 渲染，reasoning 仅驱动“正在思考”提示并按协议保留内存历史，CSP 保持不变。

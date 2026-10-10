@@ -104,6 +104,8 @@ Generation providers accept `protocol: "openai" | "anthropic"`. Omitted protocol
 
 两端点只接受 Dashboard Settings Cookie；GET 需要 X-Jev-Session，POST 需要 JSON、精确 Origin/Host 和绑定会话的 CSRF。任何 Authorization 替代均被拒绝，Cookie 不因此获得 /v1 推理权限。该能力是 Settings 角色的受限浏览器生成例外，Settings Bearer 及通用管理 call 不提供生成。
 
-准入前不调用上游，成功受理后费用/次数不退款，不自动重试或隐式换模。POST 直接复用一次实际推理规划，不能先 route.inspect 再生成。SSE 按 route、delta、done/error 返回，delta 的 content/reasoning_content 分开；仅收到 finish_reason 后正常终止才发 done。EOF 无终态为中断；本端点不宣称 OpenAI SSE 兼容。HTTP 头前错误为 JSON error，流内错误为独立 error 事件；不回显供应商错误体。
+准入前不调用上游，成功受理后费用/次数不退款，不自动重试或隐式换模。POST 直接复用一次实际推理规划，不能先 route.inspect 再生成。选模成功后立即发送 route，不等待上游首个事件；此后的生成失败均通过 SSE error 返回。SSE 按 route、delta、done/error 返回，delta 的 content/reasoning_content 分开；仅收到 finish_reason 后正常终止才发 done。EOF 无终态为中断；本端点不宣称 OpenAI SSE 兼容。HTTP 头前错误为 JSON error，流内错误为独立 error 事件；不回显供应商错误体。
 
 429 返回 playground_rate_limited、limit_scope、retry_after_seconds、可用时 reset_at，并带 Retry-After。实例 UTC 日额度持久化，并发为单进程；配置和全部默认值见 configuration.md。只有真实执行元数据进入路由展示，不产生 Jev 自由文本理由。
+
+Playground JSON/SSE 错误提供 stage（request/routing/generation）、Router request_id，以及可用的 upstream_status 和白名单 upstream_code。摘要由本地固定分类生成，不回显上游自由文本、地址、凭证或请求内容。公开 Chat 错误保留原信封，并在上游 error 中附加同源 diagnostic 分类。
