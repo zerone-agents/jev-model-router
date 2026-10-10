@@ -1,6 +1,7 @@
 package httptransport
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -78,20 +79,17 @@ func (p *playgroundHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	execution := p.inference.Begin(ctx, w.Header().Get("X-Request-ID"))
 	finalErr := routing.Fail("internal_error", "playground execution interrupted")
 	defer func() { execution.Finish(finalErr) }()
-	plan, e := execution.Plan(req, nil)
-	if e != nil {
-		finalErr = contextError(ctx, e)
+	started := false
+	finalErr = executeChat(ctx, execution, p.executor, req, p.limits.Timeout, 0, chatOutput{
+		stream: func(streamCtx context.Context, stream routing.EventStream, _ routing.Plan) error {
+			started = true
+			return writePlaygroundStream(streamCtx, w, stream, execution.Metadata())
+		},
+	})
+	if finalErr != nil && !started {
 		playgroundError(w, finalErr)
-		return
 	}
-	stream, e := p.executor.Stream(ctx, plan, req)
-	if e != nil {
-		finalErr = contextError(ctx, e)
-		playgroundError(w, finalErr)
-		return
-	}
-	defer stream.Close()
-	finalErr = writePlaygroundStream(ctx, w, stream, execution.Metadata())
+
 }
 func (p *playgroundHTTP) parse(w http.ResponseWriter, r *http.Request) (routing.Request, error) {
 	var req routing.Request
@@ -107,7 +105,7 @@ func (p *playgroundHTTP) parse(w http.ResponseWriter, r *http.Request) (routing.
 	if contracts.Validate("playground", b) != nil {
 		return req, routing.Fail("invalid_request", "invalid playground request")
 	}
-	if e = json.Unmarshal(b, &req); e != nil {
+	if req, e = decodeChatRequest(bytes.NewReader(b)); e != nil {
 		return req, routing.Fail("invalid_request", "invalid playground request")
 	}
 	if len(req.Messages) > p.limits.MaxMessages {

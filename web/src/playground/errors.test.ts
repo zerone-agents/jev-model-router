@@ -27,3 +27,10 @@ it("distinguishes minute, daily and concurrency limits in both languages", () =>
     "Playground limit reached",
   );
 });
+
+it("explains model and history incompatibility", () => {
+  for (const code of ["no_candidates", "unsupported_request"]) {
+    expect(replyErrorText(code, undefined, "en")).toContain("history");
+    expect(replyErrorText(code, undefined, "zh")).toContain("历史");
+  }
+});

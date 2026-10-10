@@ -7,6 +7,18 @@ export function replyErrorText(
   scope: string | undefined,
   lang: Lang,
 ) {
+  if (code === "no_candidates")
+    return text(
+      lang,
+      "No enabled model supports this conversation's content or history. Check model capabilities and upstream protocol compatibility.",
+      "没有已启用的模型能够处理此对话的内容或历史，请检查模型能力及上游协议兼容性。",
+    );
+  if (code === "unsupported_request")
+    return text(
+      lang,
+      "The selected model or upstream protocol does not support this request or conversation history.",
+      "所选模型或上游协议不支持此请求或对话历史。",
+    );
   if (code === "playground_rate_limited") {
     const messages: Record<string, [string, string]> = {
       session_minute: [
