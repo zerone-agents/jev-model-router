@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md)
 
 A lightweight model routing gateway for agents. Connect OpenAI Chat Completions or Anthropic Messages clients, select an explicit model or let Jev choose from editable model cards, and manage providers through a CLI and bilingual dashboard.
 
-The current release is [v0.1.17](https://github.com/zerone-agents/jev-model-router/releases/tag/v0.1.17). It runs as a single Go service with SQLite, streams text and tool calls, and supports OpenAI-compatible and native Anthropic generation upstreams within the matrix below. Local Laya, sensitive-session locking, ArbiterOS and PostgreSQL remain planned.
+The current release is [v0.1.18](https://github.com/zerone-agents/jev-model-router/releases/tag/v0.1.18). It runs as a single Go service with SQLite, streams text and tool calls, and supports OpenAI-compatible and native Anthropic generation upstreams within the matrix below. Local Laya, sensitive-session locking, ArbiterOS and PostgreSQL remain planned.
 
 ## Client and upstream support
 

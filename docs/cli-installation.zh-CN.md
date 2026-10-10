@@ -14,7 +14,7 @@
 
 同时下载该版本的 `SHA256SUMS`，解压前核对压缩包 SHA-256。macOS 使用 `shasum -a 256 <压缩包>`，Linux 使用 `sha256sum <压缩包>`，PowerShell 使用 `Get-FileHash <压缩包> -Algorithm SHA256`。校验和用于检查文件完整性，不是代码签名；二进制尚未签名或公证。
 
-例如解压 `jev-router_0.1.17_darwin_arm64.tar.gz`，将其中的 `jev-router` 放入 PATH 目录。Windows 解压 ZIP 后可通过 PowerShell 运行 `jev-router.exe`，或将所在目录加入 PATH。
+例如解压 `jev-router_0.1.18_darwin_arm64.tar.gz`，将其中的 `jev-router` 放入 PATH 目录。Windows 解压 ZIP 后可通过 PowerShell 运行 `jev-router.exe`，或将所在目录加入 PATH。
 
 ```sh
 jev-router --version
@@ -52,7 +52,7 @@ SQLite 和上游密钥留在服务器。本地 CLI 从本地读取 JSON 配置�
 本地打包需要 Go 1.27.0 和 Python 3：
 
 ```sh
-python3 scripts/package-cli.py --source /path/to/tag-checkout --version v0.1.17 --output /tmp/cli-assets
+python3 scripts/package-cli.py --source /path/to/tag-checkout --version v0.1.18 --output /tmp/cli-assets
 ```
 
 输出目录必须为空。CI 校验哈希并运行 Linux amd64 二进制；交叉编译通过不代表所有平台均已完成原生运行验证。
