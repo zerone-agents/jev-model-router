@@ -79,8 +79,8 @@ func prepareAnthropicUpstream(ctx *schemas.BifrostContext, t routing.Target, r r
 	if fail != nil {
 		return nil, nativeUnsupported("request conversion")
 	}
-	var wire map[string]any
-	if json.Unmarshal(body, &wire) != nil {
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(body, &fields) != nil {
 		return nil, routing.Fail("internal_error", "invalid prepared generation request")
 	}
 	// The final Chat builder strips unsigned thinking for Claude. Compatible
@@ -99,22 +99,23 @@ func prepareAnthropicUpstream(ctx *schemas.BifrostContext, t routing.Target, r r
 		if err != nil {
 			return nil, nativeUnsupported("messages")
 		}
-		wire["messages"] = decoded(messages)
+		fields["messages"] = messages
+		body, err = json.Marshal(fields)
+		if err != nil {
+			return nil, routing.Fail("internal_error", "invalid prepared generation request")
+		}
 	}
+	wire, _ := decoded(body).(map[string]any)
 	if e = checkNativeWire(r, wire, thinking, effort); e != nil {
 		return nil, e
 	}
-	in.RawRequestBody, e = json.Marshal(wire)
-	if e != nil {
-		return nil, routing.Fail("internal_error", "invalid prepared generation request")
-	}
+	in.RawRequestBody = body
 	return in, nil
 }
-func decoded(raw json.RawMessage) any { var v any; json.Unmarshal(raw, &v); return v }
 func checkNativeWire(r routing.Request, w map[string]any, thinking, effort string) error {
-	limit := float64(65536)
+	limit := json.Number("65536")
 	if v := r.Options["max_completion_tokens"]; v != nil {
-		limit = decoded(v).(float64)
+		limit = decoded(v).(json.Number)
 	}
 	if w["max_tokens"] != limit {
 		return nativeUnsupported("max_completion_tokens")
@@ -274,8 +275,8 @@ func checkNativeMessages(r routing.Request, w map[string]any) error {
 			}
 		}
 		for _, c := range m.ToolCalls {
-			var args map[string]any
-			if json.Unmarshal([]byte(c.Function.Arguments), &args) != nil || args == nil {
+			args, _ := decoded([]byte(c.Function.Arguments)).(map[string]any)
+			if args == nil {
 				return nativeUnsupported("messages.tool_calls.arguments")
 			}
 			expected = append(expected, atom(m.Role, map[string]any{"type": "tool_use", "id": c.ID, "name": c.Function.Name, "input": args}))
