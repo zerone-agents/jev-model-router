@@ -29,6 +29,9 @@ export function Playground({ client, lang, onError }: PageProps) {
   const [model, setModel] = useState("auto"),
     [models, setModels] = useState<string[]>([]),
     [prompt, setPrompt] = useState("");
+  const lifetime = useRef(new AbortController());
+  const [statusError, setStatusError] = useState<unknown>();
+  const [statusLoading, setStatusLoading] = useState(false);
   const [sentBytes, setSentBytes] = useState<number | null>(null);
   const [status, setStatus] = useState<PlaygroundStatus>(),
     [error, setError] = useState<unknown>(),
@@ -42,15 +45,25 @@ export function Playground({ client, lang, onError }: PageProps) {
   const active = isActive(state.phase),
     wait = Math.max(0, Math.ceil((until - now) / 1000));
   const refresh = useCallback(
-    async (signal: AbortSignal) => {
+    async (owner: AbortSignal) => {
+      if (owner.aborted) return;
+      setStatusLoading(true);
+      setStatusError(undefined);
+      const signal = AbortSignal.any([owner, AbortSignal.timeout(15000)]);
       try {
         const s = await readPlaygroundStatus(client, signal);
-        if (!signal.aborted) setStatus(s);
+        if (!owner.aborted) setStatus(s);
       } catch (e) {
-        if (!signal.aborted) {
-          setError(e);
-          onError(e);
+        if (!owner.aborted) {
+          const failure =
+            signal.reason?.name === "TimeoutError"
+              ? new APIError("timeout")
+              : e;
+          setStatusError(failure);
+          onError(failure);
         }
+      } finally {
+        if (!owner.aborted) setStatusLoading(false);
       }
     },
     [client, onError],
@@ -58,7 +71,8 @@ export function Playground({ client, lang, onError }: PageProps) {
   useEffect(() => {
     mounted.current = true;
     const abort = new AbortController();
-    void refresh(AbortSignal.any([abort.signal, AbortSignal.timeout(15000)]));
+    lifetime.current = abort;
+    void refresh(abort.signal);
     void (async () => {
       let cursor = "",
         all: string[] = [];
@@ -179,7 +193,7 @@ export function Playground({ client, lang, onError }: PageProps) {
     } finally {
       if (mounted.current && id === sequence.current) {
         current.current = null;
-        void refresh(AbortSignal.timeout(15000));
+        void refresh(lifetime.current.signal);
       }
     }
   };
@@ -347,7 +361,9 @@ export function Playground({ client, lang, onError }: PageProps) {
                 <small className={tooLarge ? "pg-danger" : "muted"}>
                   {status
                     ? `${(sentBytes ?? bytes).toLocaleString()} / ${status.limits.input_bytes.toLocaleString()} bytes`
-                    : text(lang, "Loading limits…", "正在读取限额…")}
+                    : statusError != null
+                      ? text(lang, "Limits unavailable", "限额读取失败")
+                      : text(lang, "Loading limits…", "正在读取限额…")}
                 </small>
               </div>
               {active ? (
@@ -385,6 +401,18 @@ export function Playground({ client, lang, onError }: PageProps) {
               "会调用真实模型并可能产生费用。对话仅保存在当前页面，刷新后丢失。",
             )}
           </p>
+          {statusError != null && (
+            <div>
+              <ErrorBox error={statusError} lang={lang} />
+              <button
+                type="button"
+                disabled={statusLoading}
+                onClick={() => void refresh(lifetime.current.signal)}
+              >
+                {text(lang, "Retry limits", "重试读取限额")}
+              </button>
+            </div>
+          )}
           {error != null && <ErrorBox error={error} lang={lang} />}{" "}
           {dayLimited && (
             <p role="status">

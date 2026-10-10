@@ -1,10 +1,15 @@
 import { expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createManagementClient } from "../api";
 import { Playground } from "./Playground";
-it("defaults to auto and renders a completed routed response", async () => {
-  const fetcher = vi.fn(async (path: RequestInfo | URL) =>
+it("recovers from initial limits timeout and completes a routed response", async () => {
+  const timeout = new AbortController();
+  const timeoutSpy = vi
+    .spyOn(AbortSignal, "timeout")
+    .mockReturnValue(timeout.signal);
+  let firstStatus = true;
+  const fetcher = vi.fn(async (path: RequestInfo | URL, init?: RequestInit) =>
     String(path).endsWith("completions")
       ? new Response(
           'event: route\ndata: {"request_id":"r","model_id":"flash","path":"single_candidate","config_version":1,"decision_ms":3}\n\nevent: delta\ndata: {"reasoning_content":"hidden-secret"}\n\nevent: delta\ndata: {"content":"Hello there"}\n\nevent: done\ndata: {"finish_reason":"stop"}\n\n',
@@ -21,26 +26,33 @@ it("defaults to auto and renders a completed routed response", async () => {
               meta: {},
             }),
           )
-        : new Response(
-            JSON.stringify({
-              enabled: true,
-              limits: {
-                input_bytes: 32768,
-                max_messages: 100,
-                output_tokens: 4096,
-                daily_requests: 200,
-                session_rpm: 6,
-                instance_rpm: 20,
-              },
-              timeout_seconds: 120,
-              quota: {
-                day_remaining: 200,
-                session_remaining: 6,
-                instance_remaining: 20,
-                reset_at: "2030-01-01T00:00:00Z",
-              },
-            }),
-          ),
+        : firstStatus
+          ? ((firstStatus = false),
+            new Promise<Response>((_, reject) =>
+              init?.signal?.addEventListener("abort", () =>
+                reject(init.signal?.reason),
+              ),
+            ))
+          : new Response(
+              JSON.stringify({
+                enabled: true,
+                limits: {
+                  input_bytes: 32768,
+                  max_messages: 100,
+                  output_tokens: 4096,
+                  daily_requests: 200,
+                  session_rpm: 6,
+                  instance_rpm: 20,
+                },
+                timeout_seconds: 120,
+                quota: {
+                  day_remaining: 200,
+                  session_remaining: 6,
+                  instance_remaining: 20,
+                  reset_at: "2030-01-01T00:00:00Z",
+                },
+              }),
+            ),
   );
   render(
     <Playground
@@ -49,6 +61,15 @@ it("defaults to auto and renders a completed routed response", async () => {
       onError={() => {}}
     />,
   );
+  await act(async () =>
+    timeout.abort(new DOMException("Timed out", "TimeoutError")),
+  );
+  const retry = await screen.findByRole("button", { name: "Retry limits" });
+  expect(screen.queryByText("Loading limits…")).not.toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent("Request timed out");
+  timeoutSpy.mockRestore();
+  fireEvent.click(retry);
+  await screen.findByText("0 / 32,768 bytes");
   const user = userEvent.setup();
   const picker = await screen.findByRole("button", {
     name: "Model",

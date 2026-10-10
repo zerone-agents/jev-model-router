@@ -58,6 +58,7 @@ export function errorText(e: unknown, lang: Lang) {
       "Input does not match the instance contract.",
       "输入不符合实例契约。",
     ],
+    timeout: ["Request timed out. Please try again.", "请求超时，请重试。"],
     network_error: [
       "No response received. Check the connection.",
       "未收到响应，请检查连接。",
