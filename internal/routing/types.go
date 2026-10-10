@@ -58,6 +58,7 @@ type Model struct {
 	Capabilities Capabilities `json:"capabilities"`
 }
 type DecisionConfig struct {
+	Path      string `json:"path,omitempty"`
 	BaseURL   string `json:"base_url"`
 	Model     string `json:"model"`
 	SecretRef string `json:"secret_ref"`

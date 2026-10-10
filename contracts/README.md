@@ -111,3 +111,7 @@ Generation providers accept `protocol: "openai" | "anthropic"`. Omitted protocol
 Playground JSON/SSE 错误提供 stage（request/routing/generation）、Router request_id，以及可用的 upstream_status 和白名单 upstream_code。摘要由本地固定分类生成，不回显上游自由文本、地址、凭证或请求内容。公开 Chat 错误保留原信封，并在上游 error 中附加同源 diagnostic 分类。
 
 Jev 决策接口失败同样保留真实上游 HTTP 状态和已识别错误码，Playground 标记为 routing；此时不发送选模成功事件，也不调用生成供应商。错误响应最多检查 64 KiB，未知格式或未知码不回显原文；上游响应体读取超时仍归类 timeout。
+
+## Decision endpoint
+
+`decision.put` supports optional `path`, appended to `base_url`; omitted means `/v1/systemone`. DefAPI uses `/api/v1/decisions` and model `typesafe/jev-1.13`. This is a full replacement: omitting a previously configured path restores the default. Authentication remains Bearer via `secret_ref`; request and Choice response schemas remain native Jev. Paths allow slash-separated alphanumeric, hyphen and underscore segments only, without query or fragment.

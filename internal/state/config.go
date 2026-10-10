@@ -218,6 +218,7 @@ func mutate(s *routing.Snapshot, c management.Call) (any, error) {
 			return nil, routing.Fail("not_found", "model not found")
 		}
 	case "decision.put":
+		s.Decision = routing.DecisionConfig{}
 		json.Unmarshal(c.Input, &s.Decision)
 		return s.Decision, nil
 	case "prompt.put":
