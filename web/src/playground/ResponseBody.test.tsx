@@ -20,3 +20,19 @@ it("renders streaming Chinese Markdown and code without active HTML", () => {
   expect(container.querySelector('a[href^="javascript:"]')).toBeNull();
   expect(container.querySelector("strong")).toHaveTextContent("加粗");
 });
+
+it("settles long incomplete Markdown immediately when streaming finishes", () => {
+  const long = Array.from(
+    { length: 80 },
+    (_, i) => `第 ${i} 段：中文内容和 English words。\n\n`,
+  ).join("");
+  const { container, rerender } = render(
+    <ResponseBody content={long + "```txt\nunclosed"} streaming />,
+  );
+  expect(container.textContent).toContain("第 79 段");
+  rerender(
+    <ResponseBody content={long + "```txt\nunclosed\n```"} streaming={false} />,
+  );
+  expect(container.querySelector("code")).toHaveTextContent("unclosed");
+  expect(container.textContent).toContain("第 79 段");
+});

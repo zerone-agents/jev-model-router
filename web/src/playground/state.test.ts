@@ -64,3 +64,34 @@ it("ignores late events and excludes partial pairs from history", () => {
   });
   expect(s.turns).toEqual([]);
 });
+
+it("ignores empty deltas and clears thinking on failures and truncation", () => {
+  let s = reducePlayground(initialState(), {
+    type: "start",
+    id: 9,
+    prompt: "hello",
+  });
+  s = reducePlayground(s, {
+    type: "event",
+    id: 9,
+    event: { type: "delta", content: "", reasoning_content: "" },
+  });
+  expect(s.phase).toBe("waiting");
+  s = reducePlayground(s, {
+    type: "event",
+    id: 9,
+    event: { type: "delta", reasoning_content: "hidden" },
+  });
+  expect(s.phase).toBe("thinking");
+  s = reducePlayground(s, {
+    type: "event",
+    id: 9,
+    event: { type: "done", finish_reason: "length" },
+  });
+  expect(s.phase).toBe("truncated");
+  expect(history(s)).toEqual([]);
+  s = reducePlayground(s, { type: "start", id: 10, prompt: "next" });
+  s = reducePlayground(s, { type: "fail", id: 10 });
+  expect(s.phase).toBe("failed");
+  expect(history(s)).toEqual([]);
+});
