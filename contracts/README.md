@@ -1,6 +1,6 @@
 # 管理能力契约
 
-机器契约在 `management.json` 和 `schemas/` 中，服务端校验与实例能力发现使用同一来源。`GET /admin/v1/schema`、`GET /admin/v1/schema/{capability}` 和 `POST /admin/v1/call/{capability}` 均要求 settings 凭证。UI 复用这些管理能力，提供状态、模型描述、提示词和路由记录的查看，以及描述/提示词编辑。
+机器契约在 `management.json` 和 `schemas/` 中，服务端校验与实例能力发现使用同一来源。`GET /admin/v1/schema`、`GET /admin/v1/schema/{capability}` 和 `POST /admin/v1/call/{capability}` 均要求 settings 凭证。UI 复用这些管理能力，提供状态、模型描述、提示词和路由记录的查看，以及描述/提示词编辑；Playground 使用本文末尾定义的独立 Cookie-only 流式能力。
 
 ## 最小能力集合
 
@@ -64,7 +64,7 @@ call body 为 `{"input":{...},"expected_version":1,"idempotency_key":"operation-
 
 ## Dashboard 会话认证
 
-`schemas/session.json` 是认证端点、有效期、容量、Cookie 和浏览器来源要求的机器契约，随 `call.protocol.session` 发布；认证端点不是配置能力，不消耗版本或幂等键。CLI 保持 Settings Bearer；普通管理请求仅在 Authorization 缺席时接受 Cookie，有效 Cookie 不会覆盖无效 Bearer。推理 API 使用 inference 凭证。Chat 和 models 保持 Bearer；`/v1/messages` 另接受 `x-api-key`，同传时两个凭证必须都有效且属于同一身份/角色，Cookie 不授予推理权限。
+`schemas/session.json` 是认证端点、有效期、容量、Cookie 和浏览器来源要求的机器契约，随 `call.protocol.session` 发布；认证端点不是配置能力，不消耗版本或幂等键。CLI 保持 Settings Bearer；普通管理请求仅在 Authorization 缺席时接受 Cookie，有效 Cookie 不会覆盖无效 Bearer。推理 API 使用 inference 凭证。Chat 和 models 保持 Bearer；`/v1/messages` 另接受 `x-api-key`，同传时两个凭证必须都有效且属于同一身份/角色，Cookie 不授予这些 /v1 端点的推理权限；独立 Playground 例外见下文。
 
 登录用 Settings Bearer 与空 JSON 对象换取 HttpOnly Cookie，返回 expires_at/csrf_token；状态查询恢复 CSRF，注销只撤销请求会话。所有 Cookie POST 校验精确 Origin、JSON 与绑定该会话的 CSRF；GET 要求 X-Jev-Session: 1。响应禁止缓存。只有成功登录写 Cookie，状态、注销和错误均不清 Cookie，避免迟到响应删除另一标签页的新会话。遇到 CSRF 不匹配，显式恢复后重新决定操作，不自动重放。`session_limit` 为 HTTP 429 / CLI 6，retryable=false。
 
