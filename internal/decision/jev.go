@@ -43,7 +43,11 @@ func (j *jev) Choose(ctx context.Context, c routing.DecisionConfig, in routing.D
 	if e != nil {
 		return zero, routing.Fail("config_missing", "decision credential unavailable")
 	}
-	req, e := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(c.BaseURL, "/")+"/v1/systemone", bytes.NewReader(body))
+	path := c.Path
+	if path == "" {
+		path = "/v1/systemone"
+	}
+	req, e := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(c.BaseURL, "/")+path, bytes.NewReader(body))
 	if e != nil {
 		return zero, routing.Fail("config_missing", "invalid decision endpoint")
 	}
