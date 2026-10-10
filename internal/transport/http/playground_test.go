@@ -327,7 +327,7 @@ func TestPublicAndPlaygroundDiagnosticParity(t *testing.T) {
 func TestPlaygroundJevFailureHasRoutingDiagnostics(t *testing.T) {
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(429)
-		w.Write([]byte(`{"error":{"code":"insufficient_quota","message":"SECRET"}}`))
+		w.Write([]byte(`{"error":{"code":"insufficient_quota","message":"password=SECRET"}}`))
 	}))
 	defer up.Close()
 	g := &pgGenerator{t: t}

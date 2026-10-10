@@ -17,6 +17,7 @@ export type Route = {
   decision_ms: number;
 };
 export type Diagnostic = {
+  upstream_error?: { body: unknown; truncated: boolean; request_id?: string };
   stage?: "request" | "routing" | "generation";
   request_id?: string;
   upstream_status?: number;
@@ -69,6 +70,14 @@ function object(v: unknown): v is Record<string, unknown> {
 }
 function diagnostic(v: Record<string, unknown>): Diagnostic {
   if (
+    (v.upstream_error !== undefined &&
+      (!object(v.upstream_error) ||
+        !("body" in v.upstream_error) ||
+        typeof v.upstream_error.truncated !== "boolean" ||
+        (v.upstream_error.request_id !== undefined &&
+          (typeof v.upstream_error.request_id !== "string" ||
+            v.upstream_error.request_id.length > 128)) ||
+        JSON.stringify(v.upstream_error).length > 131072)) ||
     (v.stage !== undefined &&
       !["request", "routing", "generation"].includes(String(v.stage))) ||
     (v.request_id !== undefined &&
@@ -83,6 +92,7 @@ function diagnostic(v: Record<string, unknown>): Diagnostic {
   )
     throw new APIError("invalid_response");
   return {
+    upstream_error: v.upstream_error,
     stage: v.stage,
     request_id: v.request_id,
     upstream_status: v.upstream_status,

@@ -262,6 +262,24 @@
           "upstream_code": {
             "type": "string",
             "maxLength": 128
+          },
+          "upstream_error": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "body": {},
+              "truncated": {
+                "type": "boolean"
+              },
+              "request_id": {
+                "type": "string",
+                "maxLength": 128
+              }
+            },
+            "required": [
+              "body",
+              "truncated"
+            ]
           }
         },
         "required": [
@@ -320,8 +338,26 @@
       "upstream_code": {
         "type": "string",
         "maxLength": 128
+      },
+      "upstream_error": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "body": {},
+          "truncated": {
+            "type": "boolean"
+          },
+          "request_id": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "body",
+          "truncated"
+        ]
       }
     },
-    "policy": "Optional diagnostic fields apply to JSON errors and SSE error events. Summaries are local fixed text; only recognized upstream codes are exposed, never raw provider messages."
+    "policy": "JSON and SSE errors share stable local summaries and optional upstream_error {body, truncated}. Actual upstream JSON (including JSON encoded in detail strings) or plain text is sanitized before exposure. Credentials, authentication fields and structured request echoes are redacted. Input over 64 KiB is omitted; sanitized output over 16 KiB is a truncated text excerpt. HTML is inert text. SDK diagnostics and raw requests are never exposed or persisted."
   }
 }

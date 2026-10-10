@@ -66,7 +66,11 @@ func messagesError(err error, id string) (int, map[string]any) {
 			status, message = 502, "generation or decision provider failed"
 		}
 	}
-	return status, map[string]any{"type": "error", "error": map[string]string{"type": typ, "message": message}, "request_id": id}
+	detail := map[string]any{"type": typ, "message": message}
+	if upstream != nil {
+		detail["diagnostic"] = routing.Diagnose(err)
+	}
+	return status, map[string]any{"type": "error", "error": detail, "request_id": id}
 }
 func writeMessagesError(w http.ResponseWriter, err error, id string) {
 	status, body := messagesError(err, id)

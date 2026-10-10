@@ -17,6 +17,7 @@ const nativeFrameLimit = 1024 * 1024
 // The reader is the sole body consumer. State is shared only with this request's
 // output wrapper; snapshots are taken after the SDK channel has closed.
 type anthropicUpstreamValidation struct {
+	secret            string
 	mu                sync.Mutex
 	terminalVerified  bool
 	failure           error
@@ -165,7 +166,9 @@ func (s *anthropicUpstreamValidation) accept(typ string, raw []byte) error {
 		return nativeError(502)
 	}
 	if typ == "error" {
-		return nativeEventError(event.Error.Type)
+		err := nativeEventError(event.Error.Type).(*routing.UpstreamError)
+		err.Details = routing.SanitizeUpstream(raw, s.secret)
+		return err
 	}
 	if typ == "ping" {
 		return nil

@@ -870,3 +870,18 @@ tr:has(details[open]) .request-summary-text {
 .record-result-error {
   color: #d17f7f;
 }
+
+.pg-upstream-details {
+  margin-top: 0.75rem;
+  min-width: 0;
+}
+.pg-upstream-details summary {
+  cursor: pointer;
+}
+.pg-upstream-details pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 20rem;
+  overflow: auto;
+  font-size: 0.85em;
+}

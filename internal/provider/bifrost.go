@@ -28,17 +28,17 @@ type bifrostGenerator struct {
 func New(resolve func(string) ([]byte, error)) (routing.Generator, error) {
 	return &bifrostGenerator{resolve: resolve, clients: map[[32]byte]*clientEntry{}}, nil
 }
-func (g *bifrostGenerator) acquire(t routing.Target) (*bifrost.Bifrost, func(), error) {
+func (g *bifrostGenerator) acquire(t routing.Target) (*bifrost.Bifrost, func(), string, error) {
 	key, e := g.resolve(t.Provider.SecretRef)
 	if e != nil {
-		return nil, nil, routing.Fail("config_missing", "provider credential unavailable")
+		return nil, nil, "", routing.Fail("config_missing", "provider credential unavailable")
 	}
 	baseURL := strings.TrimRight(t.Provider.BaseURL, "/")
 	identity := sha256.Sum256(append([]byte(string(t.Provider.EffectiveProtocol())+"\x00"+baseURL+"\x00v1:timeout300:concurrency8:retries0\x00"), key...))
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.closed {
-		return nil, nil, routing.Fail("upstream_error", "generation service stopped")
+		return nil, nil, "", routing.Fail("upstream_error", "generation service stopped")
 	}
 	entry := g.clients[identity]
 	if entry == nil {
@@ -52,20 +52,20 @@ func (g *bifrostGenerator) acquire(t routing.Target) (*bifrost.Bifrost, func(), 
 				}
 			}
 			if oldest == nil {
-				return nil, nil, routing.ErrGenerationCapacity
+				return nil, nil, "", routing.ErrGenerationCapacity
 			}
 			delete(g.clients, victim)
 			oldest.client.Shutdown()
 		}
 		c, e := bifrost.Init(context.Background(), schemas.BifrostConfig{Account: fixedAccount{url: baseURL, key: string(key), protocol: t.Provider.EffectiveProtocol()}, Logger: quietLogger{}, InitialPoolSize: 8})
 		if e != nil {
-			return nil, nil, routing.Fail("upstream_error", "generation initialization failed")
+			return nil, nil, "", routing.Fail("upstream_error", "generation initialization failed")
 		}
 		entry = &clientEntry{client: c}
 		g.clients[identity] = entry
 	}
 	entry.active++
-	return entry.client, func() { g.mu.Lock(); entry.active--; entry.last = time.Now(); g.mu.Unlock() }, nil
+	return entry.client, func() { g.mu.Lock(); entry.active--; entry.last = time.Now(); g.mu.Unlock() }, string(key), nil
 }
 func (g *bifrostGenerator) Close() error {
 	g.mu.Lock()
@@ -82,11 +82,12 @@ func (g *bifrostGenerator) Complete(ctx context.Context, t routing.Target, r rou
 	if e := Check(t, r); e != nil {
 		return routing.Completion{}, e
 	}
-	client, release, e := g.acquire(t)
+	client, release, secret, e := g.acquire(t)
 	if e != nil {
 		return routing.Completion{}, e
 	}
 	defer release()
+	ctx = context.WithValue(ctx, upstreamSecretKey{}, secret)
 	bc := schemas.NewBifrostContext(ctx, time.Time{})
 	defer bc.Cancel()
 	bc.SetValue(schemas.BifrostContextKeyAllowPerRequestRawOverride, true)
@@ -100,7 +101,7 @@ func (g *bifrostGenerator) Complete(ctx context.Context, t routing.Target, r rou
 	}
 	out, fail := client.ChatCompletionRequest(bc, req)
 	if fail != nil {
-		return routing.Completion{}, providerError(ctx, fail)
+		return routing.Completion{}, providerError(bc, fail)
 	}
 	return completion(out)
 }
@@ -108,10 +109,11 @@ func (g *bifrostGenerator) Stream(ctx context.Context, t routing.Target, r routi
 	if e := Check(t, r); e != nil {
 		return nil, e
 	}
-	client, release, e := g.acquire(t)
+	client, release, secret, e := g.acquire(t)
 	if e != nil {
 		return nil, e
 	}
+	ctx = context.WithValue(ctx, upstreamSecretKey{}, secret)
 	bc := schemas.NewBifrostContext(ctx, time.Time{})
 	// Inspect original usage presence: the pinned SDK otherwise invents a zero
 	// aggregate at stream completion. Raw frames stay inside this adapter.
@@ -126,11 +128,13 @@ func (g *bifrostGenerator) Stream(ctx context.Context, t routing.Target, r routi
 	if t.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
 		return streamNativePassthrough(bc, client, req, routing.RequiresTools(r), nativeSignatureOptional(t), release)
 	}
+	captureStreamErrors(bc)
 	ch, fail := client.ChatCompletionStreamRequest(bc, req)
 	if fail != nil {
+		err := providerError(bc, fail)
 		bc.Cancel()
 		release()
-		return nil, providerError(ctx, fail)
+		return nil, err
 	}
 	return &stream{ctx: bc, ch: ch, release: release}, nil
 }
@@ -217,6 +221,15 @@ func completion(in *schemas.BifrostChatResponse) (routing.Completion, error) {
 // Only provider error fields cross the boundary. Do not serialize BifrostError:
 // its diagnostics can include raw requests, credentials and transport details.
 func providerError(ctx context.Context, fail *schemas.BifrostError) error {
+	if ctx.Err() == nil {
+		if captured, ok := ctx.Value(capturedErrorKey{}).(*capturedError); ok {
+			captured.Lock()
+			defer captured.Unlock()
+			if captured.err != nil {
+				return captured.err
+			}
+		}
+	}
 	if ctx.Err() != nil || fail == nil || fail.IsBifrostError || fail.Error == nil {
 		return safeError(ctx)
 	}
@@ -224,36 +237,26 @@ func providerError(ctx context.Context, fail *schemas.BifrostError) error {
 	if fail.StatusCode != nil && *fail.StatusCode >= 400 && *fail.StatusCode <= 599 {
 		status = *fail.StatusCode
 	}
-	// Bifrost also labels synthesized parse/network errors as provider errors.
-	// Verify provenance against the actual JSON envelope, never its diagnostics.
-	raw, err := json.Marshal(fail.ExtraFields.RawResponse)
-	if err != nil {
+	// Only actual failed HTTP response bodies cross this boundary. SDK messages
+	// and raw requests are never used as fallback error details.
+	details := routing.SanitizeUpstream(fail.ExtraFields.RawResponse, upstreamSecret(ctx))
+	if details == nil {
 		return safeError(ctx)
 	}
-	if text, ok := fail.ExtraFields.RawResponse.(string); ok {
-		raw = []byte(text)
-	}
-	var envelope struct {
-		Error map[string]json.RawMessage `json:"error"`
-	}
-	if json.Unmarshal(raw, &envelope) != nil || envelope.Error == nil {
-		return safeError(ctx)
-	}
-	var message string
-	if json.Unmarshal(envelope.Error["message"], &message) != nil || strings.TrimSpace(message) == "" {
-		return safeError(ctx)
-	}
-	body := map[string]any{"message": message, "type": nil, "code": nil, "param": nil}
-	for _, key := range []string{"type", "code", "param"} {
-		if value, ok := envelope.Error[key]; ok {
-			var text *string
-			if json.Unmarshal(value, &text) != nil {
-				return safeError(ctx)
+	addUpstreamRequestID(ctx, details, nil)
+	body := map[string]any{"message": "upstream rejected request", "type": "upstream_error", "code": "upstream_error", "param": nil}
+	reported := ""
+	if envelope, ok := details.Body.(map[string]any); ok {
+		if upstream, ok := envelope["error"].(map[string]any); ok {
+			reported = routing.ReportedErrorCode(upstream)
+			for _, field := range []string{"message", "type", "code", "param"} {
+				if v, ok := upstream[field].(string); ok {
+					body[field] = v
+				}
 			}
-			body[key] = text
 		}
 	}
-	return &routing.UpstreamError{Status: status, Body: body, ReportedCode: routing.ReportedErrorCode(body)}
+	return &routing.UpstreamError{Status: status, Body: body, ReportedCode: reported, Details: details}
 }
 
 func safeError(ctx context.Context) error {
@@ -329,6 +332,29 @@ func hasReportedUsage(raw any) bool {
 		}
 		if frame.Usage != nil {
 			return true
+		}
+	}
+}
+
+// The credential used by this exact client lease remains available until the
+// stream closes, including after a concurrent provider credential rotation.
+type upstreamSecretKey struct{}
+
+func upstreamSecret(ctx context.Context) string {
+	secret, _ := ctx.Value(upstreamSecretKey{}).(string)
+	return secret
+}
+
+func addUpstreamRequestID(ctx context.Context, details *routing.UpstreamDetails, headers map[string]string) {
+	if headers == nil {
+		headers, _ = ctx.Value(schemas.BifrostContextKeyProviderResponseHeaders).(map[string]string)
+	}
+	for _, name := range []string{"request-id", "x-request-id", "cf-ray"} {
+		for key, id := range headers {
+			if strings.EqualFold(key, name) {
+				details.SetRequestID(id, upstreamSecret(ctx))
+				return
+			}
 		}
 	}
 }

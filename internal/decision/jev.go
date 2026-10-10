@@ -66,7 +66,14 @@ func (j *jev) Choose(ctx context.Context, c routing.DecisionConfig, in routing.D
 		if len(b) <= 65536 && json.Unmarshal(b, &envelope) == nil {
 			reported = routing.ReportedErrorCode(envelope.Error)
 		}
-		return zero, &routing.UpstreamError{Status: resp.StatusCode, ReportedCode: reported,
+		details := routing.SanitizeUpstream(b, string(key))
+		for _, header := range []string{"request-id", "x-request-id", "cf-ray"} {
+			if id := resp.Header.Get(header); id != "" {
+				details.SetRequestID(id, string(key))
+				break
+			}
+		}
+		return zero, &routing.UpstreamError{Status: resp.StatusCode, ReportedCode: reported, Details: details,
 			Body: map[string]any{"code": "upstream_error", "type": "upstream_error", "message": "decision upstream rejected request", "param": nil}}
 	}
 	b, e := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
