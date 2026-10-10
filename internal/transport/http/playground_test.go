@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/zerone-agents/jev-model-router/internal/decision"
 	"github.com/zerone-agents/jev-model-router/internal/inference"
 	"github.com/zerone-agents/jev-model-router/internal/playground"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
@@ -320,5 +321,28 @@ func TestPublicAndPlaygroundDiagnosticParity(t *testing.T) {
 	}
 	if _, ok := err.Body["diagnostic"]; ok {
 		t.Fatal("mutated upstream error")
+	}
+}
+
+func TestPlaygroundJevFailureHasRoutingDiagnostics(t *testing.T) {
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(429)
+		w.Write([]byte(`{"error":{"code":"insufficient_quota","message":"SECRET"}}`))
+	}))
+	defer up.Close()
+	g := &pgGenerator{t: t}
+	h, token, csrf, _ := pgFixture(t, playground.DefaultLimits(), g)
+	pg := h.(*playgroundHTTP)
+	snap := snapshot()
+	other := snap.Models[0]
+	other.ID = "second"
+	snap.Models = append(snap.Models, other)
+	snap.Decision = routing.DecisionConfig{BaseURL: up.URL, Model: "jev", SecretRef: "env:TEST"}
+	pg.inference.Store = testStore{snap}
+	pg.inference.Planner = &routing.Planner{Decider: decision.New(up.Client(), func(string) ([]byte, error) { return []byte("key"), nil }, decision.DefaultBudget())}
+	w := sessionRequest(h, "POST", "/admin/v1/playground/completions", pgInput, token, csrf)
+	body := w.Body.String()
+	if g.calls.Load() != 0 || !strings.Contains(body, `"stage":"routing"`) || !strings.Contains(body, `"upstream_status":429`) || !strings.Contains(body, `"upstream_code":"insufficient_quota"`) || !strings.Contains(body, w.Header().Get("X-Request-ID")) || strings.Contains(body, "SECRET") || strings.Contains(body, "event: route") {
+		t.Fatal(body)
 	}
 }
