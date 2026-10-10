@@ -55,7 +55,19 @@ func (j *jev) Choose(ctx context.Context, c routing.DecisionConfig, in routing.D
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return zero, routing.Fail("upstream_error", "decision upstream rejected request")
+		b, readErr := io.ReadAll(io.LimitReader(resp.Body, 65537))
+		if readErr != nil {
+			return zero, decisionIOError(ctx, readErr)
+		}
+		var envelope struct {
+			Error map[string]any `json:"error"`
+		}
+		reported := ""
+		if len(b) <= 65536 && json.Unmarshal(b, &envelope) == nil {
+			reported = routing.ReportedErrorCode(envelope.Error)
+		}
+		return zero, &routing.UpstreamError{Status: resp.StatusCode, ReportedCode: reported,
+			Body: map[string]any{"code": "upstream_error", "type": "upstream_error", "message": "decision upstream rejected request", "param": nil}}
 	}
 	b, e := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if e != nil {
