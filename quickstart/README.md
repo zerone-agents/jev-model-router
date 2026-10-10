@@ -6,7 +6,7 @@ Run Jev Model Router with Docker Compose. One container serves the API and manag
 
 ## Run (recommended)
 
-The default stack pulls `zeroneai/jev-model-router:latest` from Docker Hub. No Go, Node, or source build is needed. To pin the current documented release, set `ROUTER_IMAGE=zeroneai/jev-model-router:0.1.16` in `.env`.
+The default stack pulls `zeroneai/jev-model-router:latest` from Docker Hub. No Go, Node, or source build is needed. To pin the current documented release, set `ROUTER_IMAGE=zeroneai/jev-model-router:0.1.17` in `.env`.
 
 ```sh
 git clone https://github.com/zerone-agents/jev-model-router.git

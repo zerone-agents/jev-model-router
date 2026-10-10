@@ -6,7 +6,7 @@
 
 ## 启动（推荐）
 
-默认从 Docker Hub 拉取 `zeroneai/jev-model-router:latest`，无需安装 Go、Node 或本地编译。要固定本文对应版本，在 `.env` 设置 `ROUTER_IMAGE=zeroneai/jev-model-router:0.1.16`。
+默认从 Docker Hub 拉取 `zeroneai/jev-model-router:latest`，无需安装 Go、Node 或本地编译。要固定本文对应版本，在 `.env` 设置 `ROUTER_IMAGE=zeroneai/jev-model-router:0.1.17`。
 
 ```sh
 git clone https://github.com/zerone-agents/jev-model-router.git

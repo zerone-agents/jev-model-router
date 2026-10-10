@@ -14,7 +14,7 @@ Download the archive matching your local machine from [GitHub Releases](https://
 
 Download `SHA256SUMS` from the same release and compare the archive's SHA-256 hash before extracting. macOS: `shasum -a 256 <archive>`; Linux: `sha256sum <archive>`; PowerShell: `Get-FileHash <archive> -Algorithm SHA256`. The checksums detect corruption; they are not code signatures. The binaries are not signed/notarized.
 
-For example, extract `jev-router_0.1.16_darwin_arm64.tar.gz`, then place its `jev-router` executable in a directory on your PATH. On Windows, extract the ZIP and use `jev-router.exe` from PowerShell or add its directory to PATH.
+For example, extract `jev-router_0.1.17_darwin_arm64.tar.gz`, then place its `jev-router` executable in a directory on your PATH. On Windows, extract the ZIP and use `jev-router.exe` from PowerShell or add its directory to PATH.
 
 ```sh
 jev-router --version
@@ -52,7 +52,7 @@ The remote instance retains SQLite and upstream credentials. JSON configuration 
 Local packaging requires Go 1.27.0 and Python 3:
 
 ```sh
-python3 scripts/package-cli.py --source /path/to/tag-checkout --version v0.1.16 --output /tmp/cli-assets
+python3 scripts/package-cli.py --source /path/to/tag-checkout --version v0.1.17 --output /tmp/cli-assets
 ```
 
 Use a fresh output directory. CI verifies checksums and runs the Linux amd64 binary; cross-compilation alone does not establish native execution coverage on every platform.

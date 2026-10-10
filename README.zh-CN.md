@@ -4,7 +4,7 @@
 
 面向 Agent 的轻量模型路由网关。接入 OpenAI Chat Completions 或 Anthropic Messages 客户端，显式指定模型或由 Jev 根据任务和可编辑模型卡自动选模，通过 CLI 和中英文管理界面维护供应商。
 
-当前正式版为 [v0.1.16](https://github.com/zerone-agents/jev-model-router/releases/tag/v0.1.16)。单个 Go 服务配合 SQLite，支持文本与工具调用流式输出，并按下表接入 OpenAI 兼容和原生 Anthropic 生成上游。本地 Laya、敏感会话锁定、ArbiterOS 与 PostgreSQL 仍属规划。
+当前正式版为 [v0.1.17](https://github.com/zerone-agents/jev-model-router/releases/tag/v0.1.17)。单个 Go 服务配合 SQLite，支持文本与工具调用流式输出，并按下表接入 OpenAI 兼容和原生 Anthropic 生成上游。本地 Laya、敏感会话锁定、ArbiterOS 与 PostgreSQL 仍属规划。
 
 ## 客户端与上游支持
 
