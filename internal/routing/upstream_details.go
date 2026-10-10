@@ -143,9 +143,10 @@ func (d *UpstreamDetails) SetRequestID(id string, secrets ...string) {
 		return
 	}
 	for _, c := range id {
-		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.ContainsRune("._:-", c)) {
-			return
+		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.ContainsRune("._:-", c) {
+			continue
 		}
+		return
 	}
 	encoded, _ := json.Marshal(id)
 	clean := SanitizeUpstream(encoded, secrets...)
