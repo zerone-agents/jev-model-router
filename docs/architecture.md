@@ -112,7 +112,7 @@ CLI 管理与 dashboard 输出为结构化 JSON，日志走 stderr；stdout 不�
 
 SKILL 说明“何时发现能力、如何选择操作、如何理解失败及验证结果”，字段与命令以运行时 schema 为准。技能作为产品资产随仓库/发布包分发，当前不自动安装到开发者的个人技能目录。
 
-独立交付的管理 UI 只承担状态、模型描述、提示词和路由记录的查看及辅助调整；核心能力不依赖浏览器隐藏状态。管理权限不因使用 UI 而扩大。React 静态资源由 Go embed 提供，业务调用仍走同源管理 API。浏览器一次性交换 settings 凭证为固定 7 天的 HttpOnly 会话；SQLite 仅保存会话哈希，重启保留有效会话，注销在服务端撤销当前请求会话。CLI 继续使用 Bearer。首版仅允许描述和提示词编辑，其他配置通过 CLI。
+管理 UI 提供状态、模型描述、提示词和路由记录的查看及辅助调整，并通过下述 Playground 专用能力提供有限额的文本生成体验；核心路由逻辑仍由共享服务负责。普通管理 API 权限不因 UI 而扩大，Playground 的 Settings 会话生成例外显式声明。React 静态资源由 Go embed 提供，业务调用仍走同源管理 API。浏览器一次性交换 settings 凭证为固定 7 天的 HttpOnly 会话；SQLite 仅保存会话哈希，重启保留有效会话，注销在服务端撤销当前请求会话。CLI 继续使用 Bearer。首版仅允许描述和提示词编辑，其他配置通过 CLI。
 
 ## 实现顺序与验证边界
 
@@ -131,3 +131,9 @@ ArbiterOS 工具执行治理仍在后续阶段。当前架构不创建空治理�
 ## 生成上游协议
 
 Provider.protocol 区分 openai 与 anthropic，旧配置默认 openai。OpenAI Chat 入口可在两种协议间选模；Messages 入口当前只允许 OpenAI 兼容上游（原生方向见 #51）。Bifrost 类型与转换保护留在 provider；请求级检查在候选容量过滤和 Jev 之前执行，只有 unsupported_request 可排除候选，内部故障直接返回。Anthropic 缺省输出限额和按目标估算预留均为 65536，OpenAI 保留 4096 估算且不注入限额。SDK 客户端缓存按协议、URL、凭证和配置隔离，不修改在途快照。
+
+## Playground
+
+Dashboard 的受限文本生成采用独立 Cookie-only 端点，与公开 `/v1/chat/completions` 共用请求解码、规划、上游调用和首事件检查。入口分别保留认证、限额与响应编码；不通过回环 HTTP 调用自身，也不向浏览器暴露 inference 凭证。Playground 仍限制为文本流式输入，新能力需显式开放。两条路径复用 `internal/inference` 的快照、规划与记录以及现有 Executor。`internal/playground` 管理短时原子准入和单进程并发；`internal/state` 保存会话/实例滚动窗口与 UTC 日额度。准入先于模型调用，数据库失败不绕过额度，取消/失败不退款，执行退出才释放并发。
+
+这是 Settings 会话的明确权限扩展：管理员无需 inference 凭证即可通过 Playground 体验生成；普通 Settings Bearer、管理 call 和 /v1 推理认证不变。机器契约发布浏览器专用请求/流式协议，UI 没有隐藏的选模实现。首版输入仅文本，不执行工具。生成正文由 Streamdown 渲染，reasoning 仅驱动“正在思考”提示并按协议保留内存历史，CSP 保持不变。

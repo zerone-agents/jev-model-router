@@ -1,6 +1,6 @@
 # 管理能力契约
 
-机器契约在 `management.json` 和 `schemas/` 中，服务端校验与实例能力发现使用同一来源。`GET /admin/v1/schema`、`GET /admin/v1/schema/{capability}` 和 `POST /admin/v1/call/{capability}` 均要求 settings 凭证。UI 复用这些管理能力，提供状态、模型描述、提示词和路由记录的查看，以及描述/提示词编辑。
+机器契约在 `management.json` 和 `schemas/` 中，服务端校验与实例能力发现使用同一来源。`GET /admin/v1/schema`、`GET /admin/v1/schema/{capability}` 和 `POST /admin/v1/call/{capability}` 均要求 settings 凭证。UI 复用这些管理能力，提供状态、模型描述、提示词和路由记录的查看，以及描述/提示词编辑；Playground 使用本文末尾定义的独立 Cookie-only 流式能力。
 
 ## 最小能力集合
 
@@ -64,7 +64,7 @@ call body 为 `{"input":{...},"expected_version":1,"idempotency_key":"operation-
 
 ## Dashboard 会话认证
 
-`schemas/session.json` 是认证端点、有效期、容量、Cookie 和浏览器来源要求的机器契约，随 `call.protocol.session` 发布；认证端点不是配置能力，不消耗版本或幂等键。CLI 保持 Settings Bearer；普通管理请求仅在 Authorization 缺席时接受 Cookie，有效 Cookie 不会覆盖无效 Bearer。推理 API 使用 inference 凭证。Chat 和 models 保持 Bearer；`/v1/messages` 另接受 `x-api-key`，同传时两个凭证必须都有效且属于同一身份/角色，Cookie 不授予推理权限。
+`schemas/session.json` 是认证端点、有效期、容量、Cookie 和浏览器来源要求的机器契约，随 `call.protocol.session` 发布；认证端点不是配置能力，不消耗版本或幂等键。CLI 保持 Settings Bearer；普通管理请求仅在 Authorization 缺席时接受 Cookie，有效 Cookie 不会覆盖无效 Bearer。推理 API 使用 inference 凭证。Chat 和 models 保持 Bearer；`/v1/messages` 另接受 `x-api-key`，同传时两个凭证必须都有效且属于同一身份/角色，Cookie 不授予这些 /v1 端点的推理权限；独立 Playground 例外见下文。
 
 登录用 Settings Bearer 与空 JSON 对象换取 HttpOnly Cookie，返回 expires_at/csrf_token；状态查询恢复 CSRF，注销只撤销请求会话。所有 Cookie POST 校验精确 Origin、JSON 与绑定该会话的 CSRF；GET 要求 X-Jev-Session: 1。响应禁止缓存。只有成功登录写 Cookie，状态、注销和错误均不清 Cookie，避免迟到响应删除另一标签页的新会话。遇到 CSRF 不匹配，显式恢复后重新决定操作，不自动重放。`session_limit` 为 HTTP 429 / CLI 6，retryable=false。
 
@@ -97,3 +97,13 @@ call body 为 `{"input":{...},"expected_version":1,"idempotency_key":"operation-
 该入口使用独立 Anthropic 错误信封，认证失败也包含顶层 type:error、error.type/message、request_id；request-id 与 X-Request-ID 相同。400/401/403/404/405/413/422/429/500/502/503/504/529 的映射和流内失败范围见 [兼容文档](../docs/compatibility.md#anthropic-messages-issue-23)。Messages 不套管理信封，也不透传上游 OpenAI 错误体。
 
 Generation providers accept `protocol: "openai" | "anthropic"`. Omitted protocol defaults to `openai`, including replacement writes; preserve it when editing an Anthropic provider. Reads return the effective protocol. Existing stored rows need no migration or version increment. `base_url` is the API prefix (for example `https://api.anthropic.com/v1`).
+
+## Playground 浏览器生成
+
+`schemas/playground.json` 是专用端点、输入、流事件、认证与默认限额的单一来源，随 `call.protocol.playground` 发布，不是普通 `/call` 能力。`GET /admin/v1/playground` 返回启用状态、有效限额及当前会话/实例/UTC 日剩余额度快照；`POST /admin/v1/playground/completions` 接收 model、文本 user/assistant messages、stream:true，assistant 可携带协议需要的 reasoning_content。其余字段拒绝；输出限额由服务端注入。
+
+两端点只接受 Dashboard Settings Cookie；GET 需要 X-Jev-Session，POST 需要 JSON、精确 Origin/Host 和绑定会话的 CSRF。任何 Authorization 替代均被拒绝，Cookie 不因此获得 /v1 推理权限。该能力是 Settings 角色的受限浏览器生成例外，Settings Bearer 及通用管理 call 不提供生成。
+
+准入前不调用上游，成功受理后费用/次数不退款，不自动重试或隐式换模。POST 直接复用一次实际推理规划，不能先 route.inspect 再生成。SSE 按 route、delta、done/error 返回，delta 的 content/reasoning_content 分开；仅收到 finish_reason 后正常终止才发 done。EOF 无终态为中断；本端点不宣称 OpenAI SSE 兼容。HTTP 头前错误为 JSON error，流内错误为独立 error 事件；不回显供应商错误体。
+
+429 返回 playground_rate_limited、limit_scope、retry_after_seconds、可用时 reset_at，并带 Retry-After。实例 UTC 日额度持久化，并发为单进程；配置和全部默认值见 configuration.md。只有真实执行元数据进入路由展示，不产生 Jev 自由文本理由。

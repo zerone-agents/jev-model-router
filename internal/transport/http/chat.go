@@ -3,9 +3,7 @@ package httptransport
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
-	"io"
 	"net/http"
 	"time"
 )
@@ -16,69 +14,28 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 	defer func() { execution.Finish(finalErr) }()
 	fail := func(e error) { finalErr = e; writeError(w, e) }
 	r.Body = http.MaxBytesReader(w, r.Body, s.limits.MaxBodyBytes)
-	var req routing.Request
-	d := json.NewDecoder(r.Body)
-	if err := d.Decode(&req); err != nil {
-		var fieldError *routing.Error
-		if errors.As(err, &fieldError) {
-			fail(fieldError)
-		} else {
-			fail(routing.Fail("invalid_request", "invalid chat body"))
-		}
-		return
-	}
-	if d.Decode(new(any)) != io.EOF {
-		fail(routing.Fail("invalid_request", "invalid chat body"))
-		return
-	}
-	plan, e := execution.Plan(req, nil)
+	req, e := decodeChatRequest(r.Body)
 	if e != nil {
 		fail(e)
 		return
 	}
 	id := w.Header().Get("X-Request-ID")
-	if !req.Stream {
-		ctx, cancel := context.WithTimeout(r.Context(), s.limits.FirstEventTimeout)
-		defer cancel()
-		result, e := s.executor.Complete(ctx, plan, req)
-		e = contextError(ctx, e)
-		if e != nil {
-			fail(e)
-			return
-		}
-		http.NewResponseController(w).SetWriteDeadline(time.Now().Add(s.limits.IdleTimeout))
-		finalErr = WriteCompletion(w, result, plan.ModelID, id)
-		return
+	started := false
+	finalErr = executeChat(r.Context(), execution, s.executor, req, s.limits.FirstEventTimeout, s.limits.StreamBuffer, chatOutput{
+		complete: func(result routing.Completion, plan routing.Plan) error {
+			started = true
+			http.NewResponseController(w).SetWriteDeadline(time.Now().Add(s.limits.IdleTimeout))
+			return WriteCompletion(w, result, plan.ModelID, id)
+		},
+		stream: func(ctx context.Context, stream routing.EventStream, plan routing.Plan) error {
+			started = true
+			return writeStream(ctx, w, stream, plan.ModelID, id, s.limits.IdleTimeout)
+		},
+	})
+	if finalErr != nil && !started {
+		writeError(w, finalErr)
 	}
-	ctx, stop := context.WithCancelCause(r.Context())
-	defer stop(context.Canceled)
-	timer := time.AfterFunc(s.limits.FirstEventTimeout, func() { stop(context.DeadlineExceeded) })
-	defer timer.Stop()
-	stream, e := s.executor.Stream(ctx, plan, req)
-	if e != nil {
-		fail(contextError(ctx, e))
-		return
-	}
-	buffer := bufferStream(ctx, stream, s.limits.StreamBuffer)
-	defer buffer.Close()
-	// Headers are committed only once a valid event is available. Errors after
-	// that point use an SSE error object and never a successful DONE marker.
-	var first routing.Event
-	for {
-		first, e = buffer.Next(ctx)
-		if e != nil {
-			fail(contextError(ctx, e))
-			return
-		}
-		if validEvent(first) {
-			break
-		}
-	}
-	if !timer.Stop() {
-		fail(routing.Fail("timeout", "first event timed out"))
-		return
-	}
-	finalErr = writeStream(ctx, w, &prependStream{first: &first, rest: buffer}, plan.ModelID, id, s.limits.IdleTimeout)
+
 }
 func completionBody(result routing.Completion, model, kind string) map[string]any {
 	b := map[string]any{"id": result.ID, "object": kind, "created": result.Created, "model": model, "choices": result.Choices}

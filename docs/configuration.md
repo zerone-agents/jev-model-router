@@ -115,3 +115,30 @@ For the verified BigModel profile, use this provider input (the environment refe
 Create models through `models.put` with `provider_id: "bigmodel"` and `upstream_name: "glm-5.3"` or `"glm-5.3-flash"`. Choose your own public IDs, descriptions and verified capabilities using the instance schema. Create disabled, run `models.test`, then enable; the 16-token connection test does not validate thinking, tools or vision. In Compose, add `BIGMODEL_API_KEY` to the service environment as well as `.env`, or use managed `api_key` instead.
 
 The provider API prefix includes `/v1`; the resulting endpoint is `https://open.bigmodel.cn/api/anthropic/v1/messages`. An Anthropic SDK may itself append `/v1/messages` to a root URL, but Router provider configuration appends only `/messages`. OpenAI clients still connect to the Router's `/v1` URL. The Router `/v1/messages` entry cannot yet select a native Anthropic provider; that direction is tracked in [#51](https://github.com/zerone-agents/jev-model-router/issues/51).
+
+## Playground
+
+Dashboard 登录后可使用独立的 Cookie-only Playground 文本生成入口，无需另填 inference 凭证。它复用真实路由和生成服务，会向供应商发送内容并可能产生费用。现有 CLI / SDK 推理端点的权限及限制不变。
+
+启动配置（环境变量为 `JEV_ROUTER_` 加字段大写）如下：
+
+| 字段 | 默认值 | 范围 |
+| --- | --- | --- |
+| `playground_enabled` | `true` | `true` / `false` |
+| `playground_session_rpm` | 6 | 1–1000000 |
+| `playground_instance_rpm` | 20 | 1–1000000 |
+| `playground_session_concurrency` | 1 | 1–128 |
+| `playground_instance_concurrency` | 3 | 1–128 |
+| `playground_daily_requests` | 200 | 1–1000000 |
+| `playground_input_bytes` | 32768 | 1–16777216，不能超过 body 上限 |
+| `playground_body_bytes` | 262144 | 1–16777216 |
+| `playground_max_messages` | 100 | 1–1000 |
+| `playground_output_tokens` | 4096 | 16–10000000 |
+| `playground_timeout` | `120s` | `1s`–`10m` |
+
+RPM 是任意滚动 60 秒内的受理次数；每日按 UTC 零点重置。会话窗口、实例窗口与日额度原子提交并保存到 SQLite，刷新页面、重新登录或重启不会重置实例额度。已受理的失败、取消和超时仍计数；认证及输入校验失败不计数。数据库准入失败时禁止调用上游。
+
+并发限制作用于单实例单服务进程，多副本没有共享并发协调保证。取消会传播到上游，但不能撤销已产生的费用。限额约束调用量及输出，不是精确费用上限。输入字节包括完整正文和协议携带的 reasoning 历史；超限明确拒绝，不自动截断。
+
+页面仅在内存保存对话，刷新或离开后丢失；失败、停止或截断的回合不会自动加入下一轮历史。思考正文不展示、不落浏览器持久存储；按协议需要携带的 reasoning 历史仍保留在当前页面内存。正文通过 Streamdown 渲染，原始 HTML 不执行、图片不加载，既有 CSP 不放宽。
+

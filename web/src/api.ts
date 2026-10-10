@@ -6,6 +6,7 @@ export type CallEnvelope = {
 export type Capability = {
   id: string;
   availability: string;
+  call?: { protocol?: { playground?: unknown } };
   input_schema: Record<string, unknown>;
 };
 export type Reply<T> = {
@@ -156,6 +157,29 @@ export function createManagementClient(
           throw new APIError("session_changed", 403, e.operationId);
         throw e;
       }),
+    playground: (input?: unknown, signal?: AbortSignal) =>
+      fetchImpl(
+        input === undefined
+          ? "/admin/v1/playground"
+          : "/admin/v1/playground/completions",
+        {
+          method: input === undefined ? "GET" : "POST",
+          credentials: "same-origin",
+          redirect: "error",
+          cache: "no-store",
+          headers: {
+            "X-Jev-Session": "1",
+            ...(input === undefined
+              ? {}
+              : { "Content-Type": "application/json", "X-CSRF-Token": csrf }),
+          },
+          body: input === undefined ? undefined : JSON.stringify(input),
+          signal: AbortSignal.any([
+            controller.signal,
+            ...(signal ? [signal] : []),
+          ]),
+        },
+      ),
     dispose: () => {
       csrf = "";
       controller.abort();

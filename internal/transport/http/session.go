@@ -259,3 +259,22 @@ func NewSessionManagementHandler(service *management.Service, s *SessionHTTP) ht
 		admin.ServeHTTP(w, r)
 	})
 }
+
+// AuthenticatePlayground never grants browser generation through Bearer auth.
+func (s *SessionHTTP) AuthenticatePlayground(r *http.Request) (string, error) {
+	if headerPresent(r, "Authorization") {
+		return "", routing.Fail("forbidden", "playground requires a dashboard session")
+	}
+	if _, err := s.Authenticate(r); err != nil {
+		return "", err
+	}
+	origin, err := s.source(r)
+	if err != nil {
+		return "", err
+	}
+	token, err := sessionCookie(r)
+	if err != nil {
+		return "", err
+	}
+	return s.Service.Identity(r.Context(), origin, token)
+}
