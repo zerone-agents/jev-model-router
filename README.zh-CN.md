@@ -2,9 +2,18 @@
 
 [English](README.md) | 简体中文
 
-面向 Agent 的轻量模型路由网关。以 Jev 原生 choice 根据任务和可编辑模型卡选模，提供 OpenAI Chat Completions 兼容 JSON/SSE、管理 CLI 与配套 SKILL。
+面向 Agent 的轻量模型路由网关。接入 OpenAI Chat Completions 或 Anthropic Messages 客户端，显式指定模型或由 Jev 根据任务和可编辑模型卡自动选模，通过 CLI 和中英文管理界面维护供应商。
 
-首版已实现 Go 单实例 + SQLite、显式/自动选模和 OpenAI 兼容生成适配。本地 Laya、敏感会话锁定、ArbiterOS 与 PostgreSQL 属于后续阶段。已建立小规模选模与Agent诊断基线，详见[验收摘要](docs/acceptance/2026-09-29.zh-CN.md)；生产全场景质量与经济收益仍未验证。未声明 AgentUse 认证。
+当前正式版为 [v0.1.15](https://github.com/zerone-agents/jev-model-router/releases/tag/v0.1.15)。单个 Go 服务配合 SQLite，支持文本与工具调用流式输出，并按下表接入 OpenAI 兼容和原生 Anthropic 生成上游。本地 Laya、敏感会话锁定、ArbiterOS 与 PostgreSQL 仍属规划。
+
+## 客户端与上游支持
+
+| 客户端入口 | OpenAI 兼容上游 | 原生 Anthropic 上游 |
+| --- | --- | --- |
+| `/v1/chat/completions` | JSON / SSE | JSON / SSE，包含受支持的思考与工具续写 |
+| `/v1/messages` | 经转换支持 JSON / SSE | 由 [#51](https://github.com/zerone-agents/jev-model-router/issues/51) 追踪，尚未支持 |
+
+支持范围以[兼容矩阵](docs/compatibility.md)公布的字段组合为准，无法保留语义的转换明确失败。BigModel `glm-5.3` 和 `glm-5.3-flash` 通过本地 Router 完成了 12 个原始 Agent SDK 示例，见[兼容范围与验证方法](docs/compatibility.md)。该结果不代表所有 Anthropic 部署或原生签名历史均兼容。
 
 ## 快速开始
 
@@ -53,19 +62,38 @@ UI 由同一个 Go 可执行文件提供，路径为 `/dashboard/`。远程实�
 `empty-object.json` 内容是 `{}`。供应商完整配置示例（先注入 `PROVIDER_API_KEY`）：
 
 ```json
-{"id":"cloud","base_url":"https://api.openai.com/v1","secret_ref":"env:PROVIDER_API_KEY"}
+{"id":"cloud","protocol":"openai","base_url":"https://api.openai.com/v1","secret_ref":"env:PROVIDER_API_KEY"}
 ```
 
 按 `schema models.put` 配置禁用模型 → `call models.test --id <ID>` 固定连接测试 → 读取版本并启用 → `route.inspect` 检查。多候选 auto 还需 `decision.put` 配置 Jev 根地址、原生模型版本和密钥引用。用 `prompt.put` 修改唯一默认均衡模板。复杂输入使用 JSON 文件或 stdin，所有写入携带版本与幂等键。完整工作流见[配套 SKILL](skills/jev-router/SKILL.md)。
 
-推理客户端配置 base URL 为 `http://127.0.0.1:8080/v1`，API key 使用 inference 凭证；`model: "auto"` 自动选择，也可使用 `/v1/models` 返回的已启用外部 ID。settings 仅用于管理及固定测试。
+通过 `/v1/models` 查询已启用的对外模型 ID。settings 凭证仅用于管理及固定测试，生成请求使用 inference 凭证。
+
+## 调用推理接口
+
+OpenAI 客户端的 base URL 使用 `http://127.0.0.1:8080/v1`；Anthropic SDK 使用根地址 `http://127.0.0.1:8080`，SDK 会追加 `/v1/messages`。两者均使用 inference 凭证，模型填写 `auto` 或已启用的对外 ID。
+
+```sh
+curl http://127.0.0.1:8080/v1/chat/completions \
+  -H "Authorization: Bearer $JEV_ROUTER_INFERENCE_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}],"max_tokens":1024}'
+
+curl http://127.0.0.1:8080/v1/messages \
+  -H "x-api-key: $JEV_ROUTER_INFERENCE_TOKEN" \
+  -H 'anthropic-version: 2023-06-01' \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}],"max_tokens":1024}'
+```
+
+增加 `"stream":true` 可使用 SSE。Messages 当前只选择 OpenAI 兼容上游；若只配置原生 Anthropic 上游，请使用 Chat Completions 入口。见 [Anthropic SDK 示例](examples/anthropic-messages.mjs)及[原生上游配置](docs/configuration.md#native-anthropic-generation-upstream)。
 
 ## 路由约定
 
 - 零候选失败、单候选直达、多候选每次调用 Jev；显式选择跳过 Jev。
 - 偏好尽量交给提示词和自然语言模型卡；代码仅锁定权限、能力、容量及协议边界。
 - `auto` 为保留 ID。完整生成请求不裁剪，参数不静默丢失，不重试或换模。
-- Jev 模式没有敏感路由保证；图片字段不送 Jev，文本和工具结果可能送往 Jev。
+- Jev 模式没有敏感路由保证；对话文本可能送往 Jev；图片数据、工具定义、参数和输出不发送，工具历史仅保留配对的 ID 与名称等关联记录。
 - 配置写入立即影响新请求；禁用模型不撤销在途快照。
 - 记录保存路由元数据和最后一条用户消息最多 120 字的文本摘要，默认保留 7 天且最多 10 万条，超限丢弃最旧记录，尽力写入并公开降级状态，不是审计日志。
 
@@ -75,7 +103,7 @@ UI 由同一个 Go 可执行文件提供，路径为 `/dashboard/`。远程实�
 
 ```mermaid
 flowchart TD
-    Agent[Agent 模型客户端] --> API[Chat Completions JSON / SSE]
+    Agent[Agent 模型客户端] --> API[Chat Completions / Messages JSON / SSE]
     Skill[配套 SKILL] --> CLI[Go CLI]
     CLI --> Admin[管理 HTTP / schema]
     Admin --> Management[共享管理服务]
@@ -86,7 +114,7 @@ flowchart TD
     Planner -->|多候选 auto| Jev[Jev 原生 choice]
     Planner --> Executor[单目标执行]
     Executor --> Bifrost[Bifrost Core]
-    Bifrost --> Models[OpenAI 兼容生成端点]
+    Bifrost --> Models[OpenAI 兼容 / 原生 Anthropic 上游]
     API -->|尽力写入| SQLite
 ```
 
@@ -120,4 +148,4 @@ go test -race ./... -count=1
 go vet ./...
 ```
 
-测试只访问本地模拟端点。[架构](docs/architecture.md)、[管理契约](contracts/README.md)、[领域术语](CONTEXT.md) 是协作入口。本地研究、实施规格与 ADR 按约定不进入 Git。
+默认测试只访问本地模拟端点。可选 SDK 集成需要本地 SDK；显式启用的真实验收会调用付费上游并可能执行示例工具，见[验证范围](docs/compatibility.md#sdk-完整-agent-examples)。[架构](docs/architecture.md)、[管理契约](contracts/README.md)、[领域术语](CONTEXT.md) 是协作入口。本地研究、实施规格、ADR 与逐次验收记录按约定不进入 Git。

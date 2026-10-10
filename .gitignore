@@ -5,6 +5,7 @@
 /.data/
 
 /docs/validation/
+/docs/acceptance/
 
 /web/node_modules/
 /web/test-results/

@@ -40,7 +40,7 @@ CLI 的 `--help` 离线可用，`schema` 发现实例实际能力；复杂输入
 
 管理结果使用 `ok`、`data` 或 `error`、`warnings`、`meta`，其中 meta 包含 operation ID、timestamp 和 schema version；首版为同步管理能力，未暴露异步事件协议。CLI 将结构化错误映射到稳定非零退出码，并在契约中公布映射。
 
-这些约定只用于管理能力。`/v1/chat/completions` 保持其 JSON/SSE 格式，`/v1/models` 保持模型列表格式。公共模型列表不携带供应商凭证与管理元数据。
+这些约定只用于管理能力。`/v1/chat/completions` 保持其 JSON/SSE 格式，`/v1/messages` 使用 Anthropic JSON/SSE 格式，`/v1/models` 保持模型列表格式。公共模型列表不携带供应商凭证与管理元数据。
 
 参考：[AgentUse 0.2.0 协议页面](https://www.zerone.run/zh/protocol)。本目录不表示已获得协议认证。
 
@@ -76,7 +76,7 @@ call body 为 `{"input":{...},"expected_version":1,"idempotency_key":"operation-
 
 ## 推理控制与模型能力
 
-`chat.json` 与 `route.inspect` 校验 `chat_template_kwargs.enable_thinking` 和 `reasoning_effort` 的格式及允许值，拒绝未知模板字段。合法推理控制直接原样转发，不要求模型声明能力，也不根据这些参数过滤候选。上游判断是否支持，失败不触发参数删除、降级或换模。
+`chat.json` 与 `route.inspect` 校验 `chat_template_kwargs.enable_thinking` 和 `reasoning_effort` 的格式及允许值，拒绝未知模板字段。OpenAI 兼容上游的合法推理控制原样转发，不要求模型声明能力。原生 Anthropic 上游按归一化规则映射 thinking/effort，并在候选选择前拒绝无法保留的组合，见[兼容矩阵](../docs/compatibility.md#openai-clients-with-native-anthropic-upstream-50)。上游判断模型是否支持，失败不触发参数删除、降级或换模。
 
 既有可选 `capabilities.reasoning` 保留读写兼容，但仅作为说明性元数据，不参与请求校验、自动选模或显式选模。无配置、空数组或与请求不同的元数据均不会阻止推理参数透传。Jev 仍接收请求的推理控制并计入输入预算。Chat JSON/SSE 保留文本 reasoning_content，并允许 assistant 历史回传；签名/加密推理扩展不在本契约内。
 

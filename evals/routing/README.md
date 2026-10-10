@@ -21,4 +21,4 @@ Use new output paths for each run. No automatic retries or overwrites. `repeat` 
 
 The original pre-fixed gate was ≥22/24 hits, ≥10/12 per class, ≥10/12 cases with identical repeated selections, and no call/invalid-choice errors. Development scores are separate. Freeze and record dataset/model-description/template hashes, source revision, server configuration and thresholds **before** each run. The runner saves metrics only, without credentials, prompts or model answers. Do not publish raw run files.
 
-This tool measures preference conformance only. Use separate Agent fixtures for generation quality and a separate study for actual economics. See the [dated evidence summary](../../docs/acceptance/2026-09-29.md).
+This tool measures preference conformance only. Use separate Agent fixtures for generation quality and a separate study for actual economics. See the [compatibility and validation scope](../../docs/compatibility.md).
