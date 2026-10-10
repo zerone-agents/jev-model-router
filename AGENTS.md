@@ -34,3 +34,9 @@ Before triaging or changing issue state, read
 Use a single-context layout: root `CONTEXT.md` and `docs/adr/`.
 Before exploring domain concepts or architectural decisions, read
 `docs/agents/domain.md`.
+
+## Frontend standards and review
+
+Before implementing or reviewing UI changes, read
+`docs/agents/frontend-standards.md`. For UI reviews, also apply
+`docs/agents/frontend-review.md`.

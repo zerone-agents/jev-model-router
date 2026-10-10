@@ -786,52 +786,7 @@ pre {
 }
 .page-size-picker {
   width: 148px;
-  position: relative;
   justify-self: end;
-}
-.numbered-pager .page-size-trigger {
-  width: 100%;
-  justify-content: space-between;
-  min-height: 36px;
-  padding: 7px 12px;
-  gap: 16px;
-  border: 1px solid #dad5cf;
-  border-radius: 8px;
-  background: #fff;
-  color: #39352f;
-  font: inherit;
-}
-.page-size-trigger svg {
-  color: var(--muted);
-}
-.page-size-menu {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  right: 0;
-  z-index: 10;
-  width: 100%;
-  padding: 5px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--paper);
-  box-shadow: 0 8px 24px #39352f14;
-}
-.numbered-pager .page-size-menu button {
-  display: flex;
-  justify-content: space-between;
-  width: 100%;
-  padding: 9px 10px;
-  border-radius: 7px;
-  font: inherit;
-}
-.page-size-menu button[aria-checked="true"] {
-  background: #e9dfd6;
-  color: #843d29;
-}
-.page-size-menu button:focus-visible {
-  outline: none;
-  box-shadow: inset 0 0 0 1px #bba18c;
-  background: #f0e8df;
 }
 @media (max-width: 760px) {
   .numbered-pager {

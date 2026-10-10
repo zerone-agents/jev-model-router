@@ -100,7 +100,10 @@ test("auto routes a real stream, hides reasoning and preserves production CSP", 
   });
   await send(page, "markdown");
   await expect(page.getByText("Thinking…", { exact: true })).toBeVisible();
-  await expect(page.getByText("Completed", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Stop", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByText("Completed", { exact: true })).toHaveCount(0);
   await expect(page.locator(".pg-markdown strong")).toHaveText("中文");
   await expect(page.locator(".pg-markdown code")).toContainText(
     "const answer = 42",
@@ -144,11 +147,13 @@ test("stop clears thinking and another tab cannot bypass session concurrency", a
   const other = await context.newPage();
   await other.goto("/dashboard/");
   await other.getByRole("button", { name: "Playground", exact: true }).click();
-  await other.getByLabel("Model").selectOption("pg-model");
+  await other.getByRole("button", { name: "Model", exact: true }).click();
+  await other.getByRole("menuitemradio", { name: "pg-model" }).click();
   await send(other, "hello");
-  await expect(
-    other.getByText("Playground limit reached. Wait before sending again."),
-  ).toBeVisible();
+  await expect(other.locator(".pg-answer").getByRole("alert")).toBeVisible();
+  await expect(other.locator(".pg-answer").getByRole("alert")).toHaveText(
+    "This session has too many requests in progress. Wait for a reply to finish or stop it before sending again.",
+  );
   await page.getByRole("button", { name: "Stop", exact: true }).click();
   await expect(page.getByText("Stopped", { exact: true })).toBeVisible();
   await expect(page.getByText("Thinking…", { exact: true })).toHaveCount(0);
@@ -166,9 +171,13 @@ test("mobile explicit model and Chinese UI remain usable", async ({ page }) => {
     .getByRole("button", { name: "Playground", exact: true })
     .last()
     .click();
-  await page.getByLabel("Model").selectOption("pg-model");
+  await page.getByRole("button", { name: "Model", exact: true }).click();
+  await page.getByRole("menuitemradio", { name: "pg-model" }).click();
   await send(page, "hello");
-  await expect(page.getByText("Completed", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Stop", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByText("Completed", { exact: true })).toHaveCount(0);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -186,4 +195,38 @@ test("mobile explicit model and Chinese UI remain usable", async ({ page }) => {
     .last()
     .click();
   await expect(page.getByLabel("消息", { exact: true })).toBeVisible();
+});
+
+test("sending keeps the page and composer stable", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page);
+  const snapshot = () =>
+    page.evaluate(() => ({
+      scrollY: window.scrollY,
+      boxes: [".pg-transcript", ".pg-compose", ".pg-inspector"].map(
+        (selector) => {
+          const rect = document
+            .querySelector(selector)!
+            .getBoundingClientRect();
+          return {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+          };
+        },
+      ),
+    }));
+  const before = await snapshot();
+  await send(page, "layout stability");
+  await expect(
+    page.getByRole("button", { name: "Stop", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByText("Completed", { exact: true })).toHaveCount(0);
+  const after = await snapshot();
+  expect(after.scrollY).toBe(before.scrollY);
+  expect(after.boxes[0]).toEqual(before.boxes[0]);
+  expect(after.boxes[1]).toEqual(before.boxes[1]);
+  expect(after.boxes[2].x).toBe(before.boxes[2].x);
+  expect(after.boxes[2].width).toBe(before.boxes[2].width);
 });

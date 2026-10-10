@@ -95,3 +95,33 @@ it("ignores empty deltas and clears thinking on failures and truncation", () => 
   expect(s.phase).toBe("failed");
   expect(history(s)).toEqual([]);
 });
+
+it("keeps each failure with its reply and preserves partial content", () => {
+  let s = reducePlayground(initialState(), {
+    type: "start",
+    id: 1,
+    prompt: "hello",
+  });
+  s = reducePlayground(s, {
+    type: "event",
+    id: 1,
+    event: { type: "delta", content: "partial" },
+  });
+  s = reducePlayground(s, {
+    type: "event",
+    id: 1,
+    event: { type: "error", code: "upstream_error", message: "failure" },
+  });
+  s = reducePlayground(s, { type: "start", id: 2, prompt: "next" });
+  s = reducePlayground(s, {
+    type: "fail",
+    id: 2,
+    errorCode: "playground_rate_limited",
+  });
+  expect(s.turns[0]).toMatchObject({
+    content: "partial",
+    errorCode: "upstream_error",
+  });
+  expect(s.turns[1]).toMatchObject({ errorCode: "playground_rate_limited" });
+  expect(history(s)).toEqual([]);
+});

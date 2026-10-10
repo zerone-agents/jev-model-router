@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useRef, useId, useState } from "react";
+import { ChoicePicker } from "./ui/ChoicePicker";
+import { Fragment, useEffect, useState } from "react";
 import { APIError, type Client } from "./api";
 import { text, type Lang } from "./i18n";
 export type PageProps = {
@@ -278,110 +279,21 @@ function PageSizePicker({
   value: number;
   onChange: (size: number) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
-  const options = useRef<(HTMLButtonElement | null)[]>([]);
-  const id = useId();
-  const sizes = [10, 20, 50, 100];
-  useEffect(() => {
-    if (!open) return;
-    options.current[sizes.indexOf(value)]?.focus();
-    const close = (event: PointerEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("pointerdown", close);
-    return () => document.removeEventListener("pointerdown", close);
-  }, [open, value]);
   return (
-    <div
+    <ChoicePicker
       className="page-size-picker"
-      ref={root}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
-      }}
-    >
-      <button
-        ref={trigger}
-        className="page-size-trigger"
-        aria-label={text(
-          lang,
-          kind === "models" ? "Models per page" : "Records per page",
-          kind === "models" ? "每页模型数" : "每页记录数",
-        )}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? id : undefined}
-        onClick={() => setOpen(!open)}
-        onKeyDown={(event) => {
-          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-            event.preventDefault();
-            setOpen(true);
-          }
-        }}
-      >
-        {text(lang, `${value} / page`, `${value} 条 / 页`)}
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          aria-hidden="true"
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
-      </button>
-      {open && (
-        <div
-          id={id}
-          className="page-size-menu"
-          role="menu"
-          aria-label={text(
-            lang,
-            kind === "models" ? "Models per page" : "Records per page",
-            kind === "models" ? "每页模型数" : "每页记录数",
-          )}
-        >
-          {sizes.map((size, index) => (
-            <button
-              key={size}
-              ref={(node) => {
-                options.current[index] = node;
-              }}
-              role="menuitemradio"
-              aria-checked={value === size}
-              tabIndex={-1}
-              onClick={() => {
-                setOpen(false);
-                trigger.current?.focus();
-                onChange(size);
-              }}
-              onKeyDown={(event) => {
-                let next = index;
-                if (event.key === "ArrowDown")
-                  next = (index + 1) % sizes.length;
-                else if (event.key === "ArrowUp")
-                  next = (index + sizes.length - 1) % sizes.length;
-                else if (event.key === "Home") next = 0;
-                else if (event.key === "End") next = sizes.length - 1;
-                else if (event.key === "Escape") {
-                  event.preventDefault();
-                  setOpen(false);
-                  trigger.current?.focus();
-                  return;
-                } else return;
-                event.preventDefault();
-                options.current[next]?.focus();
-              }}
-            >
-              {text(lang, `${size} / page`, `${size} 条 / 页`)}
-              <span aria-hidden="true">{value === size ? "✓" : ""}</span>
-            </button>
-          ))}
-        </div>
+      placement="top"
+      label={text(
+        lang,
+        kind === "models" ? "Models per page" : "Records per page",
+        kind === "models" ? "每页模型数" : "每页记录数",
       )}
-    </div>
+      value={String(value)}
+      onChange={(value) => onChange(Number(value))}
+      items={[10, 20, 50, 100].map((size) => ({
+        value: String(size),
+        label: text(lang, `${size} / page`, `${size} 条 / 页`),
+      }))}
+    />
   );
 }

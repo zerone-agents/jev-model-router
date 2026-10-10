@@ -15,6 +15,8 @@ export type Turn = {
   reasoning: string;
   phase: Phase;
   route?: Route;
+  errorCode?: string;
+  limitScope?: string;
   usage?: {
     input_tokens: number;
     output_tokens: number;
@@ -29,7 +31,12 @@ export type PlaygroundState = {
 export type PlaygroundAction =
   | { type: "start"; id: number; prompt: string }
   | { type: "event"; id: number; event: PlaygroundEvent }
-  | { type: "stop" | "fail"; id: number }
+  | {
+      type: "stop" | "fail";
+      id: number;
+      errorCode?: string;
+      limitScope?: string;
+    }
   | { type: "reset" };
 export const initialState = (): PlaygroundState => ({
   id: null,
@@ -60,9 +67,13 @@ export function reducePlayground(
     };
   if (a.id !== s.id || !isActive(s.phase)) return s;
   const turn = { ...s.turns[s.turns.length - 1] };
-  if (a.type === "stop" || a.type === "fail")
+  if (a.type === "stop" || a.type === "fail") {
     turn.phase = a.type === "stop" ? "stopped" : "failed";
-  else if (a.type === "event") {
+    if (a.type === "fail") {
+      turn.errorCode = a.errorCode || "internal_error";
+      turn.limitScope = a.limitScope;
+    }
+  } else if (a.type === "event") {
     const e = a.event;
     if (e.type === "route") turn.route = e;
     if (e.type === "delta") {
@@ -83,7 +94,10 @@ export function reducePlayground(
             : "failed";
       turn.usage = e.usage;
     }
-    if (e.type === "error") turn.phase = "failed";
+    if (e.type === "error") {
+      turn.phase = "failed";
+      turn.errorCode = e.code;
+    }
   }
   return { ...s, phase: turn.phase, turns: [...s.turns.slice(0, -1), turn] };
 }

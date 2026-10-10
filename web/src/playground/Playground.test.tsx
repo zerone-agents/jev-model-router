@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createManagementClient } from "../api";
 import { Playground } from "./Playground";
@@ -50,12 +50,29 @@ it("defaults to auto and renders a completed routed response", async () => {
     />,
   );
   const user = userEvent.setup();
-  expect(await screen.findByRole("combobox", { name: "Model" })).toHaveValue(
-    "auto",
-  );
-  await user.type(screen.getByRole("textbox", { name: "Message" }), "hello");
-  await user.click(screen.getByRole("button", { name: "Send" }));
+  const picker = await screen.findByRole("button", {
+    name: "Model",
+  });
+  expect(picker).toHaveTextContent("Auto");
+  await user.click(picker);
+  await user.click(await screen.findByRole("menuitemradio", { name: "flash" }));
+  expect(picker).toHaveTextContent("flash");
+  await user.click(picker);
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  expect(picker).toHaveFocus();
+  const input = screen.getByRole("textbox", { name: "Message" });
+  await user.type(input, "hello");
+  await user.keyboard("{Shift>}{Enter}{/Shift}world");
+  expect(input).toHaveValue("hello\nworld");
+  fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+  fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
+  fireEvent.keyDown(input, { key: "Enter", repeat: true });
+  expect(
+    fetcher.mock.calls.filter(([path]) => String(path).endsWith("completions")),
+  ).toHaveLength(0);
+  await user.keyboard("{Enter}");
   expect(await screen.findByText("Hello there")).toBeInTheDocument();
   expect(screen.queryByText("hidden-secret")).not.toBeInTheDocument();
-  expect(await screen.findByText("Completed")).toBeInTheDocument();
+  expect(screen.queryByText("Completed")).not.toBeInTheDocument();
 });

@@ -1,3 +1,5 @@
+import { replyErrorText } from "./errors";
+import { ChoicePicker } from "../ui/ChoicePicker";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { ArrowUp, Stop, Plus, ArrowBendUpRight } from "@phosphor-icons/react";
 import { APIError } from "../api";
@@ -35,7 +37,7 @@ export function Playground({ client, lang, onError }: PageProps) {
   const current = useRef<AbortController | null>(null),
     sequence = useRef(0),
     mounted = useRef(true),
-    last = useRef<HTMLDivElement>(null);
+    transcript = useRef<HTMLDivElement>(null);
   const active = isActive(state.phase),
     wait = Math.max(0, Math.ceil((until - now) / 1000));
   const refresh = useCallback(
@@ -80,7 +82,6 @@ export function Playground({ client, lang, onError }: PageProps) {
         if (!abort.signal.aborted) setModels(all);
       } catch (e) {
         if (!abort.signal.aborted) {
-          setError(e);
           onError(e);
         }
       }
@@ -99,7 +100,8 @@ export function Playground({ client, lang, onError }: PageProps) {
     return () => clearInterval(timer);
   }, [until]);
   useEffect(() => {
-    last.current?.scrollIntoView?.({ block: "nearest" });
+    const element = transcript.current;
+    if (element) element.scrollTop = element.scrollHeight;
   }, [state]);
   const messages = history(state);
   const bytes = new TextEncoder().encode(
@@ -156,9 +158,13 @@ export function Playground({ client, lang, onError }: PageProps) {
       );
     } catch (e) {
       if (mounted.current && id === sequence.current) {
-        dispatch({ type: abort.signal.aborted ? "stop" : "fail", id });
+        dispatch({
+          type: abort.signal.aborted ? "stop" : "fail",
+          id,
+          errorCode: e instanceof APIError ? e.code : "internal_error",
+          limitScope: e instanceof PlaygroundError ? e.scope : undefined,
+        });
         if (!abort.signal.aborted) {
-          setError(e);
           onError(e);
           if (e instanceof PlaygroundError) {
             setUntil(Date.now() + e.retryAfter * 1000);
@@ -180,7 +186,7 @@ export function Playground({ client, lang, onError }: PageProps) {
       waiting: ["Waiting for response…", "等待响应…"],
       thinking: ["Thinking…", "正在思考…"],
       responding: ["", ""],
-      completed: ["Completed", "已完成"],
+      completed: ["", ""],
       stopped: ["Stopped", "已停止"],
       failed: ["Failed or interrupted", "失败或中断"],
       truncated: ["Output limit reached", "已达到输出上限"],
@@ -209,25 +215,29 @@ export function Playground({ client, lang, onError }: PageProps) {
       <div className="pg-layout">
         <div className="pg-conversation">
           <div className="pg-toolbar">
-            <label htmlFor="pg-model">{text(lang, "Model", "模型")}</label>
-            <select
-              id="pg-model"
+            <span>{text(lang, "Model", "模型")}</span>
+            <ChoicePicker
+              className="pg-model-picker"
+              label={text(lang, "Model", "模型")}
               value={model}
               disabled={active}
-              onChange={(e) => setModel(e.target.value)}
-            >
-              <option value="auto">
-                {text(lang, "Auto · let the router choose", "Auto · 自动选模")}
-              </option>
-              {models.map((id) => (
-                <option key={id} value={id}>
-                  {id}
-                </option>
-              ))}
-            </select>
+              onChange={setModel}
+              items={[
+                {
+                  value: "auto",
+                  label: text(
+                    lang,
+                    "Auto · let the router choose",
+                    "Auto · 自动选模",
+                  ),
+                },
+                ...models.map((id) => ({ value: id, label: id })),
+              ]}
+            />
           </div>
           <div
             className="pg-transcript"
+            ref={transcript}
             aria-label={text(lang, "Conversation", "对话")}
           >
             {!state.turns.length && (
@@ -252,7 +262,6 @@ export function Playground({ client, lang, onError }: PageProps) {
             {state.turns.map((t) => (
               <article className="pg-turn" key={t.id}>
                 <div className="pg-user">
-                  <small>{text(lang, "You", "你")}</small>
                   <p>{t.prompt}</p>
                 </div>
                 <div className="pg-answer">
@@ -265,12 +274,21 @@ export function Playground({ client, lang, onError }: PageProps) {
                       streaming={isActive(t.phase)}
                     />
                   )}
-                  <div
-                    className={`pg-phase ${isActive(t.phase) ? "pg-pending" : ""}`}
-                    role="status"
-                  >
-                    {label(t.phase)}
-                  </div>
+                  {t.phase === "failed" && (
+                    <div className="pg-reply-error" role="alert">
+                      {t.errorCode
+                        ? replyErrorText(t.errorCode, t.limitScope, lang)
+                        : label(t.phase)}
+                    </div>
+                  )}
+                  {t.phase !== "failed" && label(t.phase) && (
+                    <div
+                      className={`pg-phase ${isActive(t.phase) ? "pg-pending" : ""}`}
+                      role="status"
+                    >
+                      {label(t.phase)}
+                    </div>
+                  )}
                   {t.usage && (
                     <small className="muted">
                       {text(lang, "Tokens", "Tokens")}: {t.usage.input_tokens} →{" "}
@@ -280,7 +298,6 @@ export function Playground({ client, lang, onError }: PageProps) {
                 </div>
               </article>
             ))}
-            <div ref={last} />
           </div>
           <form
             className="pg-compose"
@@ -296,16 +313,37 @@ export function Playground({ client, lang, onError }: PageProps) {
               id="pg-message"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (
+                  e.key === "Enter" &&
+                  !e.shiftKey &&
+                  !e.nativeEvent.isComposing &&
+                  e.nativeEvent.keyCode !== 229
+                ) {
+                  e.preventDefault();
+                  if (!e.repeat) void send();
+                }
+              }}
+              aria-describedby="pg-keyboard-hint"
               placeholder={text(lang, "Ask something…", "输入你的任务…")}
               rows={3}
               disabled={active}
             />
             <div className="pg-compose-bottom">
-              <small className={tooLarge ? "pg-danger" : "muted"}>
-                {status
-                  ? `${bytes.toLocaleString()} / ${status.limits.input_bytes.toLocaleString()} bytes`
-                  : text(lang, "Loading limits…", "正在读取限额…")}
-              </small>
+              <div className="pg-compose-info">
+                <p id="pg-keyboard-hint" className="pg-keyboard-hint">
+                  {text(
+                    lang,
+                    "Enter to send · Shift+Enter for a new line",
+                    "Enter 发送 · Shift+Enter 换行",
+                  )}
+                </p>
+                <small className={tooLarge ? "pg-danger" : "muted"}>
+                  {status
+                    ? `${bytes.toLocaleString()} / ${status.limits.input_bytes.toLocaleString()} bytes`
+                    : text(lang, "Loading limits…", "正在读取限额…")}
+                </small>
+              </div>
               {active ? (
                 <button type="button" onClick={stop}>
                   <Stop size={16} />
