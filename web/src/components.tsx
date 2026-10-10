@@ -9,6 +9,22 @@ export type PageProps = {
 export function errorText(e: unknown, lang: Lang) {
   const code = e instanceof APIError ? e.code : "";
   const map: Record<string, [string, string]> = {
+    playground_rate_limited: [
+      "Playground limit reached. Wait before sending again.",
+      "已达到 Playground 限额，请稍后再发送。",
+    ],
+    request_too_large: [
+      "Conversation exceeds the Playground limit.",
+      "对话超出 Playground 限制。",
+    ],
+    interrupted: [
+      "The response was interrupted. Partial output is not added to the next turn.",
+      "响应已中断，部分输出不会加入下一轮上下文。",
+    ],
+    playground_unavailable: [
+      "Playground is unavailable on this instance.",
+      "此实例的 Playground 暂不可用。",
+    ],
     https_required: [
       "Use HTTPS to connect to a remote instance.",
       "连接远程实例需要 HTTPS。",
