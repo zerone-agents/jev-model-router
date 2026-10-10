@@ -103,3 +103,56 @@ func TestPlaygroundReleaseAndStorageFailure(t *testing.T) {
 		t.Fatal("storage failure admitted")
 	}
 }
+
+func TestPlaygroundCombinedLimits(t *testing.T) {
+	for _, tc := range []struct {
+		name, scope   string
+		daily, minute int
+		advance, wait time.Duration
+	}{
+		{"day", "day", 1, 20, 0, 12 * time.Hour},
+		{"minute", "instance_minute", 200, 1, 0, time.Minute},
+		{"concurrency_longer", "instance_concurrency", 200, 1, 59900 * time.Millisecond, time.Second},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			st, e := state.Open(filepath.Join(t.TempDir(), "test.db"), nil)
+			if e != nil {
+				t.Fatal(e)
+			}
+			defer st.Close()
+			l := playground.DefaultLimits()
+			l.InstanceConcurrency = 1
+			l.DailyRequests = tc.daily
+			l.InstanceRPM = tc.minute
+			now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+			s := playground.NewService(st, l, func() time.Time { return now })
+			lease, e := s.Acquire(context.Background(), "one")
+			if e != nil {
+				t.Fatal(e)
+			}
+			defer lease.Release()
+			now = now.Add(tc.advance)
+			before, e := s.Status(context.Background(), "two")
+			if e != nil {
+				t.Fatal(e)
+			}
+			_, e = s.Acquire(context.Background(), "two")
+			var limit *playground.LimitError
+			if !errors.As(e, &limit) || limit.Scope != tc.scope || limit.RetryAfter != tc.wait {
+				t.Fatalf("limit: %+v", e)
+			}
+			if tc.scope != "instance_concurrency" && (limit.ResetAt == nil || !limit.ResetAt.Equal(now.Add(tc.wait))) {
+				t.Fatalf("reset: %+v", limit)
+			}
+			after, e := s.Status(context.Background(), "two")
+			if e != nil || before != after {
+				t.Fatalf("rejection consumed quota: %+v %+v %v", before, after, e)
+			}
+			st.Close()
+			_, e = s.Acquire(context.Background(), "two")
+			if e == nil || errors.As(e, &limit) {
+				t.Fatalf("storage failure masked: %v", e)
+			}
+		})
+	}
+}

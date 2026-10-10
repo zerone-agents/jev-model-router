@@ -57,3 +57,27 @@ it("rejects invalid events and preserves rate-limit metadata", async () => {
     scope: "day",
   });
 });
+
+it("parses multiline SSE data across every chunk size", async () => {
+  const bytes = new TextEncoder().encode(
+    'event: delta\r\ndata: {\r\ndata: "content":"中文"}\r\n\r\nevent: done\r\ndata: {"finish_reason":"stop"}\r\n\r\n',
+  );
+  for (let size = 1; size <= bytes.length; size++) {
+    const response = new Response(
+      new ReadableStream({
+        start(controller) {
+          for (let offset = 0; offset < bytes.length; offset += size)
+            controller.enqueue(bytes.slice(offset, offset + size));
+          controller.close();
+        },
+      }),
+      { headers: { "Content-Type": "text/event-stream" } },
+    );
+    const events: unknown[] = [];
+    await consumePlayground(response, (event) => events.push(event));
+    expect(events).toEqual([
+      { type: "delta", content: "中文" },
+      { type: "done", finish_reason: "stop" },
+    ]);
+  }
+});

@@ -18,6 +18,25 @@ func (s *Store) PlaygroundQuota(ctx context.Context, id string, now time.Time, l
 	q, _, e := playgroundQuota(ctx, tx, id, now, l)
 	return q, e
 }
+
+// CheckPlayground evaluates durable limits without accepting a request.
+func (s *Store) CheckPlayground(ctx context.Context, id string, now time.Time, l playground.Limits) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return storageError()
+	}
+	defer tx.Rollback()
+	_, denied, err := playgroundQuota(ctx, tx, id, now, l)
+	if err != nil {
+		return err
+	}
+	if denied != nil {
+		return denied
+	}
+	return nil
+}
 func (s *Store) AdmitPlayground(ctx context.Context, id string, now time.Time, l playground.Limits) (playground.Quota, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
