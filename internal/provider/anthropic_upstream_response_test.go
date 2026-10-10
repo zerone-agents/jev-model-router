@@ -53,7 +53,7 @@ func TestAnthropicUpstreamUsage(t *testing.T) {
 	}
 }
 func TestAnthropicUpstreamSafeErrors(t *testing.T) {
-	for _, tc := range []struct{ status, want int }{{400, 400}, {401, 502}, {403, 502}, {404, 404}, {413, 413}, {422, 422}, {429, 429}, {529, 529}, {418, 502}, {503, 503}} {
+	for _, tc := range []struct{ status, want int }{{400, 400}, {401, 401}, {402, 402}, {403, 403}, {409, 409}, {404, 404}, {413, 413}, {422, 422}, {429, 429}, {529, 529}, {418, 502}, {503, 503}} {
 		t.Run(fmt.Sprint(tc.status), func(t *testing.T) {
 			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
@@ -80,10 +80,51 @@ func TestAnthropicUpstreamSafeErrors(t *testing.T) {
 				if !errors.As(e, &up) || up.Status != tc.want {
 					t.Fatalf("stream=%v error %#v", streaming, e)
 				}
+				if d := routing.Diagnose(e); d.UpstreamCode != "" {
+					t.Fatalf("unrecognized code exposed: %+v", d)
+				}
 				b, _ := json.Marshal(up.Body)
 				if strings.Contains(string(b), "secret") || strings.Contains(string(b), "SECRET") {
 					t.Fatalf("unsafe error %s", b)
 				}
+			}
+		})
+	}
+}
+
+func TestNativeReportedErrorCodes(t *testing.T) {
+	for _, code := range []string{"insufficient_quota", "content_policy_violation", "SECRET"} {
+		e := nativeReportedError(400, []byte(`{"error":{"code":"`+code+`","message":"SECRET https://internal"}}`))
+		d := routing.Diagnose(e)
+		b, _ := json.Marshal(d)
+		if strings.Contains(string(b), "SECRET") || strings.Contains(string(b), "internal") {
+			t.Fatal(string(b))
+		}
+		if code != "SECRET" && d.UpstreamCode != code {
+			t.Fatal(d)
+		}
+	}
+}
+
+func TestNativeDiagnosticCodeProvenance(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"status only", nativeError(429), ""},
+		{"HTTP without code", nativeReportedError(429, `{"error":{"message":"limited"}}`), ""},
+		{"HTTP unknown code", nativeReportedError(429, `{"error":{"code":"secret-unknown"}}`), ""},
+		{"SSE rate limit", nativeEventError("rate_limit_error"), "rate_limit_error"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := routing.Diagnose(tc.err)
+			if d.Code != "upstream_rate_limit" || d.UpstreamCode != tc.want {
+				t.Fatalf("got %+v, want upstream_code %q", d, tc.want)
+			}
+			b, _ := json.Marshal(d)
+			if tc.want == "" && strings.Contains(string(b), "upstream_code") {
+				t.Fatal(string(b))
 			}
 		})
 	}

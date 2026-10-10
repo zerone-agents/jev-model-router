@@ -125,3 +125,51 @@ it("keeps each failure with its reply and preserves partial content", () => {
   expect(s.turns[1]).toMatchObject({ errorCode: "playground_rate_limited" });
   expect(history(s)).toEqual([]);
 });
+
+it("retains the selected model and partial response on generation failure", () => {
+  let s = reducePlayground(initialState(), {
+    type: "start",
+    id: 1,
+    prompt: "hi",
+  });
+  s = reducePlayground(s, {
+    type: "event",
+    id: 1,
+    event: {
+      type: "route",
+      model_id: "model",
+      request_id: "request",
+      path: "explicit",
+      config_version: 1,
+      decision_ms: 1,
+    },
+  });
+  s = reducePlayground(s, {
+    type: "event",
+    id: 1,
+    event: { type: "delta", content: "partial" },
+  });
+  s = reducePlayground(s, {
+    type: "event",
+    id: 1,
+    event: {
+      type: "error",
+      code: "upstream_authentication",
+      message: "Authentication failed",
+      stage: "generation",
+      upstream_status: 401,
+      request_id: "request",
+    },
+  });
+  expect(s.turns[0]).toMatchObject({
+    phase: "failed",
+    content: "partial",
+    route: { model_id: "model" },
+    diagnostic: {
+      stage: "generation",
+      upstream_status: 401,
+      request_id: "request",
+    },
+  });
+  expect(history(s)).toEqual([]);
+});

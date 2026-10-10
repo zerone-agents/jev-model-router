@@ -1,4 +1,4 @@
-import type { Message, PlaygroundEvent, Route } from "./client";
+import type { Diagnostic, Message, PlaygroundEvent, Route } from "./client";
 export type Phase =
   | "idle"
   | "waiting"
@@ -15,6 +15,7 @@ export type Turn = {
   reasoning: string;
   phase: Phase;
   route?: Route;
+  diagnostic?: Diagnostic;
   errorCode?: string;
   limitScope?: string;
   usage?: {
@@ -34,6 +35,7 @@ export type PlaygroundAction =
   | {
       type: "stop" | "fail";
       id: number;
+      diagnostic?: Diagnostic;
       errorCode?: string;
       limitScope?: string;
     }
@@ -72,6 +74,7 @@ export function reducePlayground(
     if (a.type === "fail") {
       turn.errorCode = a.errorCode || "internal_error";
       turn.limitScope = a.limitScope;
+      turn.diagnostic = a.diagnostic;
     }
   } else if (a.type === "event") {
     const e = a.event;
@@ -97,6 +100,7 @@ export function reducePlayground(
     if (e.type === "error") {
       turn.phase = "failed";
       turn.errorCode = e.code;
+      turn.diagnostic = e;
     }
   }
   return { ...s, phase: turn.phase, turns: [...s.turns.slice(0, -1), turn] };

@@ -79,15 +79,23 @@ func (p *playgroundHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	execution := p.inference.Begin(ctx, w.Header().Get("X-Request-ID"))
 	finalErr := routing.Fail("internal_error", "playground execution interrupted")
 	defer func() { execution.Finish(finalErr) }()
-	started := false
+	started, handedOff := false, false
 	finalErr = executeChat(ctx, execution, p.executor, req, p.limits.Timeout, 0, chatOutput{
-		stream: func(streamCtx context.Context, stream routing.EventStream, _ routing.Plan) error {
+		planned: func(_ routing.Plan) error {
 			started = true
+			return sendPlaygroundEvent(w, "route", execution.Metadata())
+		},
+		stream: func(streamCtx context.Context, stream routing.EventStream, _ routing.Plan) error {
+			handedOff = true
 			return writePlaygroundStream(streamCtx, w, stream, execution.Metadata())
 		},
 	})
-	if finalErr != nil && !started {
-		playgroundError(w, finalErr)
+	if finalErr != nil && !handedOff {
+		if started {
+			_ = sendPlaygroundEvent(w, "error", playgroundDiagnostic(finalErr, execution.Metadata().RequestID, "generation"))
+		} else {
+			playgroundError(w, finalErr, "routing")
+		}
 	}
 
 }
@@ -138,7 +146,7 @@ func playgroundFailure(e error) *routing.Error {
 	}
 	return &routing.Error{Code: "internal_error", Message: "playground unavailable"}
 }
-func playgroundError(w http.ResponseWriter, e error) {
+func playgroundError(w http.ResponseWriter, e error, stages ...string) {
 	status := 500
 	body := map[string]any{}
 	var limit *playground.LimitError
@@ -146,10 +154,14 @@ func playgroundError(w http.ResponseWriter, e error) {
 		seconds := max(1, int(math.Ceil(limit.RetryAfter.Seconds())))
 		status = 429
 		w.Header().Set("Retry-After", strconv.Itoa(seconds))
-		body["error"] = map[string]any{"code": "playground_rate_limited", "message": limit.Error(), "limit_scope": limit.Scope, "retry_after_seconds": seconds, "reset_at": limit.ResetAt}
+		body["error"] = map[string]any{"code": "playground_rate_limited", "message": limit.Error(), "limit_scope": limit.Scope, "retry_after_seconds": seconds, "reset_at": limit.ResetAt, "stage": "request", "request_id": w.Header().Get("X-Request-ID")}
 	} else {
 		k := playgroundFailure(e)
-		body["error"] = k
+		stage := "request"
+		if len(stages) > 0 {
+			stage = stages[0]
+		}
+		body["error"] = playgroundDiagnostic(e, w.Header().Get("X-Request-ID"), stage)
 		status = contracts.ErrorMapping(k.Code).HTTP
 		switch k.Code {
 		case "request_too_large":

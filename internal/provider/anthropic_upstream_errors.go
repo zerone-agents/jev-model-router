@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 )
@@ -9,6 +10,8 @@ import (
 func nativeError(status int) error {
 	code, message := "upstream_error", "generation provider failed"
 	switch status {
+	case 401, 402, 403, 409:
+	// Preserve the real status; consumers use the shared safe diagnostic.
 	case 400, 413, 422:
 		code, message = "invalid_request", "upstream rejected generation request"
 	case 404:
@@ -38,6 +41,9 @@ func anthropicUpstreamError(ctx context.Context, fail *schemas.BifrostError) err
 	status := 502
 	if fail != nil && fail.StatusCode != nil {
 		status = *fail.StatusCode
+	}
+	if fail != nil {
+		return nativeReportedError(status, fail.ExtraFields.RawResponse)
 	}
 	return nativeError(status)
 }
@@ -70,5 +76,32 @@ func nativeEventError(typ string) error {
 	case "overloaded_error":
 		status = 529
 	}
-	return nativeError(status)
+	err := nativeError(status).(*routing.UpstreamError)
+	err.ReportedCode = routing.ReportedErrorCode(map[string]any{"type": typ})
+	return err
+}
+
+// Inspect only recognized codes in the actual envelope, never SDK messages.
+func nativeReportedError(status int, raw any) error {
+	err := nativeError(status).(*routing.UpstreamError)
+	var b []byte
+	switch v := raw.(type) {
+	case []byte:
+		b = v
+	case string:
+		b = []byte(v)
+	default:
+		b, _ = json.Marshal(v)
+	}
+	if len(b) > 65536 {
+		return err
+	}
+	var envelope struct {
+		Error map[string]any `json:"error"`
+	}
+	if json.Unmarshal(b, &envelope) != nil {
+		return err
+	}
+	err.ReportedCode = routing.ReportedErrorCode(envelope.Error)
+	return err
 }

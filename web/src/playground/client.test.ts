@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { consumePlayground } from "./client";
+import { consumePlayground, type PlaygroundEvent } from "./client";
 it("decodes UTF-8 split across chunks and requires a terminal event", async () => {
   const bytes = new TextEncoder().encode(
     'event: delta\r\ndata: {"content":"中文"}\r\n\r\nevent: done\ndata: {"finish_reason":"stop"}\n\n',
@@ -80,4 +80,37 @@ it("parses multiline SSE data across every chunk size", async () => {
       { type: "done", finish_reason: "stop" },
     ]);
   }
+});
+it("preserves safe generation diagnostics after route and partial content", async () => {
+  const events: PlaygroundEvent[] = [];
+  await expect(
+    consumePlayground(
+      new Response(
+        'event: route\ndata: {"model_id":"m","request_id":"r","path":"explicit","config_version":1,"decision_ms":1}\n\nevent: delta\ndata: {"content":"partial"}\n\nevent: error\ndata: {"code":"upstream_rate_limit","message":"Provider rate limit reached","stage":"generation","request_id":"r","upstream_status":429}\n\n',
+        { headers: { "Content-Type": "text/event-stream" } },
+      ),
+      (e) => events.push(e),
+    ),
+  ).rejects.toThrow("upstream_rate_limit");
+  expect(events[0]).toMatchObject({ model_id: "m" });
+  expect(events[2]).toMatchObject({
+    stage: "generation",
+    request_id: "r",
+    upstream_status: 429,
+  });
+});
+it("preserves request diagnostics before SSE starts", async () => {
+  await expect(
+    consumePlayground(
+      new Response(
+        JSON.stringify({
+          error: { code: "no_candidates", stage: "routing", request_id: "r" },
+        }),
+        { status: 422 },
+      ),
+      () => {},
+    ),
+  ).rejects.toMatchObject({
+    diagnostic: { stage: "routing", request_id: "r" },
+  });
 });

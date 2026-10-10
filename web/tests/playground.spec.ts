@@ -151,8 +151,11 @@ test("stop clears thinking and another tab cannot bypass session concurrency", a
   await other.getByRole("menuitemradio", { name: "pg-model" }).click();
   await send(other, "hello");
   await expect(other.locator(".pg-answer").getByRole("alert")).toBeVisible();
-  await expect(other.locator(".pg-answer").getByRole("alert")).toHaveText(
+  await expect(other.locator(".pg-answer").getByRole("alert")).toContainText(
     "This session has too many requests in progress. Wait for a reply to finish or stop it before sending again.",
+  );
+  await expect(other.locator(".pg-answer").getByRole("alert")).toContainText(
+    "Request ID:",
   );
   await page.getByRole("button", { name: "Stop", exact: true }).click();
   await expect(page.getByText("Stopped", { exact: true })).toBeVisible();
