@@ -23,7 +23,11 @@ func (g *bifrostGenerator) CompleteMessages(ctx context.Context, t routing.Targe
 	defer bc.Cancel()
 	bc.SetValue(schemas.BifrostContextKeyAllowPerRequestRawOverride, true)
 	bc.SetValue(schemas.BifrostContextKeySendBackRawResponse, true)
-	r, err := encode(bc, t, p.Projection())
+	chat, err := p.chatRequest()
+	if err != nil {
+		return nil, err
+	}
+	r, err := encode(bc, t, chat)
 	if err != nil {
 		return nil, err
 	}

@@ -42,6 +42,24 @@
                         "text": {
                           "type": "string",
                           "maxLength": 1048576
+                        },
+                        "cache_control": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "const": "ephemeral"
+                            },
+                            "ttl": {
+                              "enum": [
+                                "5m",
+                                "1h"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -104,6 +122,24 @@
                               "additionalProperties": false
                             }
                           ]
+                        },
+                        "cache_control": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "const": "ephemeral"
+                            },
+                            "ttl": {
+                              "enum": [
+                                "5m",
+                                "1h"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -278,6 +314,24 @@
                         "content"
                       ],
                       "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "redacted_thinking"
+                        },
+                        "data": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1048576
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "data"
+                      ],
+                      "additionalProperties": false
                     }
                   ]
                 },
@@ -311,6 +365,24 @@
               "text": {
                 "type": "string",
                 "maxLength": 1048576
+              },
+              "cache_control": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "const": "ephemeral"
+                  },
+                  "ttl": {
+                    "enum": [
+                      "5m",
+                      "1h"
+                    ]
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "additionalProperties": false
               }
             },
             "required": [
@@ -363,6 +435,24 @@
           },
           "input_schema": {
             "type": "object"
+          },
+          "cache_control": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "ephemeral"
+              },
+              "ttl": {
+                "enum": [
+                  "5m",
+                  "1h"
+                ]
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -451,7 +541,7 @@
           "additionalProperties": false
         }
       ],
-      "description": "Adaptive/disabled are supported. Enabled budget syntax is recognized, but the current Chat adapter returns unsupported_request because it cannot enforce an independent budget."
+      "description": "Native upstream preserves thinking and budgets; Chat conversion cannot enforce an independent budget."
     },
     "output_config": {
       "type": "object",
@@ -483,6 +573,21 @@
         }
       },
       "required": [],
+      "additionalProperties": false
+    },
+    "top_k": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2147483647
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "maxLength": 256
+        }
+      },
       "additionalProperties": false
     }
   },
