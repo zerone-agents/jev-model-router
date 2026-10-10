@@ -50,6 +50,8 @@ type anthropicUpstreamReader struct {
 	scanner  *bufio.Scanner
 	state    *anthropicUpstreamValidation
 	finished bool
+	accept   func(string, []byte) error
+	frames   int
 }
 
 func newAnthropicUpstreamReader(reader io.Reader, state *anthropicUpstreamValidation) providerUtils.SSEEventReader {
@@ -58,9 +60,11 @@ func newAnthropicUpstreamReader(reader io.Reader, state *anthropicUpstreamValida
 	return &anthropicUpstreamReader{scanner: scanner, state: state}
 }
 func (r *anthropicUpstreamReader) fail(e error) (string, []byte, error) {
-	r.state.mu.Lock()
-	r.state.failure = e
-	r.state.mu.Unlock()
+	if r.state != nil {
+		r.state.mu.Lock()
+		r.state.failure = e
+		r.state.mu.Unlock()
+	}
 	return "", nil, e
 }
 func (r *anthropicUpstreamReader) ReadEvent() (string, []byte, error) {
@@ -86,9 +90,18 @@ func (r *anthropicUpstreamReader) ReadEvent() (string, []byte, error) {
 			if typ == "" || len(raw) == 0 || !json.Valid(raw) {
 				return r.fail(nativeError(502))
 			}
-			r.state.mu.Lock()
-			e := r.state.accept(typ, raw)
-			r.state.mu.Unlock()
+			var e error
+			if r.accept != nil {
+				r.frames++
+				if r.frames > maxMessagesStreamFrames {
+					return r.fail(nativeError(502))
+				}
+				e = r.accept(typ, raw)
+			} else {
+				r.state.mu.Lock()
+				e = r.state.accept(typ, raw)
+				r.state.mu.Unlock()
+			}
 			if e != nil {
 				return r.fail(e)
 			}
@@ -103,9 +116,11 @@ func (r *anthropicUpstreamReader) ReadEvent() (string, []byte, error) {
 				if r.scanner.Err() != nil {
 					return r.fail(nativeReaderError(r.scanner.Err()))
 				}
-				r.state.mu.Lock()
-				r.state.terminalVerified = true
-				r.state.mu.Unlock()
+				if r.state != nil {
+					r.state.mu.Lock()
+					r.state.terminalVerified = true
+					r.state.mu.Unlock()
+				}
 				r.finished = true
 			}
 			return typ, raw, nil
