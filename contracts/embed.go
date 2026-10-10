@@ -62,6 +62,7 @@ func initSchemas() {
 	idempotencyHours = int(protocol["retention"].(map[string]any)["idempotency_hours"].(float64))
 	protocol["idempotency"].(map[string]any)["valid_for_hours"] = idempotencyHours
 	protocol["session"] = SessionPolicy()
+	protocol["playground"] = PlaygroundPolicy()
 	encodedProtocol, _ := json.Marshal(protocol)
 	for i := range caps {
 		schema := callSchema(caps[i].Write)
@@ -72,6 +73,11 @@ func initSchemas() {
 		caps[i].Call = CallContract{Method: "POST", Path: "/admin/v1/call/" + caps[i].ID, Schema: body, Protocol: encodedProtocol}
 	}
 	validators = map[string]*jsonschema.Schema{}
+	var pg struct {
+		InputSchema json.RawMessage `json:"input_schema"`
+	}
+	json.Unmarshal(PlaygroundPolicy(), &pg)
+	validators["playground"] = compile(pg.InputSchema)
 	envelope, _ := json.Marshal(callSchema(true))
 	validators["write_envelope"] = compile(envelope)
 	policy := SessionLimits()

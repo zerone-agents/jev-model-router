@@ -1,0 +1,184 @@
+{
+  "authentication": {
+    "role": "settings",
+    "scheme": "cookie",
+    "csrf_header": "X-CSRF-Token",
+    "get_header": {
+      "X-Jev-Session": "1"
+    },
+    "authorization_header": "forbidden",
+    "same_origin": true
+  },
+  "endpoints": {
+    "status": {
+      "method": "GET",
+      "path": "/admin/v1/playground"
+    },
+    "generate": {
+      "method": "POST",
+      "path": "/admin/v1/playground/completions"
+    }
+  },
+  "enabled_default": true,
+  "limits": {
+    "session_rpm": {
+      "default": 6,
+      "minimum": 1,
+      "maximum": 1000000
+    },
+    "instance_rpm": {
+      "default": 20,
+      "minimum": 1,
+      "maximum": 1000000
+    },
+    "session_concurrency": {
+      "default": 1,
+      "minimum": 1,
+      "maximum": 128
+    },
+    "instance_concurrency": {
+      "default": 3,
+      "minimum": 1,
+      "maximum": 128
+    },
+    "daily_requests": {
+      "default": 200,
+      "minimum": 1,
+      "maximum": 1000000
+    },
+    "input_bytes": {
+      "default": 32768,
+      "minimum": 1,
+      "maximum": 16777216
+    },
+    "body_bytes": {
+      "default": 262144,
+      "minimum": 1,
+      "maximum": 16777216
+    },
+    "max_messages": {
+      "default": 100,
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "output_tokens": {
+      "default": 4096,
+      "minimum": 16,
+      "maximum": 10000000
+    },
+    "timeout_seconds": {
+      "default": 120,
+      "minimum": 1,
+      "maximum": 600
+    }
+  },
+  "window_seconds": 60,
+  "day_timezone": "UTC",
+  "side_effects": [
+    "Calls decision and generation providers; may incur charges and transmit conversation data.",
+    "Accepted requests consume persistent quota even on failure or cancellation."
+  ],
+  "concurrency_scope": "single process",
+  "input_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "model",
+      "messages",
+      "stream"
+    ],
+    "properties": {
+      "model": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "stream": {
+        "const": true
+      },
+      "messages": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "role",
+            "content"
+          ],
+          "properties": {
+            "role": {
+              "enum": [
+                "user",
+                "assistant"
+              ]
+            },
+            "content": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reasoning_content": {
+              "type": "string"
+            }
+          },
+          "if": {
+            "properties": {
+              "role": {
+                "const": "user"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "reasoning_content"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "stream": {
+    "content_type": "text/event-stream",
+    "events": {
+      "route": {
+        "request_id": "string",
+        "model_id": "string",
+        "path": "string",
+        "config_version": "integer",
+        "decision_ms": "integer"
+      },
+      "delta": {
+        "content": "optional string",
+        "reasoning_content": "optional string"
+      },
+      "done": {
+        "finish_reason": "string",
+        "usage": "optional token usage object"
+      },
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
+    },
+    "terminal": "Exactly one done or error; EOF without terminal is interrupted."
+  },
+  "errors": {
+    "playground_rate_limited": {
+      "http_status": 429,
+      "retry_header": "Retry-After",
+      "details": [
+        "limit_scope",
+        "retry_after_seconds",
+        "reset_at (optional)"
+      ]
+    },
+    "playground_unavailable": {
+      "http_status": 503
+    },
+    "request_too_large": {
+      "http_status": 413
+    }
+  }
+}
