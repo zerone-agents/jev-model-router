@@ -6,7 +6,7 @@ Run Jev Model Router with Docker Compose. One container serves the API and manag
 
 ## Run (recommended)
 
-The default stack pulls `zeroneai/jev-model-router:latest` from Docker Hub. No Go, Node, or source build is needed. The image must be published before this path can run; if it is unavailable, use the source-build override below.
+The default stack pulls `zeroneai/jev-model-router:latest` from Docker Hub. No Go, Node, or source build is needed. To pin the current documented release, set `ROUTER_IMAGE=zeroneai/jev-model-router:0.1.15` in `.env`.
 
 ```sh
 git clone https://github.com/zerone-agents/jev-model-router.git
@@ -54,9 +54,9 @@ Follow the [companion SKILL](../skills/jev-router/SKILL.md) to create a disabled
 
 Inside the container, `localhost` is the container itself. Use a reachable upstream hostname, not the host machine's loopback address. After changing environment keys, recreate the service with `docker compose up -d`.
 
-## Remotely managed API keys (after v0.1.1)
+## Remotely managed API keys
 
-Use a server and CLI build containing managed-credential support; v0.1.1 rejects `api_key`. Until a release includes it, use the source-build override. Generate one master key with `openssl rand -hex 32` and place it in `JEV_ROUTER_ENCRYPTION_KEY` in the server's private `.env` (`chmod 600 .env`). Recreate the container once. Back up this master key separately from SQLite; losing it makes stored provider keys unrecoverable. Never commit it or share rendered Compose configuration containing its value.
+The current release supports managed credentials. Check `jev-router schema providers.put` for `api_key` when connecting to an older server. Generate one master key with `openssl rand -hex 32` and place it in `JEV_ROUTER_ENCRYPTION_KEY` in the server's private `.env` (`chmod 600 .env`). Recreate the container once. Back up this master key separately from SQLite; losing it makes stored provider keys unrecoverable. Never commit it or share rendered Compose configuration containing its value.
 
 After that setup, add or replace provider API keys through the remote CLI using a protected JSON file or stdin. The input has `id`, `base_url`, and write-only `api_key` instead of `secret_ref`. No Compose edit or restart is needed for subsequent provider-key changes. Keep `TYPESAFE_API_KEY` for decision-backend credentials. Existing `env:`/`file:` provider references remain supported.
 
@@ -108,3 +108,7 @@ With these configured, Release pushes the same build and version/latest tags to 
 ### Dashboard sessions
 
 For a remote dashboard, set `JEV_ROUTER_DASHBOARD_ORIGIN=https://router.example.com` in `.env` and recreate the container. Terminate TLS at a proxy that preserves Host, and keep the backend private. With no origin configured, browser login works only on loopback HTTP. Login lasts 7 days across refresh and same-credential restart; logout revokes the current request session. CLI still uses Bearer. See [session deployment and recovery](../docs/configuration.md#dashboard-sessions) for capacity, credential rotation and backup recovery.
+
+## Inference protocols
+
+OpenAI clients use the Router `/v1` base URL; Anthropic SDK clients use the Router root. `/v1/chat/completions` supports OpenAI-compatible and native Anthropic upstreams; `/v1/messages` currently supports only OpenAI-compatible upstreams. See [request examples](../README.md#call-the-inference-api) and [native Anthropic/BigModel configuration](../docs/configuration.md#native-anthropic-generation-upstream).

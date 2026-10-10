@@ -2,9 +2,18 @@
 
 English | [简体中文](README.zh-CN.md)
 
-A lightweight model routing gateway for agents. It uses Jev's native choice capability to select models based on the task and editable model cards, with OpenAI Chat Completions-compatible JSON/SSE, a management CLI, and a companion SKILL.
+A lightweight model routing gateway for agents. Connect OpenAI Chat Completions or Anthropic Messages clients, select an explicit model or let Jev choose from editable model cards, and manage providers through a CLI and bilingual dashboard.
 
-The first release implements a single-instance Go gateway with SQLite, explicit and automatic model selection, and an OpenAI-compatible generation adapter. Local Laya, sensitive-session locking, ArbiterOS and PostgreSQL are planned for later phases. Small-sample routing and Agent diagnostic baselines are recorded in the [acceptance summary](docs/acceptance/2026-09-29.md); production-wide quality and economic benefits remain unverified. No AgentUse certification is claimed.
+The current release is [v0.1.15](https://github.com/zerone-agents/jev-model-router/releases/tag/v0.1.15). It runs as a single Go service with SQLite, streams text and tool calls, and supports OpenAI-compatible and native Anthropic generation upstreams within the matrix below. Local Laya, sensitive-session locking, ArbiterOS and PostgreSQL remain planned.
+
+## Client and upstream support
+
+| Client entry point | OpenAI-compatible upstream | Native Anthropic upstream |
+| --- | --- | --- |
+| `/v1/chat/completions` | JSON / SSE | JSON / SSE, including supported thinking and tool continuations |
+| `/v1/messages` | JSON / SSE through conversion | Planned in [#51](https://github.com/zerone-agents/jev-model-router/issues/51) |
+
+Support is limited to the fields and combinations in the [compatibility matrix](docs/compatibility.md). Unsupported conversions fail explicitly. BigModel `glm-5.3` and `glm-5.3-flash` passed 12 original Agent SDK examples through the local Router; see the [compatibility and validation scope](docs/compatibility.md). This does not establish compatibility with every Anthropic deployment or native signed thinking history.
 
 ## Getting started
 
@@ -53,19 +62,38 @@ The English/Chinese UI shows instance status, models, the routing prompt and rou
 The contents of `empty-object.json` are `{}`. A complete provider configuration example (inject `PROVIDER_API_KEY` first):
 
 ```json
-{"id":"cloud","base_url":"https://api.openai.com/v1","secret_ref":"env:PROVIDER_API_KEY"}
+{"id":"cloud","protocol":"openai","base_url":"https://api.openai.com/v1","secret_ref":"env:PROVIDER_API_KEY"}
 ```
 
 Configure a disabled model using `schema models.put`, run the fixed connection test with `call models.test --id <ID>`, read the current version and enable the model, then check routing with `route.inspect`. Automatic routing with multiple candidates also requires `decision.put` to configure the Jev root URL, native model version, and secret reference. Use `prompt.put` to edit the single default balanced template. Supply complex inputs through JSON files or stdin; all writes include a version and an idempotency key. See the [companion SKILL](skills/jev-router/SKILL.md) for the complete workflow.
 
-Set the inference client's base URL to `http://127.0.0.1:8080/v1` and use the inference credential as its API key. Set `model: "auto"` for automatic selection, or specify an enabled public model ID returned by `/v1/models`. The settings credential is only for management and fixed tests.
+Use `/v1/models` to discover enabled public model IDs. The settings credential is only for management and fixed tests; generation uses the inference credential.
+
+## Call the inference API
+
+OpenAI clients use `http://127.0.0.1:8080/v1` as their base URL. Anthropic SDK clients use the root `http://127.0.0.1:8080`; the SDK appends `/v1/messages`. Both use the inference credential and `auto` or an enabled public model ID.
+
+```sh
+curl http://127.0.0.1:8080/v1/chat/completions \
+  -H "Authorization: Bearer $JEV_ROUTER_INFERENCE_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}],"max_tokens":1024}'
+
+curl http://127.0.0.1:8080/v1/messages \
+  -H "x-api-key: $JEV_ROUTER_INFERENCE_TOKEN" \
+  -H 'anthropic-version: 2023-06-01' \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}],"max_tokens":1024}'
+```
+
+Add `"stream":true` for SSE. Messages currently selects only OpenAI-compatible upstreams; use Chat Completions if you have configured only native Anthropic upstreams. See the [Anthropic SDK example](examples/anthropic-messages.mjs) and [native upstream configuration](docs/configuration.md#native-anthropic-generation-upstream).
 
 ## Routing behavior
 
 - No candidates means failure; a single candidate is selected directly; multiple candidates invoke Jev on every request. Explicit model selection skips Jev.
 - Preferences live primarily in prompts and natural-language model cards. Code enforces authorization, capability, capacity, and protocol boundaries.
 - `auto` is a reserved ID. Generation requests are not truncated, parameters are not silently dropped, and requests are not retried or switched to another model.
-- Jev mode provides no sensitive-data routing guarantee. Image fields are not sent to Jev, but text and tool results may be.
+- Jev mode provides no sensitive-data routing guarantee. Conversation text may go to Jev. Image data, tool definitions, tool arguments and tool outputs are excluded; paired tool IDs and names remain.
 - Configuration writes affect new requests immediately. Disabling a model does not revoke snapshots already in use.
 - Records retain routing metadata and up to 120 characters from the latest user message. Default retention is seven days or 100,000 records, whichever limit is reached first. Writes are best effort and degraded status is exposed; these records are not audit logs.
 
@@ -75,7 +103,7 @@ See the [compatibility matrix](docs/compatibility.md) for supported fields and e
 
 ```mermaid
 flowchart TD
-    Agent[Agent model client] --> API[Chat Completions JSON / SSE]
+    Agent[Agent model client] --> API[Chat Completions / Messages JSON / SSE]
     Skill[Companion SKILL] --> CLI[Go CLI]
     CLI --> Admin[Management HTTP / schema]
     Admin --> Management[Shared management service]
@@ -86,7 +114,7 @@ flowchart TD
     Planner -->|Multiple candidates in auto mode| Jev[Jev native choice]
     Planner --> Executor[Single-target execution]
     Executor --> Bifrost[Bifrost Core]
-    Bifrost --> Models[OpenAI-compatible generation endpoints]
+    Bifrost --> Models[OpenAI-compatible / native Anthropic upstreams]
     API -->|Best-effort writes| SQLite
 ```
 
@@ -120,4 +148,4 @@ go test -race ./... -count=1
 go vet ./...
 ```
 
-Tests access local mock endpoints only. Start with the [architecture](docs/architecture.md), [management contract](contracts/README.md), and [domain terminology](CONTEXT.md). Local research, implementation specifications, and ADRs are excluded from Git by convention.
+Default tests access local mock endpoints. Optional SDK tests require a local SDK installation; explicitly enabled live acceptance tests call paid upstreams and can execute example tools. See [validation scope](docs/compatibility.md#sdk-完整-agent-examples). Start with the [architecture](docs/architecture.md), [management contract](contracts/README.md), and [domain terminology](CONTEXT.md). Local research, implementation specifications, ADRs and per-run acceptance records are excluded from Git by convention.

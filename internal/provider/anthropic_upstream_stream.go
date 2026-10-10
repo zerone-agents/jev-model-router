@@ -177,8 +177,8 @@ func (s *anthropicUpstreamStream) finish() (routing.Event, error) {
 	}
 	for i, b := range calls {
 		c := s.calls[i]
-		var args map[string]any
-		if json.Unmarshal([]byte(c.Function.Arguments), &args) != nil || args == nil || c.ID != b.ID || c.Function.Name != b.Name || !reflect.DeepEqual(args, decoded(b.Input)) {
+		args, _ := decoded([]byte(c.Function.Arguments)).(map[string]any)
+		if args == nil || c.ID != b.ID || c.Function.Name != b.Name || !reflect.DeepEqual(args, decoded(b.Input)) {
 			return routing.Event{}, nativeError(502)
 		}
 	}

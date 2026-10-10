@@ -93,7 +93,7 @@ At most 128 active sessions are allowed. Expiry/logout frees capacity; replaceme
 
 Generation providers accept `protocol: "openai" | "anthropic"`. Omitted protocol defaults to `openai`, including replacement writes; preserve it when editing an Anthropic provider. Reads return the effective protocol. Existing stored rows need no migration or version increment. `base_url` is the API prefix (for example `https://api.anthropic.com/v1`).
 
-### Native Anthropic generation upstream
+## Native Anthropic generation upstream
 
 Use a complete `providers.put` input such as:
 
@@ -103,7 +103,18 @@ Use a complete `providers.put` input such as:
 
 The adapter appends `/messages`; OpenAI providers append `/chat/completions`. No hostname or version-path guessing occurs. `providers.get` returns the effective protocol and derived `endpoint`. Omission of protocol on replacement resets it to openai. Managed `api_key` writes support the same protocol field.
 
-Native requests without an output limit send **65536** tokens and reserve the same amount in automatic routing. Explicit limits are preserved, never clamped. Connectivity probes still use 16. Use `reasoning_effort:"none"` or `chat_template_kwargs:{"enable_thinking":false}` for tool requests, including continuation. Single-turn thinking can use true (adaptive), but signed thinking history and thinking+tools are unsupported. Test model support explicitly; a local conversion check does not guarantee the upstream model accepts its parameters.
+Native requests without an output limit send **65536** tokens and reserve the same amount in automatic routing. Explicit limits are preserved, never clamped. Connectivity probes still use 16. Tool requests, including continuation, support default or enabled thinking and replay plain `reasoning_content`. `chat_template_kwargs:{"enable_thinking":true}` maps to adaptive; false or `reasoning_effort:"none"` requests disabled thinking only when the upstream supports it. Signed thinking with tools is rejected by default. The verified exception is BigModel’s official HTTPS `/api/anthropic/v1` endpoint with upstream `glm-5.3` or `glm-5.3-flash`: these accept replay without signatures, so visible thinking is retained while the optional signature is omitted. Proxies and other models do not inherit this exception. Encrypted thinking remains unsupported. Test model support explicitly; a local conversion check does not guarantee the upstream model accepts its parameters.
+
+
+For the verified BigModel profile, use this provider input (the environment reference must resolve on the Router server):
+
+```json
+{"id":"bigmodel","protocol":"anthropic","base_url":"https://open.bigmodel.cn/api/anthropic/v1","secret_ref":"env:BIGMODEL_API_KEY"}
+```
+
+Create models through `models.put` with `provider_id: "bigmodel"` and `upstream_name: "glm-5.3"` or `"glm-5.3-flash"`. Choose your own public IDs, descriptions and verified capabilities using the instance schema. Create disabled, run `models.test`, then enable; the 16-token connection test does not validate thinking, tools or vision. In Compose, add `BIGMODEL_API_KEY` to the service environment as well as `.env`, or use managed `api_key` instead.
+
+The provider API prefix includes `/v1`; the resulting endpoint is `https://open.bigmodel.cn/api/anthropic/v1/messages`. An Anthropic SDK may itself append `/v1/messages` to a root URL, but Router provider configuration appends only `/messages`. OpenAI clients still connect to the Router's `/v1` URL. The Router `/v1/messages` entry cannot yet select a native Anthropic provider; that direction is tracked in [#51](https://github.com/zerone-agents/jev-model-router/issues/51).
 
 ## Playground
 
@@ -130,3 +141,4 @@ RPM 是任意滚动 60 秒内的受理次数；每日按 UTC 零点重置。会�
 并发限制作用于单实例单服务进程，多副本没有共享并发协调保证。取消会传播到上游，但不能撤销已产生的费用。限额约束调用量及输出，不是精确费用上限。输入字节包括完整正文和协议携带的 reasoning 历史；超限明确拒绝，不自动截断。
 
 页面仅在内存保存对话，刷新或离开后丢失；失败、停止或截断的回合不会自动加入下一轮历史。思考正文不展示、不落浏览器持久存储；按协议需要携带的 reasoning 历史仍保留在当前页面内存。正文通过 Streamdown 渲染，原始 HTML 不执行、图片不加载，既有 CSP 不放宽。
+
