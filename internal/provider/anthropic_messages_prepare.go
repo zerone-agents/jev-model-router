@@ -180,6 +180,18 @@ func PrepareMessages(body json.RawMessage) (*PreparedMessages, error) {
 	return &PreparedMessages{body: append(json.RawMessage(nil), body...), stops: len(doc.StopSequences) > 0, summary: routing.RequestSummary(routing.Request{Messages: source.Messages})}, nil
 }
 func (p *PreparedMessages) nativeBody(t routing.Target) (json.RawMessage, error) {
+	if !nativeSignatureOptional(t) {
+		var doc messagesDocument
+		_ = json.Unmarshal(p.body, &doc)
+		for _, m := range doc.Messages {
+			for _, b := range inputBlocks(m.Content) {
+				if b.Type == "thinking" && b.Signature == "" {
+					return nil, routing.Fail("unsupported_request", "native thinking history requires a signature for this target")
+				}
+			}
+		}
+	}
+
 	var fields map[string]json.RawMessage
 	if json.Unmarshal(p.body, &fields) != nil {
 		return nil, routing.Fail("internal_error", "cannot build native Messages request")

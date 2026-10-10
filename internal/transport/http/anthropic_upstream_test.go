@@ -113,7 +113,7 @@ func TestChatAnthropicUpstreamHTTP(t *testing.T) {
 	}
 	w := messagesCall(h, `{"model":"external","max_tokens":1024,"messages":[{"role":"user","content":"hi"}]}`, "key")
 	if w.Code == 200 {
-		t.Fatal("unverified native Messages route allowed")
+		t.Fatal("unsigned native response accepted outside the BigModel profile")
 	}
 }
 func TestNativeUpstreamSDKs(t *testing.T) {

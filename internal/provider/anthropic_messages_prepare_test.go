@@ -92,3 +92,20 @@ func TestMessagesNativeValidationBoundaries(t *testing.T) {
 		}
 	}
 }
+
+func TestMessagesNativeUnsignedProfileReplay(t *testing.T) {
+	p, err := PrepareMessages([]byte(`{"model":"auto","max_tokens":2048,"messages":[{"role":"assistant","content":[{"type":"thinking","thinking":"native unsigned"},{"type":"tool_use","id":"t","name":"f","input":{}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"t","content":"ok"}]}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := nativeMessagesTarget()
+	target.Provider.BaseURL = "https://open.bigmodel.cn/api/anthropic/v1"
+	target.Model.UpstreamName = "glm-5.3"
+	if err = p.Check(target); err != nil {
+		t.Fatal(err)
+	}
+	target.Provider.BaseURL = "https://api.anthropic.com/v1"
+	if err = p.Check(target); err == nil {
+		t.Fatal("unsigned replay accepted outside profile")
+	}
+}

@@ -165,8 +165,7 @@
                       },
                       "required": [
                         "type",
-                        "thinking",
-                        "signature"
+                        "thinking"
                       ],
                       "additionalProperties": false
                     },
