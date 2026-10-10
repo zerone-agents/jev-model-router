@@ -1,4 +1,14 @@
-# 首版兼容验证
+# 兼容范围与验证记录
+
+当前范围截至 v0.1.15。下方带日期的段落记录对应版本的验证证据，不代表每次发布均重新执行真实模型测试。
+
+| 客户端入口 | OpenAI 兼容上游 | 原生 Anthropic 上游 |
+| --- | --- | --- |
+| Chat Completions | JSON / SSE | JSON / SSE，支持公布范围内的思考与工具续写 |
+| Anthropic Messages | JSON / SSE，经转换 | 未实现，见 [#51](https://github.com/zerone-agents/jev-model-router/issues/51) |
+
+## 基础转换与路由
+
 
 2026-09-28：固定 Bifrost Core `v1.10.2-0.20260924033752-a8411cd54142`，Go 1.27.0；SQLite 使用纯 Go 驱动 modernc.org/sqlite v1.39.1，不要求 CGO（race 测试仍需要受支持的本机构建环境）。依赖锁在 go.mod/go.sum。
 
@@ -20,7 +30,7 @@ Jev 原生协议依据 [API reference](https://docs.typesafe.ai/api)：state/que
 
 Jev 决策默认限制为 255 个候选、32,000 UTF-8 序列化字节（包含问题和选项），可通过 decision_max_bytes / JEV_ROUTER_DECISION_MAX_BYTES 修改。默认值参照官方单问题 32k token 上限采用保守字节估算；官方未提供字节推荐值，这不是精确 token 计数，详见 [启动配置](configuration.md#jev-决策输入预算)。保留全部候选、偏好、system/developer 指令和最新 user query；较旧回合按完整组从近到远加入，溢出时标记省略。Jev 不接收工具定义，工具执行仅保留调用 ID、工具名称和结果关联记录，不保留参数、输出及执行消息附带文本。图片结构替换为 image_present，不保留 URL 或内联数据。system/developer 与最新 query 的各文本段超限时分别保留首尾、从中间截断，并标记 content_truncated；仅不可裁剪元数据与最小首尾结构仍超限时失败。生成请求保持完整。
 
-生成容量预检使用 `semantic_bytes_v1`：完整历史文本（含工具结果、reasoning/refusal）、工具名称和描述按 ceil(UTF-8 字节总数/4) 估算；工具参数按解码后的字符串字节数、工具 schema/response_format/tool_choice 按紧凑 JSON 字节数单独核算；每消息预留 4、每工具调用/定义预留 8、每张图片预留 8192。图片 URL/base64 不计作文本；model、stream、temperature 等非提示字段不计入。输入与输出分开，输出限额只加一次，未指定时仍预留 4096，但不会向上游注入该限额。`route.inspect.context_estimate` 返回方法、文本/结构化字节数、图片/framing、输入、输出预留及总估算；`context_exact=false` 表明它不是精确计数，也不保证多语言或视觉模型上界。
+生成容量预检使用 `semantic_bytes_v1`：完整历史文本（含工具结果、reasoning/refusal）、工具名称和描述按 ceil(UTF-8 字节总数/4) 估算；工具参数按解码后的字符串字节数、工具 schema/response_format/tool_choice 按紧凑 JSON 字节数单独核算；每消息预留 4、每工具调用/定义预留 8、每张图片预留 8192。图片 URL/base64 不计作文本；model、stream、temperature 等非提示字段不计入。输入与输出分开，输出限额只加一次，OpenAI 上游未指定时预留 4096，不向上游注入该限额；原生 Anthropic 上游未指定时发送并预留 65536。`route.inspect.context_estimate` 返回方法、文本/结构化字节数、图片/framing、输入、输出预留及总估算；`context_exact=false` 表明它不是精确计数，也不保证多语言或视觉模型上界。
 
 `auto` 仅当所有通过非容量约束的模型都因非精确估算超限而被排除时，保留 ContextLimit 最大的全部模型作为保底候选，路径标记为 `context_estimate_fallback`；只有一个候选时直接执行，多个并列时仅将这些候选交给 Jev 选择一轮，候选列表和决策 usage 保留。若任一模型正常通过容量检查，沿用原流程；精确超限不进入此保底。能力、启用状态、供应商配置检查不能被绕过；显式模型跳过本地上下文预算估算与拦截，由上游判断容量，不换模。并列候选的 Jev 决策失败时明确报错，不任意选用模型；不重试上游；完整生成输入和输出限额保持不变，实际超限由上游处理。
 
@@ -75,7 +85,7 @@ JEV_TEST_AGENT_SDK=/absolute/path/to/agent-sdk go test ./internal/transport/http
 go test ./internal/provider -run Reasoning -count=1
 ```
 
-2026-10-01 随后完成真实阿里云对照：`qwen3.8-flash` 与 `qwen3.8-max` 的 thinking enabled、high effort 及两者组合，在未经修改的 SDK 直连、本地 Router 显式选模和 auto 路径上均通过 JSON/SSE 验证。已核对实际控制字段、1024 输出限额、非空正文/推理文本、stop 与 SSE DONE；auto 使用唯一合格候选，未调用真实 Jev。仅承诺本次已测组合，其他 effort 值及 thinking=false 仍需对应端点验证。详细范围和脱敏证据见 [真实验收记录](acceptance/2026-10-01-reasoning.md)。
+2026-10-01 随后完成真实阿里云对照：`qwen3.8-flash` 与 `qwen3.8-max` 的 thinking enabled、high effort 及两者组合，在未经修改的 SDK 直连、本地 Router 显式选模和 auto 路径上均通过 JSON/SSE 验证。已核对实际控制字段、1024 输出限额、非空正文/推理文本、stop 与 SSE DONE；auto 使用唯一合格候选，未调用真实 Jev。仅承诺本次已测组合，其他 effort 值及 thinking=false 仍需对应端点验证。逐次验收明细保留在本地，不作为公开性能基准。
 
 ## SDK 完整 Agent examples
 
@@ -87,7 +97,7 @@ go test ./internal/provider -run Reasoning -count=1
 JEV_TEST_AGENT_SDK=/path/to/agent-sdk go test ./internal/transport/http -run TestAgentSDKSimpleQuerySample -v -count=1
 ```
 
-真实上游验收可运行 `TestSDKLiveSamples`，需设置 `JEV_RUN_LIVE_SAMPLES=1`、`JEV_TEST_AGENT_SDK`、`JEV_LIVE_KEY_FILE`、`JEV_LIVE_BASE_URL`、`JEV_LIVE_MODEL`。可选 `JEV_SAMPLE_LOG_DIR` 保存本地输出。此测试会产生模型费用并执行 sample 的真实工具；请在受控环境运行。工作目录使用临时 fixture；两个使用固定 `/tmp` 文件名的示例会拒绝覆盖已有文件。当前验收模型应支持 tools、thinking 和 low/medium/high effort。详见 [验收记录](acceptance/2026-10-02-sdk-samples.md)。
+真实上游验收可运行 `TestSDKLiveSamples`，需设置 `JEV_RUN_LIVE_SAMPLES=1`、`JEV_TEST_AGENT_SDK`、`JEV_LIVE_KEY_FILE`、`JEV_LIVE_BASE_URL`、`JEV_LIVE_MODEL`。可选 `JEV_SAMPLE_LOG_DIR` 保存本地输出。此测试会产生模型费用并执行 sample 的真实工具；请在受控环境运行。工作目录使用临时 fixture；两个使用固定 `/tmp` 文件名的示例会拒绝覆盖已有文件。当前验收模型应支持 tools、thinking 和 low/medium/high effort。这些测试验证协议和工具往返，不保证生成任务质量或全部 SDK examples 通过。
 
 ## 生成上游错误
 
@@ -128,7 +138,7 @@ go test ./internal/provider ./internal/transport/http -run 'PreparedMessages|Mes
 
 SDK 测试不改写 fetch/请求；单次调用验证设置 maxRetries=0，四个完整回合共 8 次模拟生成请求；另有 1 次模拟断流验证 SDK 流内错误解析，认证失败和非法请求不外发。示例见 examples/anthropic-messages.mjs。官方 SDK 默认重试是客户端行为，不能误认为 Router 换模或重试。
 
-发布条件仍未全部完成：独立 thinking 预算、原生签名兼容、严格 initial usage、停止元数据、OpenAI 独有 effort 档位在标准 Anthropic 字段中的表达仍有差距；部署环境和真实模型验证未运行。不得据本地部分通过结论关闭 #23 或宣称已经覆盖当前 OpenAI 入口的全部语义。
+Messages 仍有明确兼容差异：不支持独立 thinking 预算和原生签名历史，initial usage、停止元数据及 effort 词汇也与其他入口不同。以上 SDK 记录来自本地模拟上游，不应据此宣称覆盖全部 OpenAI 入口语义或所有线上模型；原生上游的 BigModel 验收见下节，不能作为此转换方向的验收。
 
 Messages SSE 在 Bifrost 累计状态之前执行总预算：序列化后的已解码帧累计最多 16 MiB、最多 65536 帧，原始捕获单次最多 16 MiB。包含文本、thinking、工具参数/名称、ID 等元数据；超限明确失败并取消上游，不截断成成功输出。每个工具参数另限 1 MiB。该预算限制 adapter/converter 的累计数据，不宣称约束 SDK 解析一个巨大原始帧之前的瞬时内存分配。
 
@@ -138,7 +148,7 @@ SSE thinking 块被文本或工具输出关闭后，上游再次发送非空 thi
 
 ## OpenAI clients with native Anthropic upstream (#50)
 
-Set provider protocol to `anthropic`. JSON and SSE use the same checked Bifrost conversion for messages, leading system/developer instructions, HTTPS/data images, ordinary function tools and tool results. Leading developer text maps to the same instruction level as system, preserving order. Mid-conversation instruction insertion, unsupported image detail and unrepresentable OpenAI fields are rejected before selection. JSON Schema requires the final native schema to preserve constraints; json_object is rejected. Sampling fields are rejected if the SDK would drop them, including model-name dependent rewrites. The prepared native body is sent through Bifrost’s public passthrough transport, preventing its Chat serializer from stripping unsigned thinking history. Responses still use Bifrost converters; SSE framing and terminal validation run before conversion. No retries or fallback occur.
+Set provider protocol to `anthropic`. JSON and SSE use the same checked Bifrost conversion for messages, leading system/developer instructions, HTTPS/data images, ordinary function tools and tool results. Leading developer text maps to the same instruction level as system, preserving order. Mid-conversation instruction insertion, unsupported image detail and unrepresentable OpenAI fields are rejected before selection. JSON Schema requires the final native schema to preserve constraints; json_object is rejected. Sampling fields are rejected if the SDK would drop them, including model-name dependent rewrites. Tool-history JSON numbers retain their original precision, including integers beyond float64 exact range. Numeric compatibility checks compare exact values; schema constraints rounded by SDK conversion are rejected before sending. The prepared native body is sent through Bifrost’s public passthrough transport, preventing its Chat serializer from stripping unsigned thinking history. Responses still use Bifrost converters; SSE framing and terminal validation run before conversion. No retries or fallback occur.
 
 Thinking true maps to adaptive; false and effort none normalize to disabled. Tools can use default or enabled thinking on initial and continuation requests. Low/medium/high/max effort is preserved; minimal/xhigh and conflicting controls are rejected. Visible thinking is preserved in reasoning_content, including unsigned thinking alongside tools. Assistant reasoning_content is replayed as an unsigned native thinking block. By default, signed thinking with tools and encrypted thinking remain unsupported and fail explicitly; signatures are never fabricated. The verified BigModel profile is a narrow exception: HTTPS `open.bigmodel.cn/api/anthropic/v1` (default port or 443), with upstream model `glm-5.3` or `glm-5.3-flash`, accepts thinking/tool replay without response signatures. For these targets only, the adapter preserves visible thinking text and omits the optional signature. It does not claim native signature fidelity; proxies, other paths/models, and encrypted thinking are not covered. Standalone signed thinking retains its visible text only and does not provide a signed-history roundtrip.
 
@@ -146,6 +156,6 @@ The default native max_tokens and routing reserve are 65536, while OpenAI retain
 
 Native errors use fixed safe messages: 400/404/413/422 retain status; upstream 401/403 map to 502; 429 and 529 remain rate-limit/overload errors; other 5xx retain status, unknown 4xx map to 502. Parsing/network failures use 502, timeouts 504, cancellation 499. Raw provider messages, types and IDs do not override Router errors or request IDs. Existing OpenAI upstream error behavior remains unchanged.
 
-Local production HTTP/Bifrost tests and unmodified OpenAI/Agent SDK tool roundtrips cover JSON/SSE. Reproduce with `JEV_TEST_OPENAI_SDK=<Node project with openai> JEV_TEST_AGENT_SDK=<agent-sdk checkout with tsx> go test ./internal/transport/http -run 'TestChatAnthropicUpstreamHTTP|TestNativeUpstreamSDKs' -v`. These use a simulated native upstream. BigModel real-upstream validation through the local Router is recorded in [thinking/tool acceptance](acceptance/2026-10-09-anthropic-thinking-tools.md); it does not validate all Anthropic-compatible deployments. `/v1/messages` to native upstream remains planned under [#51](https://github.com/zerone-agents/jev-model-router/issues/51).
+Local production HTTP/Bifrost tests and unmodified OpenAI/Agent SDK tool roundtrips cover JSON/SSE. Reproduce with `JEV_TEST_OPENAI_SDK=<Node project with openai> JEV_TEST_AGENT_SDK=<agent-sdk checkout with tsx> go test ./internal/transport/http -run 'TestChatAnthropicUpstreamHTTP|TestNativeUpstreamSDKs' -v`. These use a simulated native upstream. BigModel real-upstream checks used Agent SDK v3.5.1 through a local Router, covering simple queries, multi-turn history, custom tools, streaming, streaming tools and effort controls on glm-5.3 and glm-5.3-flash. All 12 example runs completed; this is a bounded compatibility check, not a benchmark or validation of all Anthropic-compatible deployments. Successful effort requests do not prove distinct internal reasoning behavior. Per-run logs remain local. `/v1/messages` to native upstream remains planned under [#51](https://github.com/zerone-agents/jev-model-router/issues/51).
 
 Anthropic 上游的 JSON Schema 格式不支持 OpenAI `json_schema.description` 指令；非空值在候选检查时返回 `unsupported_request`，避免静默丢失。格式名称不发送；schema 使用原生约束输出，`strict` 不作为原生字段发送。

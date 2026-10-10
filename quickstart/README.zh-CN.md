@@ -6,7 +6,7 @@
 
 ## 启动（推荐）
 
-默认从 Docker Hub 拉取 `zeroneai/jev-model-router:latest`，无需安装 Go、Node 或本地编译。此方式要求镜像已发布；若镜像尚不可用，请使用下方源码构建覆盖文件。
+默认从 Docker Hub 拉取 `zeroneai/jev-model-router:latest`，无需安装 Go、Node 或本地编译。要固定本文对应版本，在 `.env` 设置 `ROUTER_IMAGE=zeroneai/jev-model-router:0.1.15`。
 
 ```sh
 git clone https://github.com/zerone-agents/jev-model-router.git
@@ -25,9 +25,9 @@ docker compose ps
 
 默认仅绑定本机。远程访问需要配置 HTTPS 反向代理并明确调整网络绑定；非 loopback 地址的管理 UI 要求 HTTPS。
 
-## 远程管理 API Key（v0.1.1 之后的功能）
+## 远程管理 API Key
 
-需要包含托管凭证功能的服务端与 CLI；v0.1.1 不接受 `api_key`。正式版本包含此功能前，请使用下方源码构建方式。用 `openssl rand -hex 32` 生成一次主密钥，填入云端私有 `.env` 的 `JEV_ROUTER_ENCRYPTION_KEY`（执行 `chmod 600 .env`），然后重建一次容器。主密钥需与 SQLite 分开备份；丢失后无法恢复已存储的供应商密钥。不要提交主密钥，也不要分享包含密钥值的 Compose 渲染结果。
+当前正式版已支持托管凭证。连接旧实例时，用 `jev-router schema providers.put` 确认是否接受 `api_key`。用 `openssl rand -hex 32` 生成一次主密钥，填入云端私有 `.env` 的 `JEV_ROUTER_ENCRYPTION_KEY`（执行 `chmod 600 .env`），然后重建一次容器。主密钥需与 SQLite 分开备份；丢失后无法恢复已存储的供应商密钥。不要提交主密钥，也不要分享包含密钥值的 Compose 渲染结果。
 
 此后通过本地 CLI 的私有 JSON 文件或 stdin 添加、更换供应商 API Key。输入包含 `id`、`base_url` 和只写的 `api_key`，替代 `secret_ref`。后续供应商密钥变更无需修改 Compose 或重启。决策后端继续使用 `TYPESAFE_API_KEY`；现有供应商的 `env:`/`file:` 引用也继续支持。
 
@@ -108,3 +108,7 @@ ROUTER_IMAGE=swr.cn-east-3.myhuaweicloud.com/zerone/jev-model-router:latest
 ### Dashboard 会话
 
 远程管理页面需在 `.env` 配置 `JEV_ROUTER_DASHBOARD_ORIGIN=https://router.example.com` 并重建容器。反向代理负责 TLS、保留原始 Host，后端保持私网访问。未配置 Origin 时，浏览器登录仅允许回环 HTTP。登录有效期固定为 7 天，刷新和同凭证重启后保留；注销撤销当前请求会话。CLI 仍使用 Bearer。容量、凭证轮换及备份恢复见[会话部署说明](../docs/configuration.md#dashboard-sessions)。
+
+## 推理协议
+
+OpenAI 客户端使用 Router `/v1` base URL；Anthropic SDK 使用 Router 根地址。`/v1/chat/completions` 支持 OpenAI 兼容与原生 Anthropic 上游，`/v1/messages` 当前仅支持 OpenAI 兼容上游。见[调用示例](../README.zh-CN.md#调用推理接口)和[原生 Anthropic/BigModel 配置](../docs/configuration.md#native-anthropic-generation-upstream)。
