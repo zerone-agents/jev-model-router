@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	bifrost "github.com/maximhq/bifrost/core"
-	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"io"
@@ -96,18 +95,12 @@ func (g *bifrostGenerator) Complete(ctx context.Context, t routing.Target, r rou
 	if e != nil {
 		return routing.Completion{}, e
 	}
+	if t.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
+		return completeNativePassthrough(bc, client, req, routing.RequiresTools(r), nativeSignatureOptional(t))
+	}
 	out, fail := client.ChatCompletionRequest(bc, req)
 	if fail != nil {
-		if t.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
-			return routing.Completion{}, anthropicUpstreamError(ctx, fail)
-		}
 		return routing.Completion{}, providerError(ctx, fail)
-	}
-	if t.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
-		if out == nil {
-			return routing.Completion{}, nativeError(502)
-		}
-		return anthropicUpstreamCompletion(out, nativeRaw(out.ExtraFields.RawResponse), routing.RequiresTools(r))
 	}
 	return completion(out)
 }
@@ -130,32 +123,14 @@ func (g *bifrostGenerator) Stream(ctx context.Context, t routing.Target, r routi
 		release()
 		return nil, e
 	}
-	var validation *anthropicUpstreamValidation
 	if t.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
-		validation = &anthropicUpstreamValidation{tools: routing.RequiresTools(r)}
-		bc.SetValue(schemas.BifrostContextKeySSEReaderFactory, &providerUtils.SSEReaderFactory{NewEventReader: func(reader io.Reader) providerUtils.SSEEventReader {
-			return newAnthropicUpstreamReader(reader, validation)
-		}})
+		return streamNativePassthrough(bc, client, req, routing.RequiresTools(r), nativeSignatureOptional(t), release)
 	}
 	ch, fail := client.ChatCompletionStreamRequest(bc, req)
 	if fail != nil {
 		bc.Cancel()
 		release()
-		if validation != nil {
-			if ctx.Err() == nil {
-				validation.mu.Lock()
-				failure := validation.failure
-				validation.mu.Unlock()
-				if failure != nil {
-					return nil, failure
-				}
-			}
-			return nil, anthropicUpstreamError(ctx, fail)
-		}
 		return nil, providerError(ctx, fail)
-	}
-	if validation != nil {
-		return &anthropicUpstreamStream{ctx: bc, ch: ch, state: validation, release: release}, nil
 	}
 	return &stream{ctx: bc, ch: ch, release: release}, nil
 }

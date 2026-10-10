@@ -61,14 +61,29 @@ func TestAnthropicUpstreamSafeErrors(t *testing.T) {
 				fmt.Fprint(w, `{"type":"error","error":{"type":"secret-type","message":"SECRET_SENTINEL","param":"secret-param"}}`)
 			}))
 			defer s.Close()
-			_, e := generator(t).Complete(context.Background(), nativeTarget(s.URL), TestRequest())
-			var up *routing.UpstreamError
-			if !errors.As(e, &up) || up.Status != tc.want {
-				t.Fatalf("error %#v", e)
-			}
-			b, _ := json.Marshal(up.Body)
-			if strings.Contains(string(b), "secret") || strings.Contains(string(b), "SECRET") {
-				t.Fatalf("unsafe error %s", b)
+			for _, streaming := range []bool{false, true} {
+				g := generator(t)
+				r := TestRequest()
+				r.Stream = streaming
+				var e error
+				if streaming {
+					var stream routing.EventStream
+					stream, e = g.Stream(context.Background(), nativeTarget(s.URL), r)
+					if e == nil {
+						_, e = stream.Next(context.Background())
+						stream.Close()
+					}
+				} else {
+					_, e = g.Complete(context.Background(), nativeTarget(s.URL), r)
+				}
+				var up *routing.UpstreamError
+				if !errors.As(e, &up) || up.Status != tc.want {
+					t.Fatalf("stream=%v error %#v", streaming, e)
+				}
+				b, _ := json.Marshal(up.Body)
+				if strings.Contains(string(b), "secret") || strings.Contains(string(b), "SECRET") {
+					t.Fatalf("unsafe error %s", b)
+				}
 			}
 		})
 	}

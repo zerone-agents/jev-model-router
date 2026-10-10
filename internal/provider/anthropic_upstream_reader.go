@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
+	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"io"
 	"strings"
 	"sync"
@@ -16,16 +17,17 @@ const nativeFrameLimit = 1024 * 1024
 // The reader is the sole body consumer. State is shared only with this request's
 // output wrapper; snapshots are taken after the SDK channel has closed.
 type anthropicUpstreamValidation struct {
-	mu               sync.Mutex
-	terminalVerified bool
-	failure          error
-	body             nativeResponse
-	started          bool
-	open             int
-	stopped          bool
-	tools            bool
-	ids              map[string]bool
-	argument         strings.Builder
+	mu                sync.Mutex
+	terminalVerified  bool
+	failure           error
+	body              nativeResponse
+	started           bool
+	open              int
+	stopped           bool
+	tools             bool
+	signatureOptional bool
+	ids               map[string]bool
+	argument          strings.Builder
 }
 type nativeBoundedReader struct {
 	reader    io.Reader
@@ -193,7 +195,7 @@ func (s *anthropicUpstreamValidation) accept(typ string, raw []byte) error {
 				return nativeError(502)
 			}
 		case "thinking":
-			if b.Thinking == nil || s.tools {
+			if b.Thinking == nil || (!s.signatureOptional && s.tools && b.Signature != nil && *b.Signature != "") {
 				return nativeError(502)
 			}
 		case "tool_use":
@@ -202,7 +204,7 @@ func (s *anthropicUpstreamValidation) accept(typ string, raw []byte) error {
 			}
 			s.ids[b.ID] = true
 			for _, v := range s.body.Content {
-				if v.Type == "thinking" {
+				if !s.signatureOptional && v.Type == "thinking" && v.Signature != nil && *v.Signature != "" {
 					return nativeError(502)
 				}
 			}
@@ -217,7 +219,7 @@ func (s *anthropicUpstreamValidation) accept(typ string, raw []byte) error {
 		default:
 			return nativeError(502)
 		}
-		if b.Type == "thinking" && len(s.ids) > 0 {
+		if !s.signatureOptional && b.Type == "thinking" && len(s.ids) > 0 && b.Signature != nil && *b.Signature != "" {
 			return nativeError(502)
 		}
 		s.body.Content = append(s.body.Content, b)
@@ -239,7 +241,7 @@ func (s *anthropicUpstreamValidation) accept(typ string, raw []byte) error {
 			}
 			*b.Thinking += *event.Delta.Thinking
 		case "signature_delta":
-			if b.Type != "thinking" || event.Delta.Signature == nil {
+			if b.Type != "thinking" || event.Delta.Signature == nil || (!s.signatureOptional && *event.Delta.Signature != "" && (s.tools || len(s.ids) > 0)) {
 				return nativeError(502)
 			}
 			if b.Signature == nil {
@@ -313,6 +315,10 @@ func (s *anthropicUpstreamValidation) accept(typ string, raw []byte) error {
 }
 
 func nativeReaderError(e error) error {
+	var upstream *routing.UpstreamError
+	if errors.As(e, &upstream) {
+		return upstream
+	}
 	if errors.Is(e, providerUtils.ErrStreamIdleTimeout) {
 		return nativeError(504)
 	}

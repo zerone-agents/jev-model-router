@@ -26,8 +26,8 @@ func TestAnthropicUpstreamRequestContract(t *testing.T) {
 		{"conflict", `,"reasoning_effort":"none","chat_template_kwargs":{"enable_thinking":true}`, false, ""},
 		{"tool_none", tool + `,"reasoning_effort":"none"`, true, "disabled"},
 		{"tool_false", tool + `,"chat_template_kwargs":{"enable_thinking":false}`, true, "disabled"},
-		{"tool_unspecified", tool, false, ""},
-		{"tool_thinking", tool + `,"chat_template_kwargs":{"enable_thinking":true}`, false, ""},
+		{"tool_unspecified", tool, true, ""},
+		{"tool_thinking", tool + `,"chat_template_kwargs":{"enable_thinking":true}`, true, "adaptive"},
 		{"sampling", `,"temperature":0.5`, true, ""}, {"two_sampling", `,"temperature":0.5,"top_p":0.9`, false, ""},
 		{"stop", `,"stop":["end"]`, true, ""}, {"seed", `,"seed":1`, false, ""},
 		{"json_object", `,"response_format":{"type":"json_object"}`, false, ""},
@@ -51,10 +51,7 @@ func TestAnthropicUpstreamRequestContract(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			wire, fail := anthropic.BuildAnthropicChatRequestBody(bc, in, anthropic.AnthropicRequestBuildConfig{Provider: schemas.Anthropic})
-			if fail != nil {
-				t.Fatal(fail)
-			}
+			wire := in.RawRequestBody
 			var b map[string]any
 			json.Unmarshal(wire, &b)
 			if tc.name == "default" && b["max_tokens"] != float64(65536) {
@@ -77,7 +74,6 @@ func TestAnthropicUpstreamRequestContract(t *testing.T) {
 	}
 	for _, body := range []string{
 		`{"model":"fast","messages":[{"role":"user","content":"hi"},{"role":"system","content":"late"}]}`,
-		`{"model":"fast","messages":[{"role":"assistant","content":"hi","reasoning_content":"old"},{"role":"user","content":"next"}]}`,
 	} {
 		if Check(nativeTarget("https://example.com"), req(t, body)) == nil {
 			t.Fatal("unsafe history accepted")
@@ -87,6 +83,7 @@ func TestAnthropicUpstreamRequestContract(t *testing.T) {
 
 func TestAnthropicUpstreamMessageContract(t *testing.T) {
 	for _, body := range []string{
+		`{"model":"fast","messages":[{"role":"assistant","content":"hi","reasoning_content":"old"},{"role":"user","content":"next"}]}`,
 		`{"model":"fast","messages":[{"role":"system","content":"first"},{"role":"developer","content":"second"},{"role":"user","content":"hi"}]}`,
 		`{"model":"fast","messages":[{"role":"user","content":[{"type":"text","text":"see"},{"type":"image_url","image_url":{"url":"https://example.com/image.png"}}]}]}`,
 		`{"model":"fast","messages":[{"role":"user","content":"hi"},{"role":"assistant","tool_calls":[{"id":"c1","type":"function","function":{"name":"lookup","arguments":"{\"q\":\"x\"}"}}]},{"role":"tool","tool_call_id":"c1","content":"found"}],"reasoning_effort":"none"}`,

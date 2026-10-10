@@ -46,11 +46,8 @@ func prepareAnthropicUpstream(ctx *schemas.BifrostContext, t routing.Target, r r
 	default:
 		return nil, nativeUnsupported("reasoning_effort")
 	}
-	if routing.RequiresTools(r) && thinking != "disabled" {
-		return nil, nativeUnsupported("tools require disabled thinking (false or reasoning_effort=none)")
-	}
 	for _, m := range r.Messages {
-		if m.ReasoningContent != nil || m.Refusal != nil || m.Name != "" {
+		if m.Refusal != nil || m.Name != "" {
 			return nil, nativeUnsupported("messages")
 		}
 	}
@@ -59,6 +56,15 @@ func prepareAnthropicUpstream(ctx *schemas.BifrostContext, t routing.Target, r r
 		return nil, routing.Fail("internal_error", "cannot prepare generation request")
 	}
 	in.Provider = schemas.Anthropic
+	// Chat clients replay plain thinking as reasoning_content. The SDK's
+	// Anthropic serializer consumes structured details, not the summary field.
+	// Preserve the text without manufacturing a native integrity signature.
+	for i := range in.Input {
+		m := &in.Input[i]
+		if m.ChatAssistantMessage != nil && m.Reasoning != nil && *m.Reasoning != "" {
+			m.ReasoningDetails = []schemas.ChatReasoningDetails{{Type: schemas.BifrostReasoningDetailsTypeText, Text: m.Reasoning}}
+		}
+	}
 	in.Params.ExtraParams = map[string]any{}
 	if in.Params.MaxCompletionTokens == nil {
 		in.Params.MaxCompletionTokens = schemas.Ptr(65536)
@@ -77,8 +83,30 @@ func prepareAnthropicUpstream(ctx *schemas.BifrostContext, t routing.Target, r r
 	if json.Unmarshal(body, &wire) != nil {
 		return nil, routing.Fail("internal_error", "invalid prepared generation request")
 	}
+	// The final Chat builder strips unsigned thinking for Claude. Compatible
+	// native providers can require it on replay. Reuse the SDK conversion but
+	// send these checked bytes through its public passthrough transport.
+	hasReasoning := false
+	for _, m := range r.Messages {
+		hasReasoning = hasReasoning || (m.ReasoningContent != nil && *m.ReasoningContent != "")
+	}
+	if hasReasoning {
+		native, err := anthropic.ToAnthropicChatRequest(ctx, in)
+		if err != nil {
+			return nil, nativeUnsupported("messages")
+		}
+		messages, err := json.Marshal(native.Messages)
+		if err != nil {
+			return nil, nativeUnsupported("messages")
+		}
+		wire["messages"] = decoded(messages)
+	}
 	if e = checkNativeWire(r, wire, thinking, effort); e != nil {
 		return nil, e
+	}
+	in.RawRequestBody, e = json.Marshal(wire)
+	if e != nil {
+		return nil, routing.Fail("internal_error", "invalid prepared generation request")
 	}
 	return in, nil
 }
@@ -211,6 +239,9 @@ func checkNativeMessages(r routing.Request, w map[string]any) error {
 		if m.Role == "tool" {
 			expected = append(expected, atom("user", map[string]any{"type": "tool_result", "tool_use_id": m.ToolCallID, "content": decoded(m.Content)}))
 			continue
+		}
+		if m.ReasoningContent != nil && *m.ReasoningContent != "" {
+			expected = append(expected, atom(m.Role, map[string]any{"type": "thinking", "thinking": *m.ReasoningContent}))
 		}
 		content := decoded(m.Content)
 		if text, ok := content.(string); ok && text != "" {
