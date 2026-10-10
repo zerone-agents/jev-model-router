@@ -14,10 +14,6 @@ type PreparedMessages struct {
 	summary string
 }
 
-func (p *PreparedMessages) Projection() routing.Request {
-	r, _ := p.chatRequest()
-	return r
-}
 func (p *PreparedMessages) Check(t routing.Target) error {
 	if t.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
 		_, err := p.nativeBody(t)

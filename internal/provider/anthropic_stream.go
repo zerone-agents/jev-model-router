@@ -53,6 +53,9 @@ func (g *bifrostGenerator) StreamMessages(ctx context.Context, t routing.Target,
 	if err := p.Check(t); err != nil {
 		return nil, err
 	}
+	if t.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
+		return nil, routing.Fail("unsupported_request", "native Messages execution is not yet enabled")
+	}
 	client, release, err := g.acquire(t)
 	if err != nil {
 		return nil, err

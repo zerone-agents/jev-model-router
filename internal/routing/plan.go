@@ -23,7 +23,7 @@ type Plan struct {
 }
 
 func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error) {
-	return p.plan(ctx, s, r, nil, false)
+	return p.plan(ctx, s, r, nil, false, nil)
 }
 
 // PlanPrepared checks the full request using a request-local adapter. Shared
@@ -32,10 +32,19 @@ func (p *Planner) PlanPrepared(ctx context.Context, s Snapshot, r Request, check
 	if check == nil {
 		return Plan{}, Fail("internal_error", "prepared request checker required")
 	}
-	return p.plan(ctx, s, r, check, true)
+	return p.PlanPreparedWithEstimate(ctx, s, r, check, nil)
 }
 
-func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Target) error, prepared bool) (Plan, error) {
+type PreparedEstimate func(Target) (ContextEstimate, bool, error)
+
+func (p *Planner) PlanPreparedWithEstimate(ctx context.Context, s Snapshot, r Request, check func(Target) error, estimate PreparedEstimate) (Plan, error) {
+	if check == nil {
+		return Plan{}, Fail("internal_error", "prepared request checker required")
+	}
+	return p.plan(ctx, s, r, check, true, estimate)
+}
+
+func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Target) error, prepared bool, preparedEstimate PreparedEstimate) (Plan, error) {
 	result := Plan{ConfigVersion: s.Version, CandidateIDs: []string{}}
 	if e := ValidateRequest(r); e != nil {
 		return result, e
@@ -118,7 +127,11 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 		}
 		var units int64
 		var isExact bool
-		if estimate == nil {
+		if preparedEstimate != nil {
+			value, precise, err := preparedEstimate(target)
+			e, isExact, units = err, precise, value.TotalTokens
+			estimates[m.ID] = value
+		} else if estimate == nil {
 			value, err := EstimateTargetContext(target, r)
 			e = err
 			units = value.TotalTokens

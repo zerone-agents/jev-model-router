@@ -126,7 +126,7 @@ func TestPreparedMessagesToolRound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := p.Projection()
+	r, _ := p.chatRequest()
 	if err = routing.ValidateRequest(r); err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +212,7 @@ func TestPreparedMessagesThinkingOnlyHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := p.Projection()
+	r, _ := p.chatRequest()
 	if len(r.Messages) != 3 || r.Messages[1].ReasoningContent == nil || *r.Messages[1].ReasoningContent != "THOUGHT" {
 		t.Fatalf("thinking-only turn lost: %+v", r.Messages)
 	}

@@ -33,6 +33,10 @@ func (r *Request) Plan(req routing.Request, check func(routing.Target) error) (r
 
 // PlanWithSummary accepts a bounded summary extracted before protocol conversion.
 func (r *Request) PlanWithSummary(req routing.Request, check func(routing.Target) error, summary string) (routing.Plan, error) {
+	return r.PlanPrepared(req, check, nil, summary)
+}
+
+func (r *Request) PlanPrepared(req routing.Request, check func(routing.Target) error, estimate routing.PreparedEstimate, summary string) (routing.Plan, error) {
 	r.record.Mode = "explicit"
 	if req.Model == "auto" {
 		r.record.Mode = "auto"
@@ -50,7 +54,7 @@ func (r *Request) PlanWithSummary(req routing.Request, check func(routing.Target
 	if check == nil {
 		plan, err = r.service.Planner.Plan(ctx, snapshot, req)
 	} else {
-		plan, err = r.service.Planner.PlanPrepared(ctx, snapshot, req, check)
+		plan, err = r.service.Planner.PlanPreparedWithEstimate(ctx, snapshot, req, check, estimate)
 	}
 	r.record.DecisionMillis = time.Since(start).Milliseconds()
 	r.record.Path = plan.Path
