@@ -66,7 +66,6 @@ func (p *PreparedMessages) Projection() routing.Request {
 		}
 		r.Messages = append(r.Messages, msg)
 	}
-	r.Messages = mergeChatMessages(r.Messages)
 	for _, raw := range doc.Tools {
 		var tool struct {
 			Name        string          `json:"name"`

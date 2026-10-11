@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"strings"
 	"sync"
@@ -73,4 +74,71 @@ func TestMessagesPlanningIsolation(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
+}
+
+func TestMessagesNativeProjectionBounds(t *testing.T) {
+	makeBody := func(messages []map[string]any, system string) []byte {
+		raw, _ := json.Marshal(map[string]any{"model": "auto", "max_tokens": 2048, "system": system, "messages": messages})
+		return raw
+	}
+	long := []map[string]any{{"role": "user", "content": strings.Repeat("a", 600000)}, {"role": "user", "content": strings.Repeat("b", 600000)}}
+	many := make([]map[string]any, 2048)
+	for i := range many {
+		many[i] = map[string]any{"role": "user", "content": "x"}
+	}
+	var expanded []map[string]any
+	for turn := 0; turn < 16; turn++ {
+		var calls, results []map[string]any
+		for i := 0; i < 128; i++ {
+			id := fmt.Sprintf("t%d_%d", turn, i)
+			calls = append(calls, map[string]any{"type": "tool_use", "id": id, "name": "f", "input": map[string]any{}})
+			results = append(results, map[string]any{"type": "tool_result", "tool_use_id": id, "content": "PRIVATE"})
+		}
+		expanded = append(expanded, map[string]any{"role": "assistant", "content": calls}, map[string]any{"role": "user", "content": results})
+	}
+	snapshot := routing.Snapshot{Providers: []routing.Provider{{ID: "native", Protocol: routing.ProtocolAnthropic}, {ID: "chat"}}, Models: []routing.Model{{ID: "native", ProviderID: "native", Enabled: true, Capabilities: routing.Capabilities{ContextLimit: 10000000, Tools: true}}, {ID: "chat", ProviderID: "chat", Enabled: true, Capabilities: routing.Capabilities{ContextLimit: 10000000, Tools: true}}}}
+	for name, body := range map[string][]byte{"long_users": makeBody(long, "system"), "system_plus_2048": makeBody(many, "system"), "tool_expansion": makeBody(expanded, "system")} {
+		t.Run(name, func(t *testing.T) {
+			p, err := PrepareMessages(body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = p.Check(nativeMessagesTarget()); err != nil {
+				t.Fatal(err)
+			}
+			if name == "long_users" && len(p.Projection().Messages) != 3 {
+				t.Fatal("native boundaries merged")
+			}
+			for _, model := range []string{"auto", "native"} {
+				projection := p.Projection()
+				projection.Model = model
+				s := snapshot
+				if model == "auto" {
+					s.Models = s.Models[:1]
+				}
+				plan, err := (&routing.Planner{}).PlanPreparedWithEstimate(context.Background(), s, projection, p.Check, p.Estimate)
+				if err != nil || plan.ModelID != "native" {
+					t.Fatalf("%s: %+v %v", model, plan, err)
+				}
+			}
+		})
+	}
+}
+func TestMessagesChatIncompatibilityIsCandidateLocal(t *testing.T) {
+	for _, content := range []string{
+		`[{"role":"assistant","content":[{"type":"image","source":{"type":"url","url":"https://image.invalid/p"}}]},{"role":"user","content":"describe"}]`,
+		`[{"role":"assistant","content":[{"type":"tool_use","id":"t","name":"f","input":{}}]},{"role":"user","content":[{"type":"text","text":"note"},{"type":"tool_result","tool_use_id":"t","content":"ok"}]}]`,
+	} {
+		p, err := PrepareMessages([]byte(`{"model":"auto","max_tokens":2048,"messages":` + content + `}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = p.Check(target("https://chat.invalid/v1"))
+		if err == nil || !strings.Contains(err.Error(), "unsupported_request") {
+			t.Fatalf("not candidate local: %v", err)
+		}
+		if err = p.Check(nativeMessagesTarget()); err != nil {
+			t.Fatal(err)
+		}
+	}
 }

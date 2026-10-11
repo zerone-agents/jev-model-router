@@ -80,13 +80,13 @@ func (p *PreparedMessages) chatRequest() (routing.Request, error) {
 				case "tool_use":
 					stage = 2
 				default:
-					return routing.Request{}, reject("invalid_request", "unsupported assistant content block")
+					return routing.Request{}, reject("unsupported_request", "unsupported assistant content block")
 				}
 			} else {
 				switch typ {
 				case "tool_result":
 					if stage > 0 {
-						return routing.Request{}, reject("invalid_request", "tool results must precede user content")
+						return routing.Request{}, reject("unsupported_request", "tool results must precede user content")
 					}
 					if block.IsError != nil && *block.IsError {
 						return routing.Request{}, reject("unsupported_request", "tool_result.is_error is not supported by the Chat adapter")
@@ -94,7 +94,7 @@ func (p *PreparedMessages) chatRequest() (routing.Request, error) {
 				case "text", "image":
 					stage = 1
 				default:
-					return routing.Request{}, reject("invalid_request", "unsupported user content block")
+					return routing.Request{}, reject("unsupported_request", "unsupported user content block")
 				}
 			}
 		}
@@ -158,7 +158,7 @@ func (p *PreparedMessages) chatRequest() (routing.Request, error) {
 		return routing.Request{}, routing.Fail("internal_error", "cannot prepare Messages projection")
 	}
 	if err := routing.ValidateRequest(projection); err != nil {
-		return routing.Request{}, err
+		return routing.Request{}, routing.Fail("unsupported_request", "Messages history cannot be represented by the Chat adapter")
 	}
 
 	return projection, nil

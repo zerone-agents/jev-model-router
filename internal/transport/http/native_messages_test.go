@@ -132,3 +132,34 @@ func TestNativeMessagesHTTPErrorContract(t *testing.T) {
 		}
 	}
 }
+
+func TestNativeMessagesHTTPLargeNativeHistory(t *testing.T) {
+	var calls atomic.Int32
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		var body struct {
+			Messages []struct {
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		if json.NewDecoder(r.Body).Decode(&body) != nil || len(body.Messages) != 2 || len(body.Messages[0].Content) != 600000 || len(body.Messages[1].Content) != 600000 {
+			t.Error("native history changed")
+		}
+		fmt.Fprint(w, `{"id":"m","type":"message","role":"assistant","model":"up","content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn"}`)
+	}))
+	defer up.Close()
+	h := nativeMessagesHandler(t, up.URL, nativeMessagesDecider{func(routing.DecisionInput) (routing.Decision, error) {
+		t.Error("incompatible Chat candidate reached decision")
+		return routing.Decision{}, nil
+	}}, true, Limits{})
+	for _, model := range []string{"auto", "external"} {
+		raw, _ := json.Marshal(map[string]any{"model": model, "max_tokens": 2048, "messages": []map[string]string{{"role": "user", "content": strings.Repeat("a", 600000)}, {"role": "user", "content": strings.Repeat("b", 600000)}}})
+		w := messagesCall(h, string(raw), "router-key")
+		if w.Code != 200 {
+			t.Fatal(w.Code, w.Body.String())
+		}
+	}
+	if calls.Load() != 2 {
+		t.Fatal("calls", calls.Load())
+	}
+}

@@ -27,7 +27,9 @@ func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error)
 }
 
 // PlanPrepared checks the full request using a request-local adapter. Shared
-// default checks are intentionally not used for its planning projection.
+// default checks and Chat wire-size validation are intentionally not used for
+// its decision-only projection. The adapter must validate the complete source
+// request before constructing it; check validates that source for each target.
 func (p *Planner) PlanPrepared(ctx context.Context, s Snapshot, r Request, check func(Target) error) (Plan, error) {
 	if check == nil {
 		return Plan{}, Fail("internal_error", "prepared request checker required")
@@ -46,8 +48,12 @@ func (p *Planner) PlanPreparedWithEstimate(ctx context.Context, s Snapshot, r Re
 
 func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Target) error, prepared bool, preparedEstimate PreparedEstimate) (Plan, error) {
 	result := Plan{ConfigVersion: s.Version, CandidateIDs: []string{}}
-	if e := ValidateRequest(r); e != nil {
-		return result, e
+	if !prepared {
+		if e := ValidateRequest(r); e != nil {
+			return result, e
+		}
+	} else if r.Model == "" || len(r.Messages) == 0 {
+		return result, Fail("internal_error", "invalid prepared planning projection")
 	}
 	if !prepared && p.PrepareCheck != nil {
 		check = p.PrepareCheck(r)
