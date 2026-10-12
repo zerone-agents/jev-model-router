@@ -205,7 +205,9 @@ func (s *messagesStream) Next(ctx context.Context) (MessageEvent, error) {
 						tool = &toolFragments{}
 						s.tools[int(call.Index)] = tool
 					}
-					if call.ID != nil {
+					// Continuation frames may encode an omitted ID as an empty
+					// string. Keep the ID already associated with this index.
+					if call.ID != nil && *call.ID != "" {
 						if tool.id != "" && tool.id != *call.ID {
 							return MessageEvent{}, routing.Fail("upstream_error", "upstream tool id changed")
 						}
