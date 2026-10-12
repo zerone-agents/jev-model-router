@@ -6,6 +6,7 @@ import {
   useRead,
   type PageProps,
 } from "./components";
+import { HealthBadge, HealthDetails } from "./health";
 import { text } from "./i18n";
 import { WriteAttempt, prepareWrite, descriptionInput } from "./edit";
 import type { Model, Resource } from "./pages";
@@ -13,6 +14,7 @@ type Snapshot = { version: number; text: string; model?: Model };
 type Props = PageProps & {
   canEdit: boolean;
   canReadProvider?: boolean;
+  canTest?: boolean;
   onDirty: (value: boolean) => void;
 };
 export function PromptEditor(props: Props) {
@@ -138,7 +140,9 @@ function Editor(props: Props & { initial: Snapshot }) {
         ...snapshot,
         version: result.data.version,
         text: snapshot.model ? submitted.description : submitted.text,
-        model: snapshot.model ? submitted : undefined,
+        model: snapshot.model
+          ? { ...submitted, health: snapshot.model.health }
+          : undefined,
       });
       setNotice("saved");
     } catch (e) {
@@ -203,7 +207,20 @@ function Editor(props: Props & { initial: Snapshot }) {
                 snapshot.model.enabled ? "已启用" : "已禁用",
               )}
             </span>
+            <HealthBadge health={snapshot.model.health} lang={lang} />
           </div>
+          <HealthDetails
+            {...props}
+            id={snapshot.model.id}
+            health={snapshot.model.health}
+            canTest={props.canTest ?? false}
+            onHealth={(health) =>
+              setSnapshot((s) => ({
+                ...s,
+                model: s.model ? { ...s.model, health } : undefined,
+              }))
+            }
+          />
           <div className="capabilities">
             {Object.entries(snapshot.model.capabilities).map(([k, v]) => (
               <span className="badge" key={k}>

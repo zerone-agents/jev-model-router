@@ -45,6 +45,7 @@ func anthropicUpstreamError(ctx context.Context, fail *schemas.BifrostError) err
 	if fail != nil {
 		err := nativeReportedError(status, fail.ExtraFields.RawResponse, upstreamSecret(ctx)).(*routing.UpstreamError)
 		addUpstreamRequestID(ctx, err.Details, nil)
+		err.RetryAfter = retryAfter(ctx)
 		return err
 	}
 	return nativeError(status)

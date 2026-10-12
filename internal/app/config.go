@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/zerone-agents/jev-model-router/internal/decision"
+	"github.com/zerone-agents/jev-model-router/internal/health"
 	"github.com/zerone-agents/jev-model-router/internal/playground"
 	httptransport "github.com/zerone-agents/jev-model-router/internal/transport/http"
 	"net"
@@ -15,6 +16,7 @@ import (
 )
 
 type Config struct {
+	Health                                                         health.Config
 	Playground                                                     playground.Limits
 	DecisionMaxBytes                                               int
 	DashboardOrigin                                                string
@@ -26,7 +28,7 @@ type Config struct {
 }
 
 func LoadConfig(path string, lookup func(string) (string, bool)) (Config, error) {
-	c := Config{Playground: playground.DefaultLimits(), DecisionMaxBytes: decision.DefaultMaxBytes, Listen: "127.0.0.1:8080", Database: ".data/router.sqlite", SettingsRef: "env:JEV_ROUTER_SETTINGS_TOKEN", InferenceRef: "env:JEV_ROUTER_INFERENCE_TOKEN", DecisionTimeout: 10 * time.Second, FirstEventTimeout: 60 * time.Second, IdleTimeout: 60 * time.Second, RecordTimeout: 100 * time.Millisecond, MaxBodyBytes: 16 << 20, StreamBuffer: 8, RetentionDays: 7, RecordMaxCount: 100000}
+	c := Config{Health: health.DefaultConfig(), Playground: playground.DefaultLimits(), DecisionMaxBytes: decision.DefaultMaxBytes, Listen: "127.0.0.1:8080", Database: ".data/router.sqlite", SettingsRef: "env:JEV_ROUTER_SETTINGS_TOKEN", InferenceRef: "env:JEV_ROUTER_INFERENCE_TOKEN", DecisionTimeout: 10 * time.Second, FirstEventTimeout: 60 * time.Second, IdleTimeout: 60 * time.Second, RecordTimeout: 100 * time.Millisecond, MaxBodyBytes: 16 << 20, StreamBuffer: 8, RetentionDays: 7, RecordMaxCount: 100000}
 	values := map[string]json.RawMessage{}
 	if path != "" {
 		b, e := os.ReadFile(path)
@@ -41,6 +43,12 @@ func LoadConfig(path string, lookup func(string) (string, bool)) (Config, error)
 	stringsMap := map[string]*string{"dashboard_origin": &c.DashboardOrigin, "encryption_key_ref": &c.EncryptionKeyRef, "listen": &c.Listen, "database": &c.Database, "settings_token_ref": &c.SettingsRef, "inference_token_ref": &c.InferenceRef}
 	durations := map[string]*time.Duration{"decision_timeout": &c.DecisionTimeout, "first_event_timeout": &c.FirstEventTimeout, "idle_timeout": &c.IdleTimeout, "record_timeout": &c.RecordTimeout}
 	numbers := map[string]bool{"decision_max_bytes": true, "max_body_bytes": true, "stream_buffer": true, "retention_days": true, "record_max_count": true}
+	for k := range c.Health.Numbers() {
+		numbers["health_"+k] = true
+	}
+	for k, v := range c.Health.Durations() {
+		durations["health_"+k] = v
+	}
 	for k := range c.Playground.Numbers() {
 		numbers["playground_"+k] = true
 	}
@@ -114,6 +122,10 @@ func LoadConfig(path string, lookup func(string) (string, bool)) (Config, error)
 			*p = int(n)
 			continue
 		}
+		if p := c.Health.Numbers()[strings.TrimPrefix(k, "health_")]; strings.HasPrefix(k, "health_") && p != nil {
+			*p = int(n)
+			continue
+		}
 		switch k {
 		case "decision_max_bytes":
 			c.DecisionMaxBytes = int(n)
@@ -140,6 +152,9 @@ func LoadConfig(path string, lookup func(string) (string, bool)) (Config, error)
 		return c, errors.New("invalid listen address")
 	}
 	if e := c.Playground.Validate(); e != nil {
+		return c, e
+	}
+	if e := c.Health.Validate(); e != nil {
 		return c, e
 	}
 	var err error

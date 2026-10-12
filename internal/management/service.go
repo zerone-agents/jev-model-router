@@ -19,6 +19,7 @@ type ConfigStore interface {
 }
 type Handler func(context.Context, string, Call) (Result, error)
 type Service struct {
+	Health          *routing.HealthGate
 	store           ConfigStore
 	validate        func(routing.Snapshot) error
 	mu              sync.RWMutex
@@ -107,6 +108,7 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 		return Result{}, routing.Fail("invalid_request", "offset and cursor cannot be combined")
 	}
 	var resource any
+	healthWarning := false
 	switch c.CapabilityID {
 	case "status.get":
 		n := 0
@@ -117,6 +119,9 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 		}
 		degraded := s.RecordsDegraded != nil && s.RecordsDegraded()
 		result := Success(map[string]any{"version": cfg.Version, "ready": n > 0 && (n == 1 || cfg.Decision.Model != ""), "enabled_models": n, "records_degraded": degraded}, time.Now())
+		if s.Health != nil && s.Health.Service.Warning() {
+			result.Warnings = append(result.Warnings, "health_degraded")
+		}
 		if degraded {
 			result.Warnings = append(result.Warnings, "records_degraded")
 		}
@@ -154,7 +159,7 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 	case "models.get":
 		for _, m := range cfg.Models {
 			if m.ID == input.ID {
-				resource = m
+				resource, healthWarning = s.modelView(ctx, cfg, m)
 			}
 		}
 	case "providers.list", "models.list":
@@ -202,19 +207,33 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 				next = last
 				break
 			}
-			items = append(items, x.v)
+			if m, ok := x.v.(routing.Model); ok {
+				v, warn := s.modelView(ctx, cfg, m)
+				items = append(items, v)
+				healthWarning = healthWarning || warn
+			} else {
+				items = append(items, x.v)
+			}
 			last = x.id
 		}
 		data := map[string]any{"version": cfg.Version, "items": items, "next_cursor": next}
 		if c.CapabilityID == "models.list" {
 			data["total"] = len(all)
 		}
-		return Success(data, time.Now()), nil
+		result := Success(data, time.Now())
+		if healthWarning {
+			result.Warnings = append(result.Warnings, "health_degraded")
+		}
+		return result, nil
 	}
 	if resource == nil {
 		return Result{}, routing.Fail("not_found", "resource not found")
 	}
-	return Success(map[string]any{"version": cfg.Version, "resource": resource}, time.Now()), nil
+	result := Success(map[string]any{"version": cfg.Version, "resource": resource}, time.Now())
+	if healthWarning {
+		result.Warnings = append(result.Warnings, "health_degraded")
+	}
+	return result, nil
 }
 
 // Search the fields and labels shown in the model list before pagination.

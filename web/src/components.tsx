@@ -10,6 +10,14 @@ export type PageProps = {
 export function errorText(e: unknown, lang: Lang) {
   const code = e instanceof APIError ? e.code : "";
   const map: Record<string, [string, string]> = {
+    health_probe_in_progress: [
+      "A check is already running or probe capacity is full. Retry shortly.",
+      "检测正在进行或探测并发已满，请稍后重试。",
+    ],
+    health_unavailable: [
+      "Health state is unavailable. Check instance storage.",
+      "健康状态不可用，请检查实例存储。",
+    ],
     playground_rate_limited: [
       "Playground limit reached. Wait before sending again.",
       "已达到 Playground 限额，请稍后再发送。",

@@ -20,7 +20,14 @@ func errorBody(e error) map[string]any {
 		return map[string]any{"error": body}
 	}
 	known := management.Failure(e).Error
-	return map[string]any{"error": map[string]any{"message": known.Message, "type": known.Code, "code": known.Code, "param": nil}}
+	body := map[string]any{"message": known.Message, "type": known.Code, "code": known.Code, "param": nil}
+	if len(known.HealthExclusions) > 0 {
+		body["health_exclusions"] = known.HealthExclusions
+		if known.HealthExclusionsTruncated {
+			body["health_exclusions_truncated"] = true
+		}
+	}
+	return map[string]any{"error": body}
 }
 func writeError(w http.ResponseWriter, e error) {
 	known := management.Failure(e).Error

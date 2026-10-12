@@ -392,7 +392,7 @@
   },
   {
     "id": "models.list",
-    "description": "List configured models",
+    "description": "List configured models with observed upstream health (no upstream call)",
     "role": "settings",
     "input_schema": {
       "type": "object",
@@ -573,7 +573,7 @@
   },
   {
     "id": "models.get",
-    "description": "Read one models",
+    "description": "Read one models with observed upstream health (no upstream call)",
     "role": "settings",
     "input_schema": {
       "type": "object",
@@ -1813,7 +1813,7 @@
   },
   {
     "id": "models.test",
-    "description": "Fixed minimal generation test, including disabled models; never enables the model",
+    "description": "Probe a model (including disabled or isolated targets), with paid external request and health update; does not change enabled configuration",
     "role": "settings",
     "input_schema": {
       "type": "object",
@@ -1875,7 +1875,8 @@
     },
     "side_effects": [
       "external_request",
-      "potential_cost"
+      "potential_cost",
+      "updates_generation_health"
     ],
     "risk": "L2",
     "availability": "implemented_when_registered",

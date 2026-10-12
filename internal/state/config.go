@@ -65,6 +65,11 @@ func snapshot(ctx context.Context, q queryer) (routing.Snapshot, error) {
 			return s, storageError()
 		}
 	}
+	for i := range s.Models {
+		if e := q.QueryRowContext(ctx, "SELECT revision FROM health_resources WHERE id=?", s.Models[i].ID).Scan(&s.Models[i].Revision); e != nil {
+			return s, storageError()
+		}
+	}
 	return s, nil
 }
 func (s *Store) Apply(ctx context.Context, principal string, c management.Call, validate func(routing.Snapshot) error) (management.Result, error) {
@@ -234,6 +239,13 @@ func mutate(s *routing.Snapshot, c management.Call) (any, error) {
 	return map[string]string{"id": id.ID}, nil
 }
 func save(ctx context.Context, tx *sql.Tx, s routing.Snapshot) error {
+	// Preserve existing resource generations across full-table configuration saves.
+	for _, m := range s.Models {
+		if _, e := tx.ExecContext(ctx, "INSERT OR IGNORE INTO health_resources(id,revision) VALUES(?,lower(hex(randomblob(16))))", m.ID); e != nil {
+			return storageError()
+		}
+	}
+
 	for _, table := range []string{"models", "providers"} {
 		if _, e := tx.ExecContext(ctx, `DELETE FROM `+table); e != nil {
 			return storageError()
@@ -250,6 +262,9 @@ func save(ctx context.Context, tx *sql.Tx, s routing.Snapshot) error {
 		if _, e := tx.ExecContext(ctx, `INSERT INTO models(id,provider_id,body) VALUES(?,?,?)`, m.ID, m.ProviderID, string(b)); e != nil {
 			return storageError()
 		}
+	}
+	if _, e := tx.ExecContext(ctx, "DELETE FROM health_resources WHERE id NOT IN (SELECT id FROM models)"); e != nil {
+		return storageError()
 	}
 	d, _ := json.Marshal(s.Decision)
 	if _, e := tx.ExecContext(ctx, `UPDATE config_meta SET version=?,prompt=?,decision=? WHERE id=1`, s.Version, s.Prompt, string(d)); e != nil {

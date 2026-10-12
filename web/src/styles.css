@@ -885,3 +885,45 @@ tr:has(details[open]) .request-summary-text {
   overflow: auto;
   font-size: 0.85em;
 }
+
+.health-healthy {
+  color: #35644a;
+  background: #edf3ed;
+}
+.health-isolated {
+  color: #a33c31;
+  background: #fbeae6;
+}
+.health-unknown,
+.health-unavailable {
+  color: #71685f;
+  background: #f0ece6;
+}
+.health-details {
+  margin: 20px 0;
+  padding: 18px 0;
+  border-top: 1px solid var(--border, #e7e3df);
+  border-bottom: 1px solid var(--border, #e7e3df);
+}
+.health-details dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+  margin: 0 0 16px;
+}
+.health-details dt {
+  font-size: 12px;
+  color: #71685f;
+}
+.health-details dd {
+  margin: 6px 0 0;
+  font-size: 14px;
+}
+.health-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.health-reason {
+  overflow-wrap: anywhere;
+}

@@ -15,6 +15,32 @@ export async function startPlaygroundUpstream() {
     for await (const part of req) body += part;
     const input = JSON.parse(body);
     const prompt = input.messages.at(-1).content;
+    if (input.model === "health-test" && prompt !== "Reply OK.") {
+      res.writeHead(429, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          error: { code: "insufficient_quota", message: "Test quota" },
+        }),
+      );
+      return;
+    }
+    if (!input.stream) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          id: "probe",
+          created: 1,
+          choices: [
+            {
+              index: 0,
+              message: { role: "assistant", content: "OK" },
+              finish_reason: "stop",
+            },
+          ],
+        }),
+      );
+      return;
+    }
     res.writeHead(200, { "Content-Type": "text/event-stream" });
     const event = (delta, finish_reason = null) =>
       res.write(

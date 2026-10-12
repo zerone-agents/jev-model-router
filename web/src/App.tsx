@@ -453,6 +453,7 @@ export function App() {
                           id={id}
                           canEdit={can("models.put")}
                           canReadProvider={can("providers.get")}
+                          canTest={can("models.test")}
                           onDirty={setDirty}
                         />
                       ) : (
