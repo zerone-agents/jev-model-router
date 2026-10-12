@@ -49,6 +49,7 @@ type Capabilities struct {
 	StructuredOutput bool                   `json:"structured_output"`
 }
 type Model struct {
+	Revision     string       `json:"-"`
 	ID           string       `json:"id"`
 	ProviderID   string       `json:"provider_id"`
 	UpstreamName string       `json:"upstream_name"`
