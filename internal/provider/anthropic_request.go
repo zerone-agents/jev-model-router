@@ -83,7 +83,7 @@ func mergeContent(a, b json.RawMessage) json.RawMessage {
 
 func validMessagesFinish(reason *string, stops bool) error {
 	if reason == nil {
-		return routing.Fail("upstream_error", "generation ended without a supported stop reason")
+		return routing.TemporaryUpstream(routing.Fail("upstream_error", "generation ended without a supported stop reason"))
 	}
 	switch *reason {
 	case "length", "tool_calls":

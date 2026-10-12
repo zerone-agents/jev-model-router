@@ -159,3 +159,43 @@ For DefAPI, use:
 ```
 
 The referenced key must be available to the server process. Both backends use Bearer authentication and native `state` / `questions` requests with Choice answers. Configuration writes do not test connectivity or change the deployed server environment.
+
+## Generation upstream health
+
+Health filtering applies to `auto` only. Explicit model requests still reach an
+isolated target and return its sanitized upstream error; a complete success
+restores automatic eligibility. Unknown targets are eligible. Health does not
+change `enabled`, and `/v1/models` continues to list all enabled models.
+
+Settings operators can read `models.list` / `models.get`, use `route.inspect`
+to see health exclusions, and run `models.test` to check an isolated or disabled
+model. Tests send fixed text and may incur provider charges. They update health,
+not configuration versions. `status.get` reports `health_degraded` warnings when
+health storage cannot be used reliably. Missing health is not an unknown result.
+
+Startup JSON keys and corresponding `JEV_ROUTER_` uppercase environment variables:
+
+| JSON key | Default | Meaning |
+| --- | --- | --- |
+| `health_failure_threshold` | `3` | Counted temporary failures before isolation |
+| `health_failure_window` | `"2m"` | Rolling failure window |
+| `health_transient_delay` | `"30s"` | First temporary-failure probe delay |
+| `health_limit_delay` | `"1m"` | Rate-limit delay without valid Retry-After |
+| `health_permanent_delay` | `"5m"` | Credentials/quota/model-error first delay |
+| `health_max_backoff` | `"30m"` | Local exponential backoff cap |
+| `health_concurrency` | `2` | Shared background/manual probe concurrency |
+| `health_interval` | `"5s"` | Minimum interval between background probe starts |
+| `health_timeout` | `"1m"` | Total probe timeout |
+| `health_max_tokens` | `1024` | Probe output limit, including provider reasoning |
+
+A valid upstream Retry-After is a lower bound even when longer than the local
+backoff cap. Waiting does not restore health; a complete successful call does.
+Disabled models are not automatically probed. Configuration errors and content
+rejections are distinguished; generic 403/404/451 do not alone isolate a model.
+
+The instance creates a separate 32-byte health fingerprint key in SQLite,
+independent of the optional managed-credential encryption key. Back up and restore
+the complete database. Restart preserves target identities and isolation. A
+missing/corrupt initialized key never triggers automatic regeneration: automatic
+routing fails, while explicit generation can still be attempted. Fingerprint-key
+rotation is not supported. Treat the database and backups as private files.

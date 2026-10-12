@@ -25,6 +25,7 @@ func completeNativeMessages(ctx *schemas.BifrostContext, client *bifrost.Bifrost
 	if out.StatusCode != 200 {
 		err := nativeReportedError(out.StatusCode, out.Body, upstreamSecret(ctx)).(*routing.UpstreamError)
 		addUpstreamRequestID(ctx, err.Details, out.Headers)
+		err.RetryAfter = retryAfterHeaders(out.Headers)
 		return nil, err
 	}
 	return validateNativeMessagesResponse(out.Body, target, prepared)

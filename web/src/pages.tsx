@@ -8,8 +8,10 @@ import {
   useRead,
   type PageProps,
 } from "./components";
+import { HealthBadge, type ModelHealth } from "./health";
 import { text } from "./i18n";
 export type Model = {
+  health?: ModelHealth;
   id: string;
   description: string;
   enabled: boolean;
@@ -286,6 +288,7 @@ export function Models(
                             ),
                           )}
                         </span>
+                        <HealthBadge health={m.health} lang={lang} />
                       </h3>
                       <p
                         className={

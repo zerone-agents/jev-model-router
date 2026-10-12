@@ -3,23 +3,27 @@ package routing
 import (
 	"context"
 	"errors"
+	"github.com/zerone-agents/jev-model-router/internal/health"
 )
 
 type Planner struct {
+	Health       *HealthGate
 	Decider      Decider
 	Check        func(Target, Request) error
 	PrepareCheck func(Request) func(Target) error
 	Estimate     func(Model, Request) (int64, bool, error)
 }
 type Plan struct {
-	ConfigVersion   int64            `json:"config_version"`
-	Target          Target           `json:"-"`
-	ModelID         string           `json:"model_id"`
-	CandidateIDs    []string         `json:"candidate_ids"`
-	Path            string           `json:"path"`
-	DecisionUsage   *Usage           `json:"decision_usage,omitempty"`
-	ContextEstimate *ContextEstimate `json:"context_estimate,omitempty"`
-	ContextExact    bool             `json:"context_exact"`
+	HealthExclusionsTruncated bool              `json:"health_exclusions_truncated,omitempty"`
+	HealthExclusions          []HealthExclusion `json:"health_exclusions,omitempty"`
+	ConfigVersion             int64             `json:"config_version"`
+	Target                    Target            `json:"-"`
+	ModelID                   string            `json:"model_id"`
+	CandidateIDs              []string          `json:"candidate_ids"`
+	Path                      string            `json:"path"`
+	DecisionUsage             *Usage            `json:"decision_usage,omitempty"`
+	ContextEstimate           *ContextEstimate  `json:"context_estimate,omitempty"`
+	ContextExact              bool              `json:"context_exact"`
 }
 
 func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error) {
@@ -46,8 +50,8 @@ func (p *Planner) PlanPreparedWithEstimate(ctx context.Context, s Snapshot, r Re
 	return p.plan(ctx, s, r, check, true, estimate)
 }
 
-func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Target) error, prepared bool, preparedEstimate PreparedEstimate) (Plan, error) {
-	result := Plan{ConfigVersion: s.Version, CandidateIDs: []string{}}
+func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Target) error, prepared bool, preparedEstimate PreparedEstimate) (result Plan, retErr error) {
+	result = Plan{ConfigVersion: s.Version, CandidateIDs: []string{}}
 	if !prepared {
 		if e := ValidateRequest(r); e != nil {
 			return result, e
@@ -74,6 +78,24 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 		}
 	}
 
+	var healthSnapshot map[health.TargetID]health.Record
+	var preparedTargets []Target
+	defer func() {
+		for _, t := range preparedTargets {
+			if retErr != nil || result.Target.Prepared != t.Prepared {
+				if t.Prepared != nil {
+					t.Prepared.Close()
+				}
+			}
+		}
+	}()
+	if p.Health != nil && r.Model == "auto" {
+		var err error
+		healthSnapshot, err = p.Health.Service.Snapshot()
+		if err != nil {
+			return result, Fail("health_unavailable", "upstream health state unavailable")
+		}
+	}
 	estimate := p.Estimate
 	estimates := map[string]ContextEstimate{}
 	hasImages, requiresTools, requiresStructured := HasImages(r), RequiresTools(r), RequiresStructuredOutput(r)
@@ -122,6 +144,24 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 				return result, e
 			}
 			continue
+		}
+		if p.Health != nil {
+			var err error
+			target, err = p.Health.PrepareTarget(ctx, target)
+			if err != nil {
+				return result, err
+			}
+			preparedTargets = append(preparedTargets, target)
+			if r.Model == "auto" {
+				if record := healthSnapshot[target.HealthIdentity()]; record.State == health.Isolated {
+					if len(result.HealthExclusions) < 200 {
+						result.HealthExclusions = append(result.HealthExclusions, HealthExclusion{ModelID: m.ID, State: record.State, Reason: record.Reason, NextProbe: record.NextProbe})
+					} else {
+						result.HealthExclusionsTruncated = true
+					}
+					continue
+				}
+			}
 		}
 		// Explicit selection delegates context capacity entirely to the provider.
 		if r.Model != "auto" {
@@ -175,7 +215,7 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 		if r.Model != "auto" {
 			return result, Fail("not_found", "model unavailable")
 		}
-		return result, Fail("no_candidates", "no enabled model can accept the complete request")
+		return result, &Error{Code: "no_candidates", Message: "no enabled model can accept the complete request", HealthExclusions: result.HealthExclusions, HealthExclusionsTruncated: result.HealthExclusionsTruncated}
 	}
 	selected := targets[0]
 	if r.Model != "auto" {

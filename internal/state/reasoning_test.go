@@ -24,7 +24,9 @@ func TestReasoningCapabilitiesSurviveConfiguration(t *testing.T) {
 	if _, err := s.Apply(context.Background(), "settings", management.Call{CapabilityID: "models.put", Input: body, ExpectedVersion: &version, IdempotencyKey: "reasoning"}, nil); err != nil {
 		t.Fatal(err)
 	}
-	if got := snap(t, s).Models[0]; !reflect.DeepEqual(got, want) {
+	gotModel := snap(t, s).Models[0]
+	want.Revision = gotModel.Revision // Internal generation is not part of configured model fields.
+	if got := gotModel; !reflect.DeepEqual(got, want) {
 		t.Fatalf("stored capabilities changed: %+v", got.Capabilities)
 	}
 	svc := management.New(s, nil)

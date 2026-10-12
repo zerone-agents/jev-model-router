@@ -49,6 +49,7 @@ type Capabilities struct {
 	StructuredOutput bool                   `json:"structured_output"`
 }
 type Model struct {
+	Revision     string       `json:"-"`
 	ID           string       `json:"id"`
 	ProviderID   string       `json:"provider_id"`
 	UpstreamName string       `json:"upstream_name"`
@@ -173,17 +174,24 @@ type Usage struct {
 	OutputTokens  int64           `json:"output_tokens"`
 }
 type Error struct {
-	Code      string `json:"code"`
-	Message   string `json:"message"`
-	Retryable bool   `json:"retryable"`
+	HealthExclusionsTruncated bool              `json:"health_exclusions_truncated,omitempty"`
+	HealthExclusions          []HealthExclusion `json:"health_exclusions,omitempty"`
+	Code                      string            `json:"code"`
+	Message                   string            `json:"message"`
+	Retryable                 bool              `json:"retryable"`
 }
 
 func (e *Error) Error() string        { return e.Code + ": " + e.Message }
 func Fail(code, message string) error { return &Error{Code: code, Message: message} }
 
+type PreparedCredential interface {
+	Identity() string
+	Close() error
+}
 type Target struct {
-	Provider Provider `json:"-"`
-	Model    Model    `json:"-"`
+	Prepared PreparedCredential `json:"-"`
+	Provider Provider           `json:"-"`
+	Model    Model              `json:"-"`
 }
 type Completion struct {
 	ID      string   `json:"id"`

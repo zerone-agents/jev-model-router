@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/zerone-agents/jev-model-router/internal/decision"
+	"github.com/zerone-agents/jev-model-router/internal/health"
 	"github.com/zerone-agents/jev-model-router/internal/inference"
 	"github.com/zerone-agents/jev-model-router/internal/management"
 	"github.com/zerone-agents/jev-model-router/internal/playground"
@@ -60,6 +61,24 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 		store.Close()
 		return nil, nil, e
 	}
+	if cfg.Health.Concurrency == 0 {
+		cfg.Health = health.DefaultConfig()
+	}
+	healthService := health.New(store, cfg.Health.Policy, time.Now)
+	healthKey, keyErr := healthService.Key()
+	preparer := gen.(interface {
+		Preparer([32]byte) func(context.Context, routing.Target) (routing.Target, error)
+	})
+	prepare := preparer.Preparer(healthKey)
+	if keyErr != nil {
+		prepare = func(ctx context.Context, t routing.Target) (routing.Target, error) { return t, nil }
+	}
+	gen.(interface{ SetHealth(*health.Service) }).SetHealth(healthService)
+	gate := &routing.HealthGate{Service: healthService, Prepare: prepare}
+	runtime := &healthRuntime{store: store, gate: gate, generator: gen, limits: cfg.Health, probes: health.NewProbeLimiter(cfg.Health.Concurrency)}
+	healthCtx, healthCancel := context.WithCancel(context.Background())
+	healthDone := make(chan struct{})
+	go func() { defer close(healthDone); health.RunScheduler(healthCtx, cfg.Health.Interval, runtime.tick) }()
 	recordCtx, recordCancel := context.WithCancel(context.Background())
 	recordDone := make(chan struct{})
 	recorder := &routing.Recorder{Sink: store, Timeout: cfg.RecordTimeout}
@@ -85,6 +104,9 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 		}
 	}()
 	close := func() {
+		healthCancel()
+		<-healthDone
+		runtime.wg.Wait()
 		recordCancel()
 		<-recordDone
 		if c, ok := gen.(io.Closer); ok {
@@ -110,10 +132,13 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 		return nil
 	})
 	service.ResolveSecret = resolve
+	service.Health = gate
 	budget := decision.DefaultBudget()
 	budget.MaxBytes = cfg.DecisionMaxBytes
-	planner := &routing.Planner{Decider: decision.New(nil, externalResolve, budget), PrepareCheck: provider.PrepareCheck}
-	checks := management.Checks{Store: store, Planner: planner, Generator: gen, DecisionTimeout: cfg.DecisionTimeout, FirstEventTimeout: cfg.FirstEventTimeout}
+	planner := &routing.Planner{Health: gate, Decider: decision.New(nil, externalResolve, budget), PrepareCheck: provider.PrepareCheck}
+	checks := management.Checks{Test: func(ctx context.Context, id string) (management.TestResult, error) {
+		return runtime.test(ctx, id, false)
+	}, Store: store, Planner: planner, Generator: gen, DecisionTimeout: cfg.DecisionTimeout, FirstEventTimeout: cfg.FirstEventTimeout}
 	checks.Register(service)
 	service.RecordsDegraded = recorder.Degraded
 	service.Register("records.list", func(ctx context.Context, _ string, call management.Call) (management.Result, error) {

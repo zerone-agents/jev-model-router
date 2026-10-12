@@ -84,9 +84,11 @@ func (s *server) messages(w http.ResponseWriter, r *http.Request) {
 	}
 	plan, err := execution.PlanPrepared(prepared.Projection(), prepared.Check, prepared.Estimate, prepared.Summary())
 	if err != nil {
+		plan.Close()
 		fail(err)
 		return
 	}
+	defer plan.Close()
 	gen, ok := s.executor.Generator.(messagesGenerator)
 	if !ok {
 		fail(routing.Fail("config_missing", "Messages generator unavailable"))

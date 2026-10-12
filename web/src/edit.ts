@@ -3,7 +3,9 @@ export function descriptionInput<T extends { description: string }>(
   resource: T,
   description: string,
 ): T {
-  return { ...resource, description };
+  const result = { ...resource, description };
+  delete (result as Record<string, unknown>).health;
+  return result;
 }
 export function prepareWrite(
   capability: string,

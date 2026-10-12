@@ -51,6 +51,7 @@ func initSchemas() {
 	if e = json.Unmarshal(b, &caps); e != nil {
 		panic(e)
 	}
+	addHealthSchemas()
 	rules, err := files.ReadFile("schemas/results.json")
 	if err != nil {
 		panic(err)
