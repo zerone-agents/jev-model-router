@@ -63,3 +63,53 @@ func TestHealthExclusionsAreBounded(t *testing.T) {
 		t.Fatalf("unbounded health exclusions: %d", len(plan.HealthExclusions))
 	}
 }
+
+type trackedHealthCredential struct {
+	id     string
+	closed int
+}
+
+func (c *trackedHealthCredential) Identity() string { return c.id }
+func (c *trackedHealthCredential) Close() error     { c.closed++; return nil }
+
+func TestPreparedHealthEstimateReleasesCredentials(t *testing.T) {
+	for _, failEstimate := range []bool{false, true} {
+		s, r := planFixture()
+		credentials := map[string]*trackedHealthCredential{}
+		svc := health.New(healthMemory{[]health.Record{{ID: "a", View: health.View{State: health.Isolated}}}}, health.DefaultPolicy(), nil)
+		p := Planner{Health: &HealthGate{Service: svc, Prepare: func(_ context.Context, target Target) (Target, error) {
+			c := &trackedHealthCredential{id: target.Model.ID}
+			credentials[c.id] = c
+			target.Prepared = c
+			return target, nil
+		}}}
+		plan, err := p.PlanPreparedWithEstimate(context.Background(), s, r, func(Target) error { return nil }, func(target Target) (ContextEstimate, bool, error) {
+			if target.Model.ID != "b" {
+				t.Fatal("isolated target estimated")
+			}
+			if failEstimate {
+				return ContextEstimate{}, false, Fail("internal_error", "estimate failed")
+			}
+			return ContextEstimate{TotalTokens: 1}, false, nil
+		})
+		if (err != nil) != failEstimate {
+			t.Fatal(err)
+		}
+		if credentials["a"].closed != 1 {
+			t.Fatal("excluded credential not released")
+		}
+		if failEstimate {
+			if credentials["b"].closed != 1 {
+				t.Fatal("failed estimate credential not released")
+			}
+		} else {
+			if plan.ModelID != "b" || credentials["b"].closed != 0 {
+				t.Fatal("selected credential released early")
+			}
+			_ = plan.Close()
+			if credentials["b"].closed != 1 {
+				t.Fatal("selected credential not released")
+			}
+		}
+	}
+}

@@ -61,7 +61,16 @@ func (g *bifrostGenerator) streamMessages(ctx context.Context, t routing.Target,
 	bc := schemas.NewBifrostContext(ctx, time.Time{})
 	bc.SetValue(schemas.BifrostContextKeyAllowPerRequestRawOverride, true)
 	bc.SetValue(schemas.BifrostContextKeySendBackRawResponse, true)
-	r, err := encode(bc, t, p.Projection())
+	if t.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
+		return streamNativeMessages(bc, client, t, p, release)
+	}
+	chat, err := p.chatRequest()
+	if err != nil {
+		bc.Cancel()
+		release()
+		return nil, err
+	}
+	r, err := encode(bc, t, chat)
 	if err != nil {
 		bc.Cancel()
 		release()

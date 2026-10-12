@@ -15,7 +15,7 @@ func MessagesInvalidField(input json.RawMessage) string {
 			return key
 		}
 	}
-	for _, key := range []string{"model", "messages", "max_tokens", "system", "stream", "temperature", "top_p", "stop_sequences", "tools", "tool_choice", "thinking", "output_config"} {
+	for _, key := range []string{"model", "messages", "max_tokens", "system", "stream", "temperature", "top_p", "top_k", "metadata", "stop_sequences", "tools", "tool_choice", "thinking", "output_config"} {
 		if raw, ok := obj[key]; ok {
 			value, err := Decode(raw)
 			if err != nil || validators["messages"].Properties[key].Validate(value) != nil {

@@ -92,7 +92,7 @@ call body 为 `{"input":{...},"expected_version":1,"idempotency_key":"operation-
 
 ## Anthropic Messages 推理契约
 
-`schemas/messages.json` 定义 POST /v1/messages 的输入形状；provider 还执行明确公布的内容组合及目标转换检查。`thinking.enabled` 的预算格式可识别，但当前 Chat adapter 无法执行独立预算，返回 unsupported_request；adaptive/disabled 和显式 output_config.effort 已实现。原生签名、带 is_error=true 的工具结果和不可保持顺序的混合块明确拒绝。版本固定 2023-06-01，beta 扩展拒绝。
+`schemas/messages.json` 定义 POST /v1/messages 输入；provider 执行公共校验和目标级检查。原生 Anthropic 目标保留 thinking 预算、签名/redacted、工具结果 is_error、cache、sampling 和 metadata；OpenAI 候选拒绝无法保真的组合。max_tokens 必填16–10000000，enabled budget_tokens≥1024且小于max_tokens。原生 body 只改model，完整请求独立估算；决策投影不含敏感原生内容。版本固定2023-06-01，beta拒绝。详见 [原生 Messages 契约](../docs/compatibility.md#native-messages-clients-with-native-anthropic-upstream-51)。
 
 该入口使用独立 Anthropic 错误信封，认证失败也包含顶层 type:error、error.type/message、request_id；request-id 与 X-Request-ID 相同。400/401/403/404/405/413/422/429/500/502/503/504/529 的映射和流内失败范围见 [兼容文档](../docs/compatibility.md#anthropic-messages-issue-23)。Messages 不套管理信封；上游错误的脱敏详情位于 error.diagnostic.upstream_error。
 

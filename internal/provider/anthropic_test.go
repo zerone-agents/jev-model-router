@@ -62,7 +62,10 @@ func TestPreparedMessagesWire(t *testing.T) {
 
 func TestPreparedMessagesValidation(t *testing.T) {
 	for _, extra := range []string{`,"thinking":{"type":"enabled","budget_tokens":1024}`, `,"cache_control":{"type":"ephemeral"}`, `,"unknown_secret":"DO_NOT_ECHO"`, `,"max_completion_tokens":12`} {
-		_, err := PrepareMessages(json.RawMessage(`{"model":"auto","max_tokens":4096,"messages":[{"role":"user","content":"secret"}]` + extra + `}`))
+		p, err := PrepareMessages(json.RawMessage(`{"model":"auto","max_tokens":4096,"messages":[{"role":"user","content":"secret"}]` + extra + `}`))
+		if err == nil {
+			err = p.Check(routing.Target{})
+		}
 		if err == nil || strings.Contains(err.Error(), "secret") || strings.Contains(err.Error(), "DO_NOT_ECHO") {
 			t.Fatalf("%s: %v", extra, err)
 		}
@@ -123,7 +126,7 @@ func TestPreparedMessagesToolRound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := p.Projection()
+	r, _ := p.chatRequest()
 	if err = routing.ValidateRequest(r); err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +212,7 @@ func TestPreparedMessagesThinkingOnlyHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := p.Projection()
+	r, _ := p.chatRequest()
 	if len(r.Messages) != 3 || r.Messages[1].ReasoningContent == nil || *r.Messages[1].ReasoningContent != "THOUGHT" {
 		t.Fatalf("thinking-only turn lost: %+v", r.Messages)
 	}
@@ -219,7 +222,10 @@ func TestPreparedMessagesAssistantGroupOrder(t *testing.T) {
 		`{"role":"assistant","content":"FIRST"},{"role":"assistant","content":[{"type":"thinking","thinking":"SECOND","signature":""}]}`,
 		`{"role":"assistant","content":[{"type":"tool_use","id":"c","name":"lookup","input":{}}]},{"role":"assistant","content":"AFTER"}`,
 	} {
-		_, err := PrepareMessages(json.RawMessage(`{"model":"auto","max_tokens":1024,"messages":[{"role":"user","content":"go"},` + content + `,{"role":"user","content":"continue"}]}`))
+		p, err := PrepareMessages(json.RawMessage(`{"model":"auto","max_tokens":1024,"messages":[{"role":"user","content":"go"},` + content + `,{"role":"user","content":"continue"}]}`))
+		if err == nil {
+			err = p.Check(routing.Target{})
+		}
 		if err == nil {
 			t.Fatal("unrepresentable assistant group silently accepted")
 		}

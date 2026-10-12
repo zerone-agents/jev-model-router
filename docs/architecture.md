@@ -76,9 +76,9 @@ docs/adr/                本地架构决策记录（Git 忽略）
 
 `transport/http` 保持 `/v1/chat/completions` 和 `/v1/models` 的兼容格式。SSE 必须保留工具调用增量、usage 与错误，不把内部 SDK 元数据暴露为协议的一部分。取消从入口传到决策及生成服务；流开始后不拼接另一模型的输出。
 
-新增 `/v1/messages` 客户端侧 Anthropic 兼容入口，共享 `inference` 的配置快照、规划计时和路由记录生命周期。请求在 `provider` 内通过 Bifrost Anthropic→Responses→Chat 转换为当前 OpenAI 兼容上游请求；返回结果/增量通过 Bifrost 反向转换，完整生成结果不先经过精简的 Chat 响应类型。请求级 prepared 数据为不可变字节，规划投影、每个目标的检查与实际发送均从它构造独立副本；`PlanPrepared` 在容量检查及 Jev 前执行完整请求检查，不修改共享 Planner 字段。仅支持已公布的可由 Chat 表达的输入组合，此 Messages 入口尚不支持原生 Anthropic 上游；Chat Completions 已支持，见下文生成上游协议。
+`/v1/messages` 共享 `inference` 的配置快照、规划计时和路由记录生命周期。PreparedMessages 保存不可变原生 JSON，按目标选择 Bifrost Chat 转换或原生 Passthrough；原生路径只替换 model，不经过 Chat/Responses。独立决策投影排除 thinking、签名、redacted、工具参数/结果及图片内容/地址；请求级完整估算仍计入这些数据。`PlanPreparedWithEstimate` 在容量过滤及 Jev 前执行目标检查，不修改共享 Planner。
 
-Messages 接受 inference 的 `x-api-key` 或 Bearer，同传时必须都有效且属于同一身份/角色；独立错误编码覆盖认证失败、流前 JSON 和流内 error。Anthropic `request-id` 与 `X-Request-ID` 为同一 Router ID。thinking 支持 adaptive/disabled 和显式 effort；独立预算和原生签名历史明确拒绝。未知 usage 不合成为零；SSE 初始 usage 为 `{}`，末尾补充实际报告值，这是经官方 SDK 0.52.0 验证的兼容差异。完整范围与兼容差异见 [兼容矩阵](compatibility.md#anthropic-messages-issue-23)。
+Messages 接受 inference 的 `x-api-key` 或 Bearer，同传必须同身份/角色；错误编码覆盖认证、流前 JSON 和流内 error，request-id 与 X-Request-ID 为同一 Router ID。原生目标保留 thinking 预算、签名/redacted、cache、usage 和停止语义；OpenAI 转换目标保持原限制。原生 SSE 在解析前有界读取，message_stop 等到干净 EOF；max_tokens 仅允许最后工具块的合法未完成对象前缀，不补全、不执行、不重试。完整范围见 [兼容矩阵](compatibility.md#native-messages-clients-with-native-anthropic-upstream-51)。
 
 兼容承诺限定于公布的字段及供应商支持组合。生成请求不裁剪对话、不静默丢弃影响行为的参数；无法支持时明确报错。协议转换和上游模型名称替换允许进行，但不能改变已支持输入的语义。
 
@@ -130,7 +130,7 @@ ArbiterOS 工具执行治理仍在后续阶段。当前架构不创建空治理�
 
 ## 生成上游协议
 
-Provider.protocol 区分 openai 与 anthropic，旧配置默认 openai。OpenAI Chat 入口可在两种协议间选模；Messages 入口当前只允许 OpenAI 兼容上游（原生方向见 #51）。Bifrost 类型与转换保护留在 provider；请求级检查在候选容量过滤和 Jev 之前执行，只有 unsupported_request 可排除候选，内部故障直接返回。Anthropic 缺省输出限额和按目标估算预留均为 65536，OpenAI 保留 4096 估算且不注入限额。SDK 客户端缓存按协议、URL、凭证和配置隔离，不修改在途快照。
+Provider.protocol 区分 openai 与 anthropic，旧配置默认 openai。OpenAI Chat 入口可在两种协议间选模；Messages 入口也支持两种协议，原生字段按候选协议检查。Bifrost 类型与转换保护留在 provider；请求级检查在候选容量过滤和 Jev 之前执行，只有 unsupported_request 可排除候选，内部故障直接返回。OpenAI Chat 客户端选择 Anthropic 时缺省输出限额和按目标估算预留均为 65536；Messages 客户端仍必填 max_tokens，OpenAI 保留 4096 估算且不注入限额。SDK 客户端缓存按协议、URL、凭证和配置隔离，不修改在途快照。
 
 ## Playground
 

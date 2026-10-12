@@ -16,7 +16,7 @@ import (
 // Use the SDK's public native transport so the exact body checked during
 // candidate preparation is sent without another lossy Chat serialization.
 func nativePassthroughRequest(req *schemas.BifrostChatRequest) *schemas.BifrostPassthroughRequest {
-	return &schemas.BifrostPassthroughRequest{Model: req.Model, Method: "POST", Path: "/messages", Body: req.RawRequestBody, SafeHeaders: map[string]string{"Content-Type": "application/json"}}
+	return nativeMessagesTransportRequest(req.Model, req.RawRequestBody)
 }
 func completeNativePassthrough(ctx *schemas.BifrostContext, client *bifrost.Bifrost, req *schemas.BifrostChatRequest, tools, signatureOptional bool) (routing.Completion, error) {
 	out, fail := client.Passthrough(ctx, schemas.Anthropic, nativePassthroughRequest(req))

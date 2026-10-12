@@ -27,22 +27,37 @@ type Plan struct {
 }
 
 func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error) {
-	return p.plan(ctx, s, r, nil, false)
+	return p.plan(ctx, s, r, nil, false, nil)
 }
 
 // PlanPrepared checks the full request using a request-local adapter. Shared
-// default checks are intentionally not used for its planning projection.
+// default checks and Chat wire-size validation are intentionally not used for
+// its decision-only projection. The adapter must validate the complete source
+// request before constructing it; check validates that source for each target.
 func (p *Planner) PlanPrepared(ctx context.Context, s Snapshot, r Request, check func(Target) error) (Plan, error) {
 	if check == nil {
 		return Plan{}, Fail("internal_error", "prepared request checker required")
 	}
-	return p.plan(ctx, s, r, check, true)
+	return p.PlanPreparedWithEstimate(ctx, s, r, check, nil)
 }
 
-func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Target) error, prepared bool) (result Plan, retErr error) {
+type PreparedEstimate func(Target) (ContextEstimate, bool, error)
+
+func (p *Planner) PlanPreparedWithEstimate(ctx context.Context, s Snapshot, r Request, check func(Target) error, estimate PreparedEstimate) (Plan, error) {
+	if check == nil {
+		return Plan{}, Fail("internal_error", "prepared request checker required")
+	}
+	return p.plan(ctx, s, r, check, true, estimate)
+}
+
+func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Target) error, prepared bool, preparedEstimate PreparedEstimate) (result Plan, retErr error) {
 	result = Plan{ConfigVersion: s.Version, CandidateIDs: []string{}}
-	if e := ValidateRequest(r); e != nil {
-		return result, e
+	if !prepared {
+		if e := ValidateRequest(r); e != nil {
+			return result, e
+		}
+	} else if r.Model == "" || len(r.Messages) == 0 {
+		return result, Fail("internal_error", "invalid prepared planning projection")
 	}
 	if !prepared && p.PrepareCheck != nil {
 		check = p.PrepareCheck(r)
@@ -158,7 +173,11 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 		}
 		var units int64
 		var isExact bool
-		if estimate == nil {
+		if preparedEstimate != nil {
+			value, precise, err := preparedEstimate(target)
+			e, isExact, units = err, precise, value.TotalTokens
+			estimates[m.ID] = value
+		} else if estimate == nil {
 			value, err := EstimateTargetContext(target, r)
 			e = err
 			units = value.TotalTokens

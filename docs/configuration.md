@@ -114,7 +114,7 @@ For the verified BigModel profile, use this provider input (the environment refe
 
 Create models through `models.put` with `provider_id: "bigmodel"` and `upstream_name: "glm-5.3"` or `"glm-5.3-flash"`. Choose your own public IDs, descriptions and verified capabilities using the instance schema. Create disabled, run `models.test`, then enable; the 16-token connection test does not validate thinking, tools or vision. In Compose, add `BIGMODEL_API_KEY` to the service environment as well as `.env`, or use managed `api_key` instead.
 
-The provider API prefix includes `/v1`; the resulting endpoint is `https://open.bigmodel.cn/api/anthropic/v1/messages`. An Anthropic SDK may itself append `/v1/messages` to a root URL, but Router provider configuration appends only `/messages`. OpenAI clients still connect to the Router's `/v1` URL. The Router `/v1/messages` entry cannot yet select a native Anthropic provider; that direction is tracked in [#51](https://github.com/zerone-agents/jev-model-router/issues/51).
+The provider API prefix includes `/v1`; the resulting endpoint is `https://open.bigmodel.cn/api/anthropic/v1/messages`. An Anthropic SDK may itself append `/v1/messages` to a root URL, but Router provider configuration appends only `/messages`. OpenAI clients still connect to the Router's `/v1` URL. The Router `/v1/messages` entry can select native Anthropic providers; it requires max_tokens and preserves native content. See the [native Messages contract](compatibility.md#native-messages-clients-with-native-anthropic-upstream-51).
 
 ## Playground
 

@@ -82,7 +82,7 @@ func (s *server) messages(w http.ResponseWriter, r *http.Request) {
 		fail(err)
 		return
 	}
-	plan, err := execution.PlanWithSummary(prepared.Projection(), prepared.Check, prepared.Summary())
+	plan, err := execution.PlanPrepared(prepared.Projection(), prepared.Check, prepared.Estimate, prepared.Summary())
 	if err != nil {
 		plan.Close()
 		fail(err)
