@@ -43,3 +43,32 @@ func TestMalformedErrorStillRedactsCredentials(t *testing.T) {
 		}
 	}
 }
+
+func TestUpstreamDetailsReviewRegressions(t *testing.T) {
+	for _, raw := range []string{
+		`HTTPS://alice:PRIVATEPASS@example.org/path?session=PRIVATEQUERY#PRIVATEFRAGMENT`,
+		`HtTpS://alice:PRIVATEPASS@example.org/path?session=PRIVATEQUERY#PRIVATEFRAGMENT`,
+		`{"error":{"message":"Invalid request: {\"messages\":[{\"role\":\"user\",\"content\":\"PRIVATE_PROMPT\"}]} trailing explanation"}}`,
+		`Invalid request: {"input":"PRIVATE_PROMPT"} trailing explanation`,
+		`Invalid request: {"prompt":"PRIVATE_PROMPT", broken`,
+		`Invalid request: {"messages":[{"content":"PRIVATE_PROMPT"}]`,
+	} {
+		b, _ := json.Marshal(SanitizeUpstream(raw))
+		if strings.Contains(string(b), "PRIVATE") {
+			t.Errorf("private content escaped sanitization: %s", b)
+		}
+	}
+}
+
+func TestEmbeddedErrorsPreserveSafeExplanation(t *testing.T) {
+	raw := `Invalid request: {"messages":[{"content":"PRIVATE_PROMPT"}],"reason":"unsupported role"} retry with a valid role; {"input":"PRIVATE_INPUT","status":400}`
+	b, _ := json.Marshal(SanitizeUpstream(raw))
+	for _, expected := range []string{"Invalid request:", "unsupported role", "retry with a valid role", "status"} {
+		if !strings.Contains(string(b), expected) {
+			t.Fatalf("lost explanation %q: %s", expected, b)
+		}
+	}
+	if strings.Contains(string(b), "PRIVATE") {
+		t.Fatal(string(b))
+	}
+}

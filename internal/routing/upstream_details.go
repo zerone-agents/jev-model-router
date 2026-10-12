@@ -25,7 +25,7 @@ var authText = regexp.MustCompile(`(?i)\b(Bearer|Basic)\s+[a-z0-9._~+/=:-]+`)
 var credentialText = regexp.MustCompile(`(?i)\b(api[-_ ]?key|access[-_ ]?token|refresh[-_ ]?token|password|secret|authorization|cookie|set-cookie)["']?\s*[:=]\s*("[^"\r\n]*"|'[^'\r\n]*'|[^\s,;<>]+)`)
 var cookieText = regexp.MustCompile(`(?i)\b(?:set-cookie|cookie)\s*:\s*[^\r\n]+`)
 var keyText = regexp.MustCompile(`\b(sk-[A-Za-z0-9._-]+|apikey_[A-Za-z0-9._-]+)\b`)
-var urlText = regexp.MustCompile(`https?://[^\s<>"']+`)
+var urlText = regexp.MustCompile(`(?i)https?://[^\s<>"']+`)
 
 // SanitizeUpstream accepts only an actual response body. Oversized input is
 // omitted rather than exposing an incomplete credential at a read boundary.
@@ -114,7 +114,29 @@ func SanitizeUpstream(raw any, secrets ...string) *UpstreamDetails {
 					return clean(nested, depth+1)
 				}
 			}
-			return redact(x)
+			// Error prose can embed request JSON after an explanation. Decode
+			// each complete structure, not only strings that are entirely JSON.
+			// If a structure is broken, omit its remaining text: field/value
+			// boundaries are no longer trustworthy for selective redaction.
+			var out strings.Builder
+			for {
+				start := strings.IndexAny(x, "{[")
+				if start < 0 {
+					out.WriteString(x)
+					break
+				}
+				out.WriteString(x[:start])
+				decoder := json.NewDecoder(strings.NewReader(x[start:]))
+				var embedded any
+				if decoder.Decode(&embedded) != nil {
+					out.WriteString("[omitted: malformed structured error]")
+					break
+				}
+				encoded, _ := json.Marshal(clean(embedded, depth+1))
+				out.Write(encoded)
+				x = x[start+int(decoder.InputOffset()):]
+			}
+			return redact(out.String())
 		default:
 			return v
 		}

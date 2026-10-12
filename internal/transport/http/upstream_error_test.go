@@ -46,3 +46,20 @@ func TestSharedUpstreamDetailsAcrossPublicProtocols(t *testing.T) {
 		}
 	}
 }
+
+func TestSharedDiagnosticsRedactEmbeddedRequestAndMixedCaseURL(t *testing.T) {
+	for _, raw := range []string{
+		`{"error":{"message":"Invalid request: {\"messages\":[{\"content\":\"PRIVATE_PROMPT\"}]} trailing explanation"}}`,
+		`Invalid request: {"prompt":"PRIVATE_PROMPT", broken`,
+		`HTTPS://alice:PRIVATEPASS@example.org/path?session=PRIVATEQUERY#PRIVATEFRAGMENT`,
+	} {
+		err := &routing.UpstreamError{Status: 400, Details: routing.SanitizeUpstream(raw), Body: map[string]any{"message": "upstream rejected request"}}
+		_, messages := messagesError(err, "router-id")
+		for _, body := range []any{errorBody(err), messages, playgroundDiagnostic(err, "router-id", "generation")} {
+			encoded, _ := json.Marshal(body)
+			if strings.Contains(string(encoded), "PRIVATE") {
+				t.Fatal(string(encoded))
+			}
+		}
+	}
+}
