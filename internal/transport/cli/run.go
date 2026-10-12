@@ -14,7 +14,7 @@ import (
 	"strings"
 )
 
-const Version = "0.1.19"
+const Version = "0.1.20"
 const help = `jev-router serve [--config file]
 jev-router dashboard [--url URL] [--config file] [--no-open]
 jev-router schema [capability] [--url URL] [--config file]
