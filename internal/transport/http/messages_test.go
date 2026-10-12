@@ -122,7 +122,7 @@ func TestMessagesStreamFailure(t *testing.T) {
 			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if before {
 					w.WriteHeader(503)
-					fmt.Fprint(w, `{"error":{"message":"SECRET"}}`)
+					fmt.Fprint(w, `{"error":{"message":"password=SECRET"}}`)
 					return
 				}
 				w.Header().Set("Content-Type", "text/event-stream")

@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/zerone-agents/jev-model-router/internal/decision"
+	"github.com/zerone-agents/jev-model-router/internal/inference"
 	"github.com/zerone-agents/jev-model-router/internal/management"
+	"github.com/zerone-agents/jev-model-router/internal/playground"
 	"github.com/zerone-agents/jev-model-router/internal/provider"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"github.com/zerone-agents/jev-model-router/internal/session"
@@ -137,10 +139,15 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 		return nil, nil, e
 	}
 	admin := httptransport.NewSessionManagementHandler(service, sessionHTTP)
+	pg := httptransport.NewPlaygroundHandler(sessionHTTP, playground.NewService(store, cfg.Playground, time.Now), &inference.Service{Store: store, Planner: planner, Recorder: recorder, DecisionTimeout: cfg.DecisionTimeout}, &routing.Executor{Generator: gen}, cfg.Playground)
 	dashboard := web.Handler()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/dashboard" || strings.HasPrefix(r.URL.Path, "/dashboard/") {
 			dashboard.ServeHTTP(w, r)
+			return
+		}
+		if r.URL.Path == "/admin/v1/playground" || strings.HasPrefix(r.URL.Path, "/admin/v1/playground/") {
+			pg.ServeHTTP(w, r)
 			return
 		}
 		if strings.HasPrefix(r.URL.Path, "/admin/") {

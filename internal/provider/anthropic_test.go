@@ -422,7 +422,7 @@ func TestMessagesParallelToolsSameFrame(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		fmt.Fprint(w, `data: {"id":"x","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"a","type":"function","function":{"name":"first","arguments":"{\"x\":"}},{"index":1,"id":"b","type":"function","function":{"name":"second","arguments":"{\"y\":"}}]}}]}`+"\n\n")
-		fmt.Fprint(w, `data: {"id":"x","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"1}"}},{"index":1,"function":{"arguments":"2}"}}]},"finish_reason":"tool_calls"}]}`+"\n\ndata: [DONE]\n\n")
+		fmt.Fprint(w, `data: {"id":"x","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"","function":{"arguments":"1}"}},{"index":1,"id":"","function":{"arguments":"2}"}}]},"finish_reason":"tool_calls"}]}`+"\n\ndata: [DONE]\n\n")
 	}))
 	defer s.Close()
 	p, err := PrepareMessages(json.RawMessage(`{"model":"external","max_tokens":1024,"stream":true,"messages":[{"role":"user","content":"query"}]}`))

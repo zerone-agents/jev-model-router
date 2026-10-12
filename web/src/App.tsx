@@ -1,7 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   SquaresFour,
+  ChatCircle,
   Stack,
   SlidersHorizontal,
   ListBullets,
@@ -16,16 +24,21 @@ import { APIError, secureOrigin, type Client } from "./api";
 import { labels, text, type Lang } from "./i18n";
 import { ErrorBox } from "./components";
 import { Overview, Models, Records } from "./pages";
+const Playground = lazy(() =>
+  import("./playground/Playground").then((m) => ({ default: m.Playground })),
+);
 import { ModelEditor, PromptEditor } from "./editors";
 type Page = keyof typeof labels.en;
 const required: Record<Page, string> = {
   overview: "status.get",
+  playground: "playground",
   models: "models.list",
   prompt: "prompt.get",
   records: "records.list",
 };
 const icons = {
   overview: SquaresFour,
+  playground: ChatCircle,
   models: Stack,
   prompt: SlidersHorizontal,
   records: ListBullets,
@@ -162,7 +175,10 @@ export function App() {
     setPage(next);
     setMobile(false);
   };
-  const can = (id: string) => session.capabilities.some((c) => c.id === id);
+  const can = (id: string) =>
+    id === "playground"
+      ? session.capabilities.some((c) => !!c.call?.protocol?.playground)
+      : session.capabilities.some((c) => c.id === id);
   const nav = (
     <>
       <a
@@ -417,6 +433,12 @@ export function App() {
                 props &&
                 (page === "overview" ? (
                   <Overview {...props} />
+                ) : page === "playground" ? (
+                  <Suspense
+                    fallback={<p>{text(lang, "Loading…", "加载中…")}</p>}
+                  >
+                    <Playground {...props} />
+                  </Suspense>
                 ) : page === "models" ? (
                   <Models
                     {...props}

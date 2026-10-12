@@ -2,6 +2,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn, execFileSync } from "node:child_process";
+import { startPlaygroundUpstream } from "./playground-upstream.mjs";
+const upstream = await startPlaygroundUpstream();
 const dir = mkdtempSync(join(tmpdir(), "jev-ui-e2e-"));
 const bin = join(dir, "jev-router");
 execFileSync("go", ["build", "-o", bin, "./cmd/jev-router"], {
@@ -22,6 +24,7 @@ const child = spawn(bin, ["serve"], {
 for (const signal of ["SIGINT", "SIGTERM"])
   process.on(signal, () => child.kill(signal));
 child.on("exit", (code) => {
+  upstream.close();
   rmSync(dir, { recursive: true, force: true });
   process.exit(code || 0);
 });

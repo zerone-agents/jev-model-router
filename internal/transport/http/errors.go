@@ -12,7 +12,12 @@ import (
 func errorBody(e error) map[string]any {
 	var upstream *routing.UpstreamError
 	if errors.As(e, &upstream) {
-		return map[string]any{"error": upstream.Body}
+		body := make(map[string]any, len(upstream.Body)+1)
+		for k, v := range upstream.Body {
+			body[k] = v
+		}
+		body["diagnostic"] = routing.Diagnose(e)
+		return map[string]any{"error": body}
 	}
 	known := management.Failure(e).Error
 	return map[string]any{"error": map[string]any{"message": known.Message, "type": known.Code, "code": known.Code, "param": nil}}

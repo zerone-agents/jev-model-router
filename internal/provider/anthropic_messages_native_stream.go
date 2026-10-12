@@ -38,6 +38,7 @@ func (r *messagesBoundedReader) Read(p []byte) (int, error) {
 }
 
 type nativeMessagesValidation struct {
+	secrets          []string
 	target           routing.Target
 	prepared         *PreparedMessages
 	started, stopped bool
@@ -50,8 +51,8 @@ type nativeMessagesValidation struct {
 	prefixes         map[int]objectPrefixKind
 }
 
-func newNativeMessagesEventReader(reader io.Reader, target routing.Target, p *PreparedMessages) providerUtils.SSEEventReader {
-	state := &nativeMessagesValidation{target: target, prepared: p, open: -1, ids: map[string]bool{}, prefixes: map[int]objectPrefixKind{}}
+func newNativeMessagesEventReader(reader io.Reader, target routing.Target, p *PreparedMessages, secrets ...string) providerUtils.SSEEventReader {
+	state := &nativeMessagesValidation{secrets: secrets, target: target, prepared: p, open: -1, ids: map[string]bool{}, prefixes: map[int]objectPrefixKind{}}
 	scanner := bufio.NewScanner(&messagesBoundedReader{reader: reader, remaining: nativeStreamLimit})
 	scanner.Buffer(make([]byte, 8192), nativeFrameLimit+1)
 	return &anthropicUpstreamReader{scanner: scanner, accept: state.accept}
@@ -75,7 +76,9 @@ func (s *nativeMessagesValidation) accept(typ string, raw []byte) error {
 		if json.Unmarshal(fields["error"], &e) != nil {
 			return nativeError(502)
 		}
-		return nativeEventError(e.Type)
+		err := nativeEventError(e.Type).(*routing.UpstreamError)
+		err.Details = routing.SanitizeUpstream(raw, s.secrets...)
+		return err
 	}
 	if typ == "ping" {
 		return nil
@@ -310,7 +313,7 @@ func (s *nativeMessagesStream) Next(ctx context.Context) (event MessageEvent, er
 			}
 			source = s.zip
 		}
-		s.reader = newNativeMessagesEventReader(source, s.target, s.prepared)
+		s.reader = newNativeMessagesEventReader(source, s.target, s.prepared, upstreamSecret(s.ctx))
 	}
 	typ, body, err := s.reader.ReadEvent()
 	if err != nil {

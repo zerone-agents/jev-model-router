@@ -114,12 +114,12 @@ func TestNativeMessagesHTTPErrorContract(t *testing.T) {
 			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				calls.Add(1)
 				w.WriteHeader(status)
-				fmt.Fprint(w, `{"type":"error","error":{"type":"api_error","message":"PRIVATE"}}`)
+				fmt.Fprint(w, `{"type":"error","error":{"type":"api_error","message":"provider rejected upstream-key","api_key":"PRIVATE"}}`)
 			}))
 			h := nativeMessagesHandler(t, up.URL, nil, false, Limits{})
 			body := fmt.Sprintf(`{"model":"external","max_tokens":2048,"stream":%t,"messages":[{"role":"user","content":"hi"}]}`, stream)
 			w := messagesCall(h, body, "router-key")
-			if w.Code != status || !strings.Contains(w.Body.String(), `"type":"error"`) || strings.Contains(w.Body.String(), "PRIVATE") || calls.Load() != 1 {
+			if w.Code != status || !strings.Contains(w.Body.String(), `"type":"error"`) || strings.Contains(w.Body.String(), "PRIVATE") || strings.Contains(w.Body.String(), "upstream-key") || !strings.Contains(w.Body.String(), "provider rejected") || !strings.Contains(w.Body.String(), "upstream_error") || calls.Load() != 1 {
 				t.Fatalf("%d %s", w.Code, w.Body.String())
 			}
 			for key, want := range map[string]int{"bad": 401, "settings-key": 403} {
@@ -161,5 +161,25 @@ func TestNativeMessagesHTTPLargeNativeHistory(t *testing.T) {
 	}
 	if calls.Load() != 2 {
 		t.Fatal("calls", calls.Load())
+	}
+}
+
+func TestNativeMessagesSSEErrorDetails(t *testing.T) {
+	for _, started := range []bool{false, true} {
+		up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/event-stream")
+			if started {
+				fmt.Fprint(w, "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"m\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"up\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":1,\"output_tokens\":0}}}\n\n")
+				w.(http.Flusher).Flush()
+			}
+			fmt.Fprint(w, "event: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"provider rejected upstream-key\",\"api_key\":\"PRIVATE\"}}\n\n")
+		}))
+		h := nativeMessagesHandler(t, up.URL, nil, false, Limits{})
+		w := messagesCall(h, `{"model":"external","max_tokens":2048,"stream":true,"messages":[{"role":"user","content":"hi"}]}`, "router-key")
+		body := w.Body.String()
+		if strings.Contains(body, "upstream-key") || strings.Contains(body, "PRIVATE") || strings.Contains(body, "message_stop") || !strings.Contains(body, "provider rejected") || !strings.Contains(body, `"upstream_status":401`) {
+			t.Fatalf("started=%v: %d %s", started, w.Code, body)
+		}
+		up.Close()
 	}
 }

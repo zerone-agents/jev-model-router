@@ -212,7 +212,7 @@ func TestNativeMessagesStreamLimits(t *testing.T) {
 	}
 }
 func TestNativeMessagesStreamCancelAndErrors(t *testing.T) {
-	for typ, status := range map[string]int{"invalid_request_error": 400, "authentication_error": 502, "permission_error": 502, "not_found_error": 404, "request_too_large": 413, "rate_limit_error": 429, "api_error": 500, "timeout_error": 504, "overloaded_error": 529, "unknown": 502} {
+	for typ, status := range map[string]int{"invalid_request_error": 400, "authentication_error": 401, "permission_error": 403, "not_found_error": 404, "request_too_large": 413, "rate_limit_error": 429, "api_error": 500, "timeout_error": 504, "overloaded_error": 529, "unknown": 502} {
 		for _, prefix := range []string{"", messagesNativeStart() + messagesNativeText(0)} {
 			_, err := readNativeFixture(t, prefix+messagesNativeEvent("error", `,"error":{"type":`+fmt.Sprintf("%q", typ)+`,"message":"SECRET"}`))
 			var e *routing.UpstreamError

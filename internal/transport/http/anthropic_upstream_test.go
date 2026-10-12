@@ -3,6 +3,7 @@ package httptransport
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/zerone-agents/jev-model-router/internal/inference"
 	"github.com/zerone-agents/jev-model-router/internal/management"
 	"github.com/zerone-agents/jev-model-router/internal/provider"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
@@ -14,9 +15,14 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func nativeChatHandler(t *testing.T) http.Handler {
+	h, _, _ := nativeChatFixture(t)
+	return h
+}
+func nativeChatFixture(t *testing.T) (http.Handler, *inference.Service, *routing.Executor) {
 	t.Helper()
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var b map[string]any
@@ -26,6 +32,9 @@ func nativeChatHandler(t *testing.T) http.Handler {
 		}
 		raw, _ := json.Marshal(b["messages"])
 		history := strings.Contains(string(raw), `"tool_result"`)
+		if strings.Contains(string(raw), "parity followup") && !strings.Contains(string(raw), `"thinking":"thought"`) {
+			t.Error("plain reasoning history lost before native upstream")
+		}
 		tools, _ := b["tools"].([]any)
 		blocks := []map[string]any{{"type": "text", "text": "answer"}}
 		stop := "end_turn"
@@ -94,7 +103,10 @@ func nativeChatHandler(t *testing.T) http.Handler {
 	cfg.Models[0].Capabilities.ContextLimit = 100000
 	cfg.Models[0].Capabilities.Tools = true
 	store := testStore{cfg}
-	return NewHandler(management.New(store, nil), store, &routing.Planner{PrepareCheck: provider.PrepareCheck}, &routing.Executor{Generator: g}, func(string) (management.Principal, error) { return management.Principal{Role: "inference"}, nil }, Limits{})
+	planner := &routing.Planner{PrepareCheck: provider.PrepareCheck}
+	executor := &routing.Executor{Generator: g}
+	service := &inference.Service{Store: store, Planner: planner, DecisionTimeout: time.Second}
+	return NewHandler(management.New(store, nil), store, planner, executor, func(string) (management.Principal, error) { return management.Principal{Role: "inference"}, nil }, Limits{}), service, executor
 }
 func TestChatAnthropicUpstreamHTTP(t *testing.T) {
 	h := nativeChatHandler(t)

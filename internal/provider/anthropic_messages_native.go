@@ -23,7 +23,9 @@ func completeNativeMessages(ctx *schemas.BifrostContext, client *bifrost.Bifrost
 		return nil, nativeError(502)
 	}
 	if out.StatusCode != 200 {
-		return nil, nativeError(out.StatusCode)
+		err := nativeReportedError(out.StatusCode, out.Body, upstreamSecret(ctx)).(*routing.UpstreamError)
+		addUpstreamRequestID(ctx, err.Details, out.Headers)
+		return nil, err
 	}
 	return validateNativeMessagesResponse(out.Body, target, prepared)
 }

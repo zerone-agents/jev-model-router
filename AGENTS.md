@@ -1,5 +1,14 @@
 # Repository instructions
 
+## Agent First
+
+When adding or changing product capabilities, prioritize complete Agent
+workflows through discoverable machine contracts and API/CLI entry points.
+Keep the usage Skill aligned with those capabilities. The management UI
+serves human inspection and adjustment through shared capabilities; core
+features must remain operable without the UI. Acceptance checks must cover
+the Agent operation path, not only UI behavior.
+
 ## Product architecture
 
 Before changing module boundaries, public capabilities, or CLI/UI behavior,
@@ -34,3 +43,9 @@ Before triaging or changing issue state, read
 Use a single-context layout: root `CONTEXT.md` and `docs/adr/`.
 Before exploring domain concepts or architectural decisions, read
 `docs/agents/domain.md`.
+
+## Frontend standards and review
+
+Before implementing or reviewing UI changes, read
+`docs/agents/frontend-standards.md`. For UI reviews, also apply
+`docs/agents/frontend-review.md`.

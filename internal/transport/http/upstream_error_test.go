@@ -6,6 +6,7 @@ import (
 	"github.com/zerone-agents/jev-model-router/internal/management"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -31,5 +32,34 @@ func TestUpstreamErrorResponse(t *testing.T) {
 	}
 	if management.Failure(err).Error.Message != "generation provider failed" {
 		t.Fatal("provider details leaked into management")
+	}
+}
+
+func TestSharedUpstreamDetailsAcrossPublicProtocols(t *testing.T) {
+	details := routing.SanitizeUpstream(`{"detail":"{\"title\":\"Typesafe is not available in your region.\"}","api_key":"SECRET"}`)
+	err := &routing.UpstreamError{Status: 451, Details: details, Body: map[string]any{"message": "upstream rejected request"}}
+	_, messages := messagesError(err, "router-id")
+	for _, body := range []any{errorBody(err), messages, playgroundDiagnostic(err, "router-id", "routing")} {
+		b, _ := json.Marshal(body)
+		if !strings.Contains(string(b), "Typesafe is not available in your region.") || strings.Contains(string(b), "SECRET") {
+			t.Fatal(string(b))
+		}
+	}
+}
+
+func TestSharedDiagnosticsRedactEmbeddedRequestAndMixedCaseURL(t *testing.T) {
+	for _, raw := range []string{
+		`{"error":{"message":"Invalid request: {\"messages\":[{\"content\":\"PRIVATE_PROMPT\"}]} trailing explanation"}}`,
+		`Invalid request: {"prompt":"PRIVATE_PROMPT", broken`,
+		`HTTPS://alice:PRIVATEPASS@example.org/path?session=PRIVATEQUERY#PRIVATEFRAGMENT`,
+	} {
+		err := &routing.UpstreamError{Status: 400, Details: routing.SanitizeUpstream(raw), Body: map[string]any{"message": "upstream rejected request"}}
+		_, messages := messagesError(err, "router-id")
+		for _, body := range []any{errorBody(err), messages, playgroundDiagnostic(err, "router-id", "generation")} {
+			encoded, _ := json.Marshal(body)
+			if strings.Contains(string(encoded), "PRIVATE") {
+				t.Fatal(string(encoded))
+			}
+		}
 	}
 }

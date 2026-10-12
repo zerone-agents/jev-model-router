@@ -4,12 +4,14 @@ export const text = (lang: Lang, en: string, zh: string) =>
 export const labels = {
   en: {
     overview: "Overview",
+    playground: "Playground",
     models: "Models",
     prompt: "Routing prompt",
     records: "Routing records",
   },
   zh: {
     overview: "概览",
+    playground: "Playground",
     models: "模型",
     prompt: "路由提示词",
     records: "路由记录",
