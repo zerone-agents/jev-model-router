@@ -142,3 +142,20 @@ RPM 是任意滚动 60 秒内的受理次数；每日按 UTC 零点重置。会�
 
 页面仅在内存保存对话，刷新或离开后丢失；失败、停止或截断的回合不会自动加入下一轮历史。思考正文不展示、不落浏览器持久存储；按协议需要携带的 reasoning 历史仍保留在当前页面内存。正文通过 Streamdown 渲染，原始 HTML 不执行、图片不加载，既有 CSP 不放宽。
 
+
+### Alternative Jev endpoints
+
+`decision.put` accepts optional `path`, appended to `base_url` after removing its trailing slash. Omission uses `/v1/systemone` for backward compatibility. Supply a slash-prefixed path of alphanumeric, hyphen or underscore segments; URLs, query strings and fragments are not accepted in this field. A replacement that omits `path` resets it to the default.
+
+For DefAPI, use:
+
+```json
+{
+  "base_url": "https://api.defapi.org",
+  "path": "/api/v1/decisions",
+  "model": "typesafe/jev-1.13",
+  "secret_ref": "env:DEFAPI_API_KEY"
+}
+```
+
+The referenced key must be available to the server process. Both backends use Bearer authentication and native `state` / `questions` requests with Choice answers. Configuration writes do not test connectivity or change the deployed server environment.

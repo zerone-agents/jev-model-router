@@ -110,4 +110,8 @@ Generation providers accept `protocol: "openai" | "anthropic"`. Omitted protocol
 
 Playground JSON/SSE 错误提供 stage（request/routing/generation）、Router request_id、可用的 upstream_status 和白名单 upstream_code。摘要仍使用稳定分类；新增可选 upstream_error 对象，包含 body（脱敏 JSON 或纯文本）、truncated（是否截断）及可用的 request_id（上游请求 ID，与 Router ID 分开）。公开 Chat 与 Messages 的 JSON/SSE 错误均通过 error.diagnostic.upstream_error 返回相同详情。供应商的未知错误码可保留在详情中，不冒充 Router 分类。
 
-Jev 决策失败同样保留详情，Playground 标记为 routing，不发送选模成功事件或调用生成供应商。嵌套 JSON 字符串会解码并递归脱敏。认证字段、API key、密码、Cookie、结构化请求回显以及本次使用的供应商凭证会被屏蔽；URL 用户信息、查询和片段被清除。详情不写入路由记录或浏览器存储，SDK 内部诊断和原始请求不作为错误正文来源。输入超过 64 KiB 时省略正文并标记 truncated，脱敏结果超过 16 KiB 时返回文本片段并标记 truncated；不能安全检查完整输入时不展示部分原文。HTML 仅作为文本显示。上游无可用正文或网络/解析错误时，保留通用错误。读取超时仍归类 timeout。
+Jev 决策失败同样保留详情，Playground 标记为 routing，不发送选模成功事件或调用生成供应商。嵌套 JSON 字符串及带说明前后缀的 JSON 片段会解码并递归脱敏；损坏的结构从起点起省略，避免暴露无法确定边界的请求回显。认证字段、API key、密码、Cookie、结构化请求回显以及本次使用的供应商凭证会被屏蔽；URL 协议名匹配不区分大小写，用户信息、查询和片段被清除。详情不写入路由记录或浏览器存储，SDK 内部诊断和原始请求不作为错误正文来源。输入超过 64 KiB 时省略正文并标记 truncated，脱敏结果超过 16 KiB 时返回文本片段并标记 truncated；不能安全检查完整输入时不展示部分原文。HTML 仅作为文本显示。上游无可用正文或网络/解析错误时，保留通用错误。读取超时仍归类 timeout。
+
+## Decision endpoint
+
+`decision.put` supports optional `path`, appended to `base_url`; omitted means `/v1/systemone`. DefAPI uses `/api/v1/decisions` and model `typesafe/jev-1.13`. This is a full replacement: omitting a previously configured path restores the default. Authentication remains Bearer via `secret_ref`; request and Choice response schemas remain native Jev. Paths allow slash-separated alphanumeric, hyphen and underscore segments only, without query or fragment.
