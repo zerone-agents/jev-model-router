@@ -195,7 +195,7 @@ func prefixString(raw []byte, i int) (int, objectPrefixKind) {
 						return i, objectPrefixIncomplete
 					}
 					c = raw[i]
-					if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F') {
+					if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
 						return i, objectPrefixInvalid
 					}
 					i++

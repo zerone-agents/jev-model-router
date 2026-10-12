@@ -18,6 +18,14 @@ func (p *PreparedMessages) chatRequest() (routing.Request, error) {
 	if err := rejectNativeChatFields(body); err != nil {
 		return routing.Request{}, err
 	}
+	// The pinned SDK's Sonic decoders differ by architecture when numbers
+	// overflow float64. Check representability consistently before conversion.
+	// This decoded value is never used for output: raw tool numbers retain
+	// their precision in the SDK's RawMessage fields.
+	var numericBounds any
+	if json.Unmarshal(body, &numericBounds) != nil {
+		return routing.Request{}, routing.Fail("unsupported_request", "Messages data cannot be represented by the Chat adapter")
+	}
 	// JSON Schema integers include 1024.0 and 1.024e3. The pinned SDK's Go int
 	// decoder needs a canonical representation, without rounding or clamping.
 	var original map[string]json.RawMessage

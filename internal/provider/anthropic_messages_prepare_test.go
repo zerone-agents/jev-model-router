@@ -111,7 +111,7 @@ func TestMessagesNativeUnsignedProfileReplay(t *testing.T) {
 }
 
 func TestMessagesCandidateToolPrecision(t *testing.T) {
-	for _, number := range []string{"9007199254740993", "1e100000"} {
+	for _, number := range []string{"9007199254740993", "1e308", "1e309", "-1e309", "1e100000"} {
 		p, err := PrepareMessages([]byte(`{"model":"auto","max_tokens":2048,"messages":[{"role":"assistant","content":[{"type":"tool_use","id":"t","name":"f","input":{"n":` + number + `}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"t","content":"ok"}]}]}`))
 		if err != nil {
 			t.Fatal(err)
@@ -120,9 +120,9 @@ func TestMessagesCandidateToolPrecision(t *testing.T) {
 			t.Fatal(err)
 		}
 		err = p.Check(target("https://example.invalid/v1"))
-		if number == "9007199254740993" {
+		if number == "9007199254740993" || number == "1e308" {
 			r, e := p.chatRequest()
-			if err != nil || e != nil || len(r.Messages) == 0 || r.Messages[0].ToolCalls[0].Function.Arguments != `{"n":9007199254740993}` {
+			if err != nil || e != nil || len(r.Messages) == 0 || r.Messages[0].ToolCalls[0].Function.Arguments != `{"n":`+number+`}` {
 				t.Fatalf("tool number changed: %v %v", err, e)
 			}
 		} else if err == nil || !strings.Contains(err.Error(), "unsupported_request") {
