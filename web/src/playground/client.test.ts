@@ -114,3 +114,35 @@ it("preserves request diagnostics before SSE starts", async () => {
     diagnostic: { stage: "routing", request_id: "r" },
   });
 });
+
+it("preserves upstream details for JSON and SSE failures", async () => {
+  const upstream_error = {
+    body: {
+      detail: {
+        title: "Typesafe is not available in your region.",
+        status: 451,
+      },
+    },
+    truncated: false,
+  };
+  await expect(
+    consumePlayground(
+      new Response(
+        JSON.stringify({ error: { code: "upstream_error", upstream_error } }),
+        { status: 451 },
+      ),
+      () => {},
+    ),
+  ).rejects.toMatchObject({ diagnostic: { upstream_error } });
+  const events: PlaygroundEvent[] = [];
+  await expect(
+    consumePlayground(
+      new Response(
+        `event: error\ndata: ${JSON.stringify({ code: "upstream_error", message: "failed", upstream_error })}\n\n`,
+        { headers: { "Content-Type": "text/event-stream" } },
+      ),
+      (e) => events.push(e),
+    ),
+  ).rejects.toThrow("upstream_error");
+  expect(events[0]).toMatchObject({ upstream_error });
+});

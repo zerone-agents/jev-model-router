@@ -2,20 +2,20 @@ package routing
 
 import "errors"
 
-// Diagnostic contains only bounded, locally defined summaries, never provider
-// messages, SDK diagnostics, URLs, credentials or request content.
+// Diagnostic combines a stable classification with sanitized upstream details.
 type Diagnostic struct {
-	Code           string `json:"code"`
-	Message        string `json:"message"`
-	UpstreamStatus int    `json:"upstream_status,omitempty"`
-	UpstreamCode   string `json:"upstream_code,omitempty"`
+	UpstreamError  *UpstreamDetails `json:"upstream_error,omitempty"`
+	Code           string           `json:"code"`
+	Message        string           `json:"message"`
+	UpstreamStatus int              `json:"upstream_status,omitempty"`
+	UpstreamCode   string           `json:"upstream_code,omitempty"`
 }
 
 func Diagnose(err error) Diagnostic {
 	d := Diagnostic{Code: "internal_error", Message: "Request failed"}
 	var up *UpstreamError
 	if errors.As(err, &up) {
-		d.Code, d.Message = "upstream_error", "Generation provider failed"
+		d.Code, d.Message = "upstream_error", "Upstream provider failed"
 		if up.Status >= 400 && up.Status <= 599 {
 			d.UpstreamStatus = up.Status
 		}
@@ -51,6 +51,7 @@ func Diagnose(err error) Diagnostic {
 			d.Code, d.Message = "upstream_rate_limit", "Provider rate limit reached"
 		}
 		d.UpstreamCode = value
+		d.UpstreamError = up.Details
 		return d
 	}
 	var known *Error

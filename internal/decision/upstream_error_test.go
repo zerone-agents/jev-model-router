@@ -22,7 +22,7 @@ func TestJevUpstreamDiagnostics(t *testing.T) {
 		{503, `<html>SECRET</html>`, "upstream_unavailable", ""},
 	} {
 		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(tc.status); w.Write([]byte(tc.body)) }))
-		_, err := New(s.Client(), func(string) ([]byte, error) { return []byte("key"), nil }, DefaultBudget()).Choose(context.Background(), routing.DecisionConfig{BaseURL: s.URL}, input())
+		_, err := New(s.Client(), func(string) ([]byte, error) { return []byte("SECRET"), nil }, DefaultBudget()).Choose(context.Background(), routing.DecisionConfig{BaseURL: s.URL}, input())
 		s.Close()
 		d := routing.Diagnose(err)
 		b, _ := json.Marshal(d)
@@ -41,8 +41,23 @@ func TestJevErrorBodyTimeout(t *testing.T) {
 	defer s.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
-	_, err := New(s.Client(), func(string) ([]byte, error) { return []byte("key"), nil }, DefaultBudget()).Choose(ctx, routing.DecisionConfig{BaseURL: s.URL}, input())
+	_, err := New(s.Client(), func(string) ([]byte, error) { return []byte("SECRET"), nil }, DefaultBudget()).Choose(ctx, routing.DecisionConfig{BaseURL: s.URL}, input())
 	if d := routing.Diagnose(err); d.Code != "timeout" || d.UpstreamCode != "" {
 		t.Fatal(d)
+	}
+}
+
+func TestJevRegionErrorDetails(t *testing.T) {
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Request-ID", "jev-request-123")
+		w.WriteHeader(451)
+		w.Write([]byte(`{"detail":"{\"title\":\"Typesafe is not available in your region.\",\"status\":451}","message":"credential: actual-credential","api_key":"another-secret"}`))
+	}))
+	defer s.Close()
+	_, err := New(s.Client(), func(string) ([]byte, error) { return []byte("actual-credential"), nil }, DefaultBudget()).Choose(context.Background(), routing.DecisionConfig{BaseURL: s.URL}, input())
+	d := routing.Diagnose(err)
+	b, _ := json.Marshal(d)
+	if d.UpstreamError == nil || d.UpstreamError.RequestID != "jev-request-123" || d.UpstreamStatus != 451 || !strings.Contains(string(b), "Typesafe is not available in your region.") || strings.Contains(string(b), "actual-credential") || strings.Contains(string(b), "another-secret") {
+		t.Fatal(string(b))
 	}
 }

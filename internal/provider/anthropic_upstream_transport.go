@@ -27,7 +27,9 @@ func completeNativePassthrough(ctx *schemas.BifrostContext, client *bifrost.Bifr
 		return routing.Completion{}, nativeError(502)
 	}
 	if out.StatusCode != 200 {
-		return routing.Completion{}, nativeReportedError(out.StatusCode, out.Body)
+		err := nativeReportedError(out.StatusCode, out.Body, upstreamSecret(ctx)).(*routing.UpstreamError)
+		addUpstreamRequestID(ctx, err.Details, out.Headers)
+		return routing.Completion{}, err
 	}
 	var native anthropic.AnthropicMessageResponse
 	if json.Unmarshal(out.Body, &native) != nil {
@@ -64,7 +66,9 @@ func (r *nativeTransportReader) fill() error {
 				return nativeError(502)
 			}
 			if out.StatusCode != 200 {
-				return nativeReportedError(out.StatusCode, out.Body)
+				err := nativeReportedError(out.StatusCode, out.Body, upstreamSecret(r.ctx)).(*routing.UpstreamError)
+				addUpstreamRequestID(r.ctx, err.Details, out.Headers)
+				return err
 			}
 			r.pending = out.Body
 		}
@@ -87,7 +91,7 @@ func streamNativePassthrough(ctx *schemas.BifrostContext, client *bifrost.Bifros
 		release()
 		return nil, err
 	}
-	state := &anthropicUpstreamValidation{tools: tools, signatureOptional: signatureOptional}
+	state := &anthropicUpstreamValidation{secret: upstreamSecret(ctx), tools: tools, signatureOptional: signatureOptional}
 	ch := make(chan *schemas.BifrostStreamChunk)
 	go func() {
 		defer close(ch)

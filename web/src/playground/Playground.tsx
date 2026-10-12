@@ -342,6 +342,42 @@ export function Playground({ client, lang, onError }: PageProps) {
                       {t.diagnostic?.upstream_code && (
                         <div>{t.diagnostic.upstream_code}</div>
                       )}
+                      {t.diagnostic?.upstream_error && (
+                        <details className="pg-upstream-details">
+                          <summary>
+                            {text(
+                              lang,
+                              "Upstream error details",
+                              "上游错误详情",
+                            )}
+                          </summary>
+                          {t.diagnostic.upstream_error.request_id && (
+                            <div>
+                              {text(lang, "Upstream request ID", "上游请求 ID")}
+                              : {t.diagnostic.upstream_error.request_id}
+                            </div>
+                          )}
+                          <pre>
+                            {typeof t.diagnostic.upstream_error.body ===
+                            "string"
+                              ? t.diagnostic.upstream_error.body
+                              : JSON.stringify(
+                                  t.diagnostic.upstream_error.body,
+                                  null,
+                                  2,
+                                )}
+                          </pre>
+                          {t.diagnostic.upstream_error.truncated && (
+                            <div>
+                              {text(
+                                lang,
+                                "Details truncated due to size limit.",
+                                "详情超出长度限制，已截断。",
+                              )}
+                            </div>
+                          )}
+                        </details>
+                      )}
                       {(t.diagnostic?.request_id || t.route?.request_id) && (
                         <div>
                           {text(lang, "Request ID", "请求 ID")}:{" "}

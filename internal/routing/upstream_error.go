@@ -10,6 +10,7 @@ var ErrGenerationCapacity = Fail("upstream_error", "generation connection capaci
 type UpstreamError struct {
 	// ReportedCode is populated only from a verified upstream envelope/event.
 	// Body may instead contain locally synthesized protocol fields.
+	Details      *UpstreamDetails
 	ReportedCode string
 	Status       int
 	Body         map[string]any

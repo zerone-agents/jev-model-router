@@ -25,7 +25,7 @@ func nativeError(status int) error {
 	case 499:
 		code, message = "cancelled", "request cancelled"
 	default:
-		if status < 500 || status > 599 {
+		if status < 400 || status > 599 {
 			status = 502
 		}
 	}
@@ -43,7 +43,9 @@ func anthropicUpstreamError(ctx context.Context, fail *schemas.BifrostError) err
 		status = *fail.StatusCode
 	}
 	if fail != nil {
-		return nativeReportedError(status, fail.ExtraFields.RawResponse)
+		err := nativeReportedError(status, fail.ExtraFields.RawResponse, upstreamSecret(ctx)).(*routing.UpstreamError)
+		addUpstreamRequestID(ctx, err.Details, nil)
+		return err
 	}
 	return nativeError(status)
 }
@@ -82,8 +84,9 @@ func nativeEventError(typ string) error {
 }
 
 // Inspect only recognized codes in the actual envelope, never SDK messages.
-func nativeReportedError(status int, raw any) error {
+func nativeReportedError(status int, raw any, secrets ...string) error {
 	err := nativeError(status).(*routing.UpstreamError)
+	err.Details = routing.SanitizeUpstream(raw, secrets...)
 	var b []byte
 	switch v := raw.(type) {
 	case []byte:

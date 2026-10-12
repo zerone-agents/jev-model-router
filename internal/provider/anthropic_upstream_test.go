@@ -43,7 +43,7 @@ func TestAnthropicUpstreamTransport(t *testing.T) {
 			}))
 			defer s.Close()
 			g := generator(t).(*bifrostGenerator)
-			client, release, e := g.acquire(nativeTarget(s.URL + "/v1/"))
+			client, release, _, e := g.acquire(nativeTarget(s.URL + "/v1/"))
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -68,13 +68,13 @@ func TestAnthropicUpstreamTransport(t *testing.T) {
 func TestProviderProtocolCacheIsolation(t *testing.T) {
 	g := generator(t).(*bifrostGenerator)
 	a := target("https://example.com/v1")
-	first, r1, e := g.acquire(a)
+	first, r1, _, e := g.acquire(a)
 	if e != nil {
 		t.Fatal(e)
 	}
 	defer r1()
 	a.Provider.Protocol = routing.ProtocolAnthropic
-	second, r2, e := g.acquire(a)
+	second, r2, _, e := g.acquire(a)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -83,7 +83,7 @@ func TestProviderProtocolCacheIsolation(t *testing.T) {
 		t.Fatal("protocols share client")
 	}
 	a.Provider.BaseURL += "/"
-	third, r3, e := g.acquire(a)
+	third, r3, _, e := g.acquire(a)
 	if e != nil {
 		t.Fatal(e)
 	}
