@@ -72,7 +72,8 @@ func ReportedErrorCode(body map[string]any) string {
 			value = *ptr
 		}
 		switch value {
-		case "insufficient_quota", "billing_error", "content_filter", "content_policy_violation",
+		case "quota_exceeded", "model_not_found", "insufficient_balance", "context_length_exceeded", "unsupported_parameter",
+			"insufficient_quota", "billing_error", "content_filter", "content_policy_violation",
 			"authentication_error", "invalid_api_key", "rate_limit_error", "rate_limit_exceeded",
 			"invalid_request_error", "permission_error", "not_found_error", "conflict_error",
 			"request_too_large", "api_error", "timeout_error", "overloaded_error":

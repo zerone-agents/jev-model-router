@@ -55,7 +55,7 @@ func messagesError(err error, id string) (int, map[string]any) {
 			status, typ, message = 404, "not_found_error", "model unavailable"
 		case "no_candidates", "budget_exceeded":
 			status, typ, message = 422, "invalid_request_error", known.Message
-		case "config_missing", "storage_error":
+		case "config_missing", "storage_error", "health_unavailable":
 			status = 503
 			message = "inference configuration or storage unavailable"
 		case "timeout":
@@ -67,6 +67,13 @@ func messagesError(err error, id string) (int, map[string]any) {
 		}
 	}
 	detail := map[string]any{"type": typ, "message": message}
+	known := management.Failure(err).Error
+	if len(known.HealthExclusions) > 0 {
+		detail["health_exclusions"] = known.HealthExclusions
+		if known.HealthExclusionsTruncated {
+			detail["health_exclusions_truncated"] = true
+		}
+	}
 	if upstream != nil {
 		detail["diagnostic"] = routing.Diagnose(err)
 	}

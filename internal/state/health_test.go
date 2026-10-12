@@ -97,3 +97,19 @@ func TestHealthDeletedKeyRowDoesNotRegenerate(t *testing.T) {
 		t.Fatal("deleted initialized key regenerated")
 	}
 }
+func TestHealthKeySameLengthCorruption(t *testing.T) {
+	s, e := Open(filepath.Join(t.TempDir(), "r.db"), nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	if _, e = s.LoadHealthKey(context.Background()); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.db.Exec("UPDATE health_meta SET fingerprint_key=randomblob(32)"); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.LoadHealthKey(context.Background()); e == nil {
+		t.Fatal("corrupt key accepted as new target identity")
+	}
+}

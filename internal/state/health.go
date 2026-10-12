@@ -1,8 +1,10 @@
 package state
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -33,13 +35,19 @@ func (s *Store) LoadHealthKey(ctx context.Context) ([32]byte, error) {
 		if _, e = tx.ExecContext(ctx, "INSERT INTO health_meta VALUES(1,?,1)", key[:]); e != nil {
 			return [32]byte{}, health.ErrUnavailable
 		}
-		if _, e = tx.ExecContext(ctx, "INSERT INTO health_initialized VALUES(1)"); e != nil {
+		digest := sha256.Sum256(key[:])
+		if _, e = tx.ExecContext(ctx, "INSERT INTO health_initialized VALUES(1,?)", digest[:]); e != nil {
 			return [32]byte{}, health.ErrUnavailable
 		}
 	} else if e != nil || version != 1 || len(b) != 32 {
 		return key, health.ErrUnavailable
 	} else {
 		copy(key[:], b)
+		var checksum []byte
+		digest := sha256.Sum256(key[:])
+		if tx.QueryRowContext(ctx, "SELECT key_hash FROM health_initialized WHERE id=1").Scan(&checksum) != nil || !bytes.Equal(checksum, digest[:]) {
+			return [32]byte{}, health.ErrUnavailable
+		}
 	}
 	if tx.Commit() != nil {
 		return [32]byte{}, health.ErrUnavailable

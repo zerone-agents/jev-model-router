@@ -29,6 +29,7 @@ func completeNativePassthrough(ctx *schemas.BifrostContext, client *bifrost.Bifr
 	if out.StatusCode != 200 {
 		err := nativeReportedError(out.StatusCode, out.Body, upstreamSecret(ctx)).(*routing.UpstreamError)
 		addUpstreamRequestID(ctx, err.Details, out.Headers)
+		err.RetryAfter = retryAfterHeaders(out.Headers)
 		return routing.Completion{}, err
 	}
 	var native anthropic.AnthropicMessageResponse
@@ -68,6 +69,7 @@ func (r *nativeTransportReader) fill() error {
 			if out.StatusCode != 200 {
 				err := nativeReportedError(out.StatusCode, out.Body, upstreamSecret(r.ctx)).(*routing.UpstreamError)
 				addUpstreamRequestID(r.ctx, err.Details, out.Headers)
+				err.RetryAfter = retryAfterHeaders(out.Headers)
 				return err
 			}
 			r.pending = out.Body

@@ -14,15 +14,16 @@ type Planner struct {
 	Estimate     func(Model, Request) (int64, bool, error)
 }
 type Plan struct {
-	HealthExclusions []HealthExclusion `json:"health_exclusions,omitempty"`
-	ConfigVersion    int64             `json:"config_version"`
-	Target           Target            `json:"-"`
-	ModelID          string            `json:"model_id"`
-	CandidateIDs     []string          `json:"candidate_ids"`
-	Path             string            `json:"path"`
-	DecisionUsage    *Usage            `json:"decision_usage,omitempty"`
-	ContextEstimate  *ContextEstimate  `json:"context_estimate,omitempty"`
-	ContextExact     bool              `json:"context_exact"`
+	HealthExclusionsTruncated bool              `json:"health_exclusions_truncated,omitempty"`
+	HealthExclusions          []HealthExclusion `json:"health_exclusions,omitempty"`
+	ConfigVersion             int64             `json:"config_version"`
+	Target                    Target            `json:"-"`
+	ModelID                   string            `json:"model_id"`
+	CandidateIDs              []string          `json:"candidate_ids"`
+	Path                      string            `json:"path"`
+	DecisionUsage             *Usage            `json:"decision_usage,omitempty"`
+	ContextEstimate           *ContextEstimate  `json:"context_estimate,omitempty"`
+	ContextExact              bool              `json:"context_exact"`
 }
 
 func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error) {
@@ -138,7 +139,11 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 			preparedTargets = append(preparedTargets, target)
 			if r.Model == "auto" {
 				if record := healthSnapshot[target.HealthIdentity()]; record.State == health.Isolated {
-					result.HealthExclusions = append(result.HealthExclusions, HealthExclusion{ModelID: m.ID, State: record.State, Reason: record.Reason, NextProbe: record.NextProbe})
+					if len(result.HealthExclusions) < 200 {
+						result.HealthExclusions = append(result.HealthExclusions, HealthExclusion{ModelID: m.ID, State: record.State, Reason: record.Reason, NextProbe: record.NextProbe})
+					} else {
+						result.HealthExclusionsTruncated = true
+					}
 					continue
 				}
 			}
@@ -191,7 +196,7 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 		if r.Model != "auto" {
 			return result, Fail("not_found", "model unavailable")
 		}
-		return result, &Error{Code: "no_candidates", Message: "no enabled model can accept the complete request", HealthExclusions: result.HealthExclusions}
+		return result, &Error{Code: "no_candidates", Message: "no enabled model can accept the complete request", HealthExclusions: result.HealthExclusions, HealthExclusionsTruncated: result.HealthExclusionsTruncated}
 	}
 	selected := targets[0]
 	if r.Model != "auto" {

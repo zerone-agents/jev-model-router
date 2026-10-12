@@ -16,15 +16,16 @@ type streamItem struct {
 	err   error
 }
 type bufferedStream struct {
+	ctx    context.Context
 	ch     chan streamItem
-	cancel context.CancelFunc
+	cancel context.CancelCauseFunc
 	source routing.EventStream
 	once   sync.Once
 }
 
 func bufferStream(ctx context.Context, s routing.EventStream, size int) *bufferedStream {
-	ctx, cancel := context.WithCancel(ctx)
-	b := &bufferedStream{ch: make(chan streamItem, size), cancel: cancel, source: s}
+	ctx, cancel := context.WithCancelCause(ctx)
+	b := &bufferedStream{ctx: ctx, ch: make(chan streamItem, size), cancel: cancel, source: s}
 	go func() {
 		defer close(b.ch)
 		for {
@@ -47,6 +48,7 @@ func bufferStream(ctx context.Context, s routing.EventStream, size int) *buffere
 func (b *bufferedStream) Next(ctx context.Context) (routing.Event, error) {
 	select {
 	case <-ctx.Done():
+		b.cancel(context.Cause(ctx))
 		return routing.Event{}, contextError(ctx, ctx.Err())
 	case v, ok := <-b.ch:
 		if !ok {
@@ -56,7 +58,14 @@ func (b *bufferedStream) Next(ctx context.Context) (routing.Event, error) {
 	}
 }
 func (b *bufferedStream) Close() error {
-	b.once.Do(func() { b.cancel(); b.source.Close() })
+	b.once.Do(func() {
+		b.cancel(context.Canceled)
+		if source, ok := b.source.(interface{ CloseWithCause(error) error }); ok {
+			_ = source.CloseWithCause(context.Cause(b.ctx))
+		} else {
+			_ = b.source.Close()
+		}
+	})
 	return nil
 }
 

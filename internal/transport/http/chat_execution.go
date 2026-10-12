@@ -41,10 +41,11 @@ type chatOutput struct {
 // the provider reader exits; the public API retains its configured buffer.
 func executeChat(ctx context.Context, execution *inference.Request, executor *routing.Executor, req routing.Request, firstTimeout time.Duration, bufferSize int, output chatOutput) error {
 	plan, err := execution.Plan(req, nil)
-	defer plan.Close()
 	if err != nil {
+		plan.Close()
 		return contextError(ctx, err)
 	}
+	defer plan.Close()
 	if output.planned != nil {
 		if err := output.planned(plan); err != nil {
 			return err

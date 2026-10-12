@@ -108,7 +108,7 @@ func (s *messagesStream) Next(ctx context.Context) (MessageEvent, error) {
 			ids := map[string]bool{}
 			for _, tool := range s.tools {
 				if tool.id == "" || tool.name == "" || ids[tool.id] {
-					return MessageEvent{}, routing.Fail("upstream_error", "invalid upstream tool call")
+					return MessageEvent{}, routing.TemporaryUpstream(routing.Fail("upstream_error", "invalid upstream tool call"))
 				}
 				ids[tool.id] = true
 				if err := validateToolArguments(tool.arguments); err != nil {
@@ -116,7 +116,7 @@ func (s *messagesStream) Next(ctx context.Context) (MessageEvent, error) {
 				}
 			}
 			if len(s.tail) == 0 {
-				return MessageEvent{}, routing.Fail("upstream_error", "stream ended without Messages completion")
+				return MessageEvent{}, routing.TemporaryUpstream(routing.Fail("upstream_error", "stream ended without Messages completion"))
 			}
 			for _, e := range s.tail {
 				if string(e.Type) == "message_delta" && s.stopString != nil && *s.stopString != "" {
@@ -132,14 +132,14 @@ func (s *messagesStream) Next(ctx context.Context) (MessageEvent, error) {
 			continue
 		}
 		if chunk == nil {
-			return MessageEvent{}, routing.Fail("upstream_error", "invalid stream event")
+			return MessageEvent{}, routing.TemporaryUpstream(routing.Fail("upstream_error", "invalid stream event"))
 		}
 		if chunk.BifrostError != nil {
 			return MessageEvent{}, providerError(s.ctx, chunk.BifrostError)
 		}
 		r := chunk.BifrostChatResponse
 		if r == nil {
-			return MessageEvent{}, routing.Fail("upstream_error", "invalid stream event")
+			return MessageEvent{}, routing.TemporaryUpstream(routing.Fail("upstream_error", "invalid stream event"))
 		}
 		if captured, ok := r.ExtraFields.RawResponse.(string); ok && int64(len(captured)) > s.byteLimit {
 			return MessageEvent{}, routing.Fail("upstream_error", "Messages stream exceeds response byte limit")
@@ -163,7 +163,7 @@ func (s *messagesStream) Next(ctx context.Context) (MessageEvent, error) {
 		r.ExtraFields = schemas.BifrostResponseExtraFields{}
 		frame, err := json.Marshal(r)
 		if err != nil {
-			return MessageEvent{}, routing.Fail("upstream_error", "invalid stream event")
+			return MessageEvent{}, routing.TemporaryUpstream(routing.Fail("upstream_error", "invalid stream event"))
 		}
 		s.frames++
 		if s.frames > maxMessagesStreamFrames || int64(len(frame)) > s.byteLimit-s.bytes {
@@ -183,7 +183,7 @@ func (s *messagesStream) Next(ctx context.Context) (MessageEvent, error) {
 					meaningful = len(d.ToolCalls) > 0 || (d.Content != nil && *d.Content != "") || (d.Reasoning != nil && *d.Reasoning != "") || d.Refusal != nil
 				}
 				if meaningful || (choice.FinishReason != nil && *choice.FinishReason != *s.finish) {
-					return MessageEvent{}, routing.Fail("upstream_error", "upstream output after stop reason")
+					return MessageEvent{}, routing.TemporaryUpstream(routing.Fail("upstream_error", "upstream output after stop reason"))
 				}
 				continue
 			}
@@ -207,7 +207,7 @@ func (s *messagesStream) Next(ctx context.Context) (MessageEvent, error) {
 					}
 					if call.ID != nil {
 						if tool.id != "" && tool.id != *call.ID {
-							return MessageEvent{}, routing.Fail("upstream_error", "upstream tool id changed")
+							return MessageEvent{}, routing.TemporaryUpstream(routing.Fail("upstream_error", "upstream tool id changed"))
 						}
 						tool.id = *call.ID
 					}

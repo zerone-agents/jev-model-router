@@ -250,13 +250,16 @@ func providerError(ctx context.Context, fail *schemas.BifrostError) error {
 	// Only actual failed HTTP response bodies cross this boundary. SDK messages
 	// and raw requests are never used as fallback error details.
 	details := routing.SanitizeUpstream(fail.ExtraFields.RawResponse, upstreamSecret(ctx))
-	if details == nil {
-		return safeError(ctx)
+	if details != nil {
+		addUpstreamRequestID(ctx, details, nil)
 	}
-	addUpstreamRequestID(ctx, details, nil)
 	body := map[string]any{"message": "upstream rejected request", "type": "upstream_error", "code": "upstream_error", "param": nil}
 	reported := ""
-	if envelope, ok := details.Body.(map[string]any); ok {
+	var sanitized any
+	if details != nil {
+		sanitized = details.Body
+	}
+	if envelope, ok := sanitized.(map[string]any); ok {
 		if upstream, ok := envelope["error"].(map[string]any); ok {
 			reported = routing.ReportedErrorCode(upstream)
 			for _, field := range []string{"message", "type", "code", "param"} {

@@ -12,7 +12,7 @@ func addHealthSchemas() {
 	if e = json.Unmarshal(b, &h); e != nil {
 		panic(e)
 	}
-	exclusion := map[string]any{"type": "array", "maxItems": 1000, "items": map[string]any{"type": "object", "properties": map[string]any{"model_id": map[string]any{"type": "string"}, "state": map[string]any{"const": "isolated"}, "reason": map[string]any{"type": "string"}, "next_probe_at": map[string]any{"type": []string{"string", "null"}}}, "required": []string{"model_id", "state", "reason", "next_probe_at"}, "additionalProperties": false}}
+	exclusion := map[string]any{"type": "array", "maxItems": 200, "items": map[string]any{"type": "object", "properties": map[string]any{"model_id": map[string]any{"type": "string"}, "state": map[string]any{"const": "isolated"}, "reason": map[string]any{"type": "string"}, "next_probe_at": map[string]any{"type": []string{"string", "null"}}}, "required": []string{"model_id", "state", "reason", "next_probe_at"}, "additionalProperties": false}}
 	for i := range caps {
 		var out map[string]any
 		json.Unmarshal(caps[i].OutputSchema, &out)
@@ -27,6 +27,7 @@ func addHealthSchemas() {
 			p["persisted"] = map[string]any{"type": "boolean"}
 		case "route.inspect":
 			p["health_exclusions"] = exclusion
+			p["health_exclusions_truncated"] = map[string]any{"type": "boolean"}
 		}
 		caps[i].OutputSchema, _ = json.Marshal(out)
 	}

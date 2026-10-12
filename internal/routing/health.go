@@ -24,8 +24,11 @@ func HealthOutcome(err error) health.Outcome {
 	if errors.As(err, &u) {
 		o := health.Outcome{Status: u.Status, Code: u.ReportedCode, RetryAt: health.ParseRetryAfter(u.RetryAfter, time.Now())}
 		switch u.ReportedCode {
-		case "invalid_api_key", "authentication_error", "insufficient_quota", "quota_exceeded", "model_not_found", "insufficient_balance":
+		case "billing_error", "invalid_api_key", "authentication_error", "insufficient_quota", "quota_exceeded", "model_not_found", "insufficient_balance":
 			o.Kind = health.Permanent
+			return o
+		case "rate_limit_error", "rate_limit_exceeded":
+			o.Kind = health.Limited
 			return o
 		case "content_filter", "content_policy_violation", "context_length_exceeded", "invalid_request_error", "unsupported_parameter":
 			return health.Outcome{}

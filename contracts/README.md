@@ -131,7 +131,8 @@ means health storage is degraded. `health_probe_in_progress` (409/CLI 5) is retr
 `health_unavailable` (503/CLI 6) prevents unsafe automatic admission.
 
 `route.inspect` returns `health_exclusions` for isolated auto candidates, including
-in `no_candidates` error metadata. Explicit inspection does not generate or recover.
+in `no_candidates` error metadata. Exclusions are limited to 200 entries;
+`health_exclusions_truncated=true` means further exclusions were omitted. Explicit inspection does not generate or recover.
 The public Chat error can include these safe exclusions, never credential fingerprints.
 Model lists remain enabled-model lists; explicitly selecting an isolated model is
 allowed. The entire generation lifecycle shares one immutable credential snapshot

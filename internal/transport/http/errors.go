@@ -23,6 +23,9 @@ func errorBody(e error) map[string]any {
 	body := map[string]any{"message": known.Message, "type": known.Code, "code": known.Code, "param": nil}
 	if len(known.HealthExclusions) > 0 {
 		body["health_exclusions"] = known.HealthExclusions
+		if known.HealthExclusionsTruncated {
+			body["health_exclusions_truncated"] = true
+		}
 	}
 	return map[string]any{"error": body}
 }

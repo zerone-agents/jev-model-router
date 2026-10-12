@@ -128,10 +128,19 @@ func (s *observedMessages) Close() error { s.done(s.ctx, context.Canceled); retu
 
 func retryAfter(ctx context.Context) string {
 	headers, _ := ctx.Value(schemas.BifrostContextKeyProviderResponseHeaders).(map[string]string)
+	return retryAfterHeaders(headers)
+}
+func retryAfterHeaders(headers map[string]string) string {
 	for k, v := range headers {
 		if strings.EqualFold(k, "Retry-After") {
 			return v
 		}
 	}
 	return ""
+}
+
+// CloseWithCause preserves an idle deadline enforced by a buffered consumer.
+func (s *observedChat) CloseWithCause(cause error) error {
+	s.done(context.Background(), cause)
+	return s.source.Close()
 }

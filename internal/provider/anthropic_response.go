@@ -33,7 +33,7 @@ func (g *bifrostGenerator) completeMessages(ctx context.Context, t routing.Targe
 		return nil, providerError(bc, failure)
 	}
 	if out == nil || len(out.Choices) != 1 || out.Choices[0].Message == nil {
-		return nil, routing.Fail("upstream_error", "invalid generation result")
+		return nil, routing.TemporaryUpstream(routing.Fail("upstream_error", "invalid generation result"))
 	}
 	choice := out.Choices[0]
 	hasStop := choice.StopString != nil && *choice.StopString != ""
@@ -47,7 +47,7 @@ func (g *bifrostGenerator) completeMessages(ctx context.Context, t routing.Targe
 		ids := map[string]bool{}
 		for _, call := range choice.Message.ToolCalls {
 			if call.ID == nil || *call.ID == "" || call.Function.Name == nil || *call.Function.Name == "" || ids[*call.ID] {
-				return nil, routing.Fail("upstream_error", "invalid upstream tool call")
+				return nil, routing.TemporaryUpstream(routing.Fail("upstream_error", "invalid upstream tool call"))
 			}
 			ids[*call.ID] = true
 			if err = validateToolArguments(call.Function.Arguments); err != nil {
@@ -63,7 +63,7 @@ func (g *bifrostGenerator) completeMessages(ctx context.Context, t routing.Targe
 		return nil, err
 	}
 	if hasStop && *choice.FinishReason != "stop" {
-		return nil, routing.Fail("upstream_error", "upstream stop metadata contradicts finish reason")
+		return nil, routing.TemporaryUpstream(routing.Fail("upstream_error", "upstream stop metadata contradicts finish reason"))
 	}
 	out.ExtraFields = schemas.BifrostResponseExtraFields{}
 	result := anthropic.ToAnthropicResponsesResponse(bc, out.ToBifrostResponsesResponse())
@@ -117,10 +117,10 @@ func reportedMessagesUsage(raw any) (*routing.Usage, error) {
 					if value, ok := frame.Usage.Details[key]; ok && string(value) != "null" {
 						var n int64
 						if json.Unmarshal(value, &n) != nil || n < 0 {
-							return nil, routing.Fail("upstream_error", "invalid upstream cache usage")
+							return nil, routing.TemporaryUpstream(routing.Fail("upstream_error", "invalid upstream cache usage"))
 						}
 						if prev, exists := cache[group[0]]; exists && prev != n {
-							return nil, routing.Fail("upstream_error", "conflicting upstream cache usage")
+							return nil, routing.TemporaryUpstream(routing.Fail("upstream_error", "conflicting upstream cache usage"))
 						}
 						cache[group[0]] = n
 					}
@@ -128,7 +128,7 @@ func reportedMessagesUsage(raw any) (*routing.Usage, error) {
 			}
 			read, write := cache["cached_read_tokens"], cache["cached_write_tokens"]
 			if read > found.InputTokens || write > found.InputTokens-read {
-				return nil, routing.Fail("upstream_error", "upstream cache usage exceeds input usage")
+				return nil, routing.TemporaryUpstream(routing.Fail("upstream_error", "upstream cache usage exceeds input usage"))
 			}
 			found.InputDetails, _ = json.Marshal(cache)
 		}
@@ -178,7 +178,7 @@ func reportedMessagesStop(raw any) (*string, error) {
 		for _, c := range frame.Choices {
 			if c.Stop != nil && *c.Stop != "" {
 				if c.Finish == nil || *c.Finish != "stop" {
-					return nil, routing.Fail("upstream_error", "upstream stop metadata contradicts finish reason")
+					return nil, routing.TemporaryUpstream(routing.Fail("upstream_error", "upstream stop metadata contradicts finish reason"))
 				}
 				stop = c.Stop
 			}
