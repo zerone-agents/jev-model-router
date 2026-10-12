@@ -84,3 +84,7 @@ Runtime discovery exposes `call.protocol.playground` for a browser-only, rate-li
 
 Playground makes real decision/generation calls and can incur charges. Discover the effective limits through its authenticated status endpoint. Do not bypass exhausted Playground quotas by switching credentials, sessions, or endpoints. Do not automatically retry a generated request after cancellation, a 429, or a partial stream.
 
+
+### Alternative Jev endpoints
+
+Discover `decision.put` before configuring an alternative endpoint. Its optional `path` defaults to `/v1/systemone`; DefAPI requires base_url `https://api.defapi.org`, path `/api/v1/decisions`, model `typesafe/jev-1.13`, and a server-side `env:` or `file:` secret reference for the DefAPI key. Preserve `path` on replacements unless intentionally resetting it to the official default. Use `route.inspect` with multiple eligible candidates to verify the decision backend; one candidate bypasses Jev. Never put a real key in documentation or committed examples.
