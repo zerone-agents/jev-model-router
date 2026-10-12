@@ -29,7 +29,7 @@ func New(resolve func(string) ([]byte, error)) (routing.Generator, error) {
 	return &bifrostGenerator{resolve: resolve, clients: map[[32]byte]*clientEntry{}}, nil
 }
 func (g *bifrostGenerator) acquire(t routing.Target) (*bifrost.Bifrost, func(), string, error) {
-	key, e := g.resolve(t.Provider.SecretRef)
+	key, e := g.credential(t)
 	if e != nil {
 		return nil, nil, "", routing.Fail("config_missing", "provider credential unavailable")
 	}

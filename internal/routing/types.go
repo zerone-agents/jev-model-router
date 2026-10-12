@@ -182,9 +182,14 @@ type Error struct {
 func (e *Error) Error() string        { return e.Code + ": " + e.Message }
 func Fail(code, message string) error { return &Error{Code: code, Message: message} }
 
+type PreparedCredential interface {
+	Identity() string
+	Close() error
+}
 type Target struct {
-	Provider Provider `json:"-"`
-	Model    Model    `json:"-"`
+	Prepared PreparedCredential `json:"-"`
+	Provider Provider           `json:"-"`
+	Model    Model              `json:"-"`
 }
 type Completion struct {
 	ID      string   `json:"id"`
