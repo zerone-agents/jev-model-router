@@ -12,12 +12,13 @@ import (
 )
 
 type healthRuntime struct {
-	store     management.ConfigStore
-	gate      *routing.HealthGate
-	generator routing.Generator
-	limits    health.Config
-	probes    *health.ProbeLimiter
-	wg        sync.WaitGroup
+	nextMaintenance time.Time
+	store           management.ConfigStore
+	gate            *routing.HealthGate
+	generator       routing.Generator
+	limits          health.Config
+	probes          *health.ProbeLimiter
+	wg              sync.WaitGroup
 }
 
 func (h *healthRuntime) target(ctx context.Context, id string) (routing.Target, int64, error) {
@@ -84,6 +85,10 @@ func (h *healthRuntime) test(ctx context.Context, id string, automatic bool) (ma
 }
 func jsonNumber(n int) string { b, _ := json.Marshal(n); return string(b) }
 func (h *healthRuntime) tick(ctx context.Context) {
+	if time.Now().After(h.nextMaintenance) {
+		h.maintain(ctx)
+		h.nextMaintenance = time.Now().Add(time.Minute)
+	}
 	s, e := h.store.Snapshot(ctx)
 	if e != nil {
 		return
@@ -112,4 +117,27 @@ func (h *healthRuntime) tick(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func (h *healthRuntime) maintain(ctx context.Context) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	s, e := h.store.Snapshot(ctx)
+	if e != nil {
+		return
+	}
+	current := map[health.TargetID]bool{}
+	for _, m := range s.Models {
+		for _, p := range s.Providers {
+			if p.ID == m.ProviderID {
+				t, e := h.gate.PrepareTarget(ctx, routing.Target{Model: m, Provider: p})
+				if e != nil || t.Prepared == nil {
+					return
+				}
+				current[t.HealthIdentity()] = true
+				t.Prepared.Close()
+			}
+		}
+	}
+	h.gate.Service.Maintain(ctx, current)
 }

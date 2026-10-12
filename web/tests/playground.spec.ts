@@ -46,7 +46,16 @@ test.beforeAll(async ({ request }) => {
   const list = await call(request, "models.list", { limit: 200 });
   for (const m of list.items) {
     if (m.enabled)
-      await call(request, "models.put", { ...m, enabled: false }, true);
+      await call(
+        request,
+        "models.put",
+        Object.fromEntries(
+          Object.entries({ ...m, enabled: false }).filter(
+            ([k]) => k !== "health",
+          ),
+        ),
+        true,
+      );
   }
   await call(
     request,

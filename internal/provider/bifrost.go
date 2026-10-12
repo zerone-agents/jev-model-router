@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	bifrost "github.com/maximhq/bifrost/core"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/zerone-agents/jev-model-router/internal/health"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"io"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -160,7 +162,7 @@ func (s *stream) Next(ctx context.Context) (routing.Event, error) {
 	case chunk, ok := <-s.ch:
 		if !ok {
 			if !s.finished {
-				return routing.Event{}, routing.Fail("upstream_error", "upstream stream ended without completion")
+				return routing.Event{}, routing.TemporaryUpstream(routing.Fail("upstream_error", "upstream stream ended without completion"))
 			}
 			return routing.Event{}, io.EOF
 		}
@@ -168,7 +170,7 @@ func (s *stream) Next(ctx context.Context) (routing.Event, error) {
 			return routing.Event{}, providerError(s.ctx, chunk.BifrostError)
 		}
 		if chunk.BifrostChatResponse == nil {
-			return routing.Event{}, routing.Fail("upstream_error", "invalid stream event")
+			return routing.Event{}, routing.TemporaryUpstream(routing.Fail("upstream_error", "invalid stream event"))
 		}
 		s.reportedUsage = s.reportedUsage || hasReportedUsage(chunk.BifrostChatResponse.ExtraFields.RawResponse)
 		out, e := completion(chunk.BifrostChatResponse)
@@ -186,17 +188,17 @@ func (s *stream) Next(ctx context.Context) (routing.Event, error) {
 func (s *stream) Close() error { s.once.Do(func() { s.ctx.Cancel(); s.release() }); return nil }
 func completion(in *schemas.BifrostChatResponse) (routing.Completion, error) {
 	if in == nil {
-		return routing.Completion{}, routing.Fail("upstream_error", "empty generation result")
+		return routing.Completion{}, routing.TemporaryUpstream(routing.Fail("upstream_error", "empty generation result"))
 	}
 	safe := *in
 	safe.ExtraFields = schemas.BifrostResponseExtraFields{}
 	b, e := json.Marshal(&safe)
 	if e != nil {
-		return routing.Completion{}, routing.Fail("upstream_error", "invalid generation result")
+		return routing.Completion{}, routing.TemporaryUpstream(routing.Fail("upstream_error", "invalid generation result"))
 	}
 	var out routing.Completion
 	if json.Unmarshal(b, &out) != nil {
-		return out, routing.Fail("upstream_error", "invalid generation result")
+		return out, routing.TemporaryUpstream(routing.Fail("upstream_error", "invalid generation result"))
 	}
 	// Historical assistant tool calls use array order; index belongs only to
 	// streaming deltas. Strip the SDK-added index from complete messages.
@@ -230,6 +232,12 @@ func providerError(ctx context.Context, fail *schemas.BifrostError) error {
 			if captured.err != nil {
 				return captured.err
 			}
+		}
+	}
+	if ctx.Err() == nil && fail != nil && fail.Error != nil {
+		var network net.Error
+		if errors.As(fail.Error.Error, &network) || errors.Is(fail.Error.Error, io.ErrUnexpectedEOF) {
+			return routing.TemporaryUpstream(safeError(ctx))
 		}
 	}
 	if ctx.Err() != nil || fail == nil || fail.IsBifrostError || fail.Error == nil {

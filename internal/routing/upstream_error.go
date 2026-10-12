@@ -19,3 +19,11 @@ type UpstreamError struct {
 
 func (e *UpstreamError) Error() string { return "upstream_error: generation provider failed" }
 func (e *UpstreamError) Unwrap() error { return Fail("upstream_error", "generation provider failed") }
+
+// TransportFailure classifies a verified transport/protocol failure without
+// retaining the SDK error, which may contain credentials or raw request data.
+type TransportFailure struct{ Cause error }
+
+func (e *TransportFailure) Error() string { return e.Cause.Error() }
+func (e *TransportFailure) Unwrap() error { return e.Cause }
+func TemporaryUpstream(e error) error     { return &TransportFailure{Cause: e} }

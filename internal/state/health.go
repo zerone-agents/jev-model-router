@@ -77,3 +77,10 @@ func (s *Store) SaveHealth(ctx context.Context, r health.Record) error {
 	}
 	return nil
 }
+func (s *Store) DeleteHealth(ctx context.Context, id health.TargetID) error {
+	_, e := s.db.ExecContext(ctx, "DELETE FROM health_records WHERE id=?", string(id))
+	if e != nil {
+		return health.ErrUnavailable
+	}
+	return nil
+}

@@ -2,27 +2,29 @@ package health
 
 import (
 	"context"
+	"math/rand/v2"
 	"sync"
 	"time"
 )
 
 type Service struct {
-	mu       sync.Mutex
-	store    Store
-	policy   Policy
-	now      func() time.Time
-	key      [32]byte
-	err      error
-	writeErr error
-	records  map[TargetID]Record
-	seq      uint64
+	dirty   map[TargetID]bool
+	active  map[TargetID]int
+	mu      sync.Mutex
+	store   Store
+	policy  Policy
+	now     func() time.Time
+	key     [32]byte
+	err     error
+	records map[TargetID]Record
+	seq     uint64
 }
 
 func New(store Store, p Policy, now func() time.Time) *Service {
 	if now == nil {
 		now = time.Now
 	}
-	s := &Service{store: store, policy: p, now: now, records: map[TargetID]Record{}}
+	s := &Service{store: store, policy: p, now: now, records: map[TargetID]Record{}, dirty: map[TargetID]bool{}, active: map[TargetID]int{}}
 	s.key, s.err = store.LoadHealthKey(context.Background())
 	if s.err != nil {
 		return s
@@ -40,8 +42,14 @@ func New(store Store, p Policy, now func() time.Time) *Service {
 	}
 	return s
 }
-func (s *Service) Key() ([32]byte, error)  { return s.key, s.err }
-func (s *Service) Begin(_ TargetID) uint64 { s.mu.Lock(); defer s.mu.Unlock(); s.seq++; return s.seq }
+func (s *Service) Key() ([32]byte, error) { return s.key, s.err }
+func (s *Service) Begin(id TargetID) uint64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.seq++
+	s.active[id]++
+	return s.seq
+}
 func clone(r Record) Record {
 	r.FailureTimes = append([]time.Time(nil), r.FailureTimes...)
 	if r.NextProbe != nil {
@@ -85,11 +93,14 @@ func (s *Service) Snapshot() (map[TargetID]Record, error) {
 func (s *Service) Warning() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.err != nil || s.writeErr != nil
+	return s.err != nil || len(s.dirty) > 0
 }
 func (s *Service) Observe(ctx context.Context, id TargetID, seq uint64, o Outcome) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.active[id] > 0 {
+		s.active[id]--
+	}
 	if s.err != nil || id == "" {
 		return ErrUnavailable
 	}
@@ -134,17 +145,19 @@ func (s *Service) Observe(ctx context.Context, id TargetID, seq uint64, o Outcom
 				delay = s.policy.MaxBackoff
 			}
 			r.Backoff = delay
-			next := now.Add(delay)
+			next := now.Add(s.jitter(delay))
 			if o.RetryAt.After(next) {
 				next = o.RetryAt
+			}
+			if r.NextProbe != nil && r.NextProbe.After(next) {
+				next = *r.NextProbe
 			}
 			r.NextProbe = &next
 			r.State = Isolated
 		}
 	}
 	s.records[id] = r
-	s.writeErr = s.store.SaveHealth(ctx, r)
-	return s.writeErr
+	return s.persist(ctx, r)
 }
 
 // DeferProbe keeps an ignored probe result isolated without inventing a health failure.
@@ -163,12 +176,14 @@ func (s *Service) DeferProbe(ctx context.Context, id TargetID, seq uint64) error
 		delay = s.policy.MaxBackoff
 	}
 	r.Backoff = delay
-	t := s.now().Add(delay)
+	t := s.now().Add(s.jitter(delay))
+	if r.NextProbe != nil && r.NextProbe.After(t) {
+		t = *r.NextProbe
+	}
 	r.NextProbe = &t
 	r.UpdatedAt = s.now()
 	s.records[id] = r
-	s.writeErr = s.store.SaveHealth(ctx, r)
-	return s.writeErr
+	return s.persist(ctx, r)
 }
 func summary(k Kind) string {
 	switch k {
@@ -178,5 +193,54 @@ func summary(k Kind) string {
 		return "Upstream temporarily rate limited."
 	default:
 		return "Upstream connection or service temporarily unavailable."
+	}
+}
+
+func (s *Service) jitter(d time.Duration) time.Duration {
+	extra := time.Duration(rand.Float64() * float64(d) / 10)
+	if d >= s.policy.MaxBackoff || extra > s.policy.MaxBackoff-d {
+		return s.policy.MaxBackoff
+	}
+	return d + extra
+}
+func (s *Service) persist(ctx context.Context, r Record) error {
+	e := s.store.SaveHealth(ctx, r)
+	if e != nil {
+		s.dirty[r.ID] = true
+	} else {
+		delete(s.dirty, r.ID)
+	}
+	return e
+}
+
+// Maintain retries failed writes and removes inactive obsolete generations only.
+func (s *Service) Maintain(ctx context.Context, current map[TargetID]bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.err != nil {
+		return
+	}
+	for id := range s.dirty {
+		if ctx.Err() != nil {
+			return
+		}
+		_ = s.persist(ctx, s.records[id])
+	}
+	remover, ok := s.store.(interface {
+		DeleteHealth(context.Context, TargetID) error
+	})
+	if !ok {
+		return
+	}
+	for id, r := range s.records {
+		if ctx.Err() != nil {
+			return
+		}
+		if !current[id] && s.active[id] == 0 && !s.dirty[id] && r.UpdatedAt.Before(s.now().Add(-7*24*time.Hour)) {
+			if remover.DeleteHealth(ctx, id) == nil {
+				delete(s.records, id)
+				delete(s.active, id)
+			}
+		}
 	}
 }

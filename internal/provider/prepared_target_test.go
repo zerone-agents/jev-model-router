@@ -2,8 +2,12 @@ package provider
 
 import (
 	"context"
+	"github.com/zerone-agents/jev-model-router/internal/health"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestPreparedTargetCredentialRotation(t *testing.T) {
@@ -46,5 +50,21 @@ func TestPreparedTargetCredentialRotation(t *testing.T) {
 	release()
 	if secret != "credential-A" || reads != 2 {
 		t.Fatal("cache hit replaced actual credential")
+	}
+}
+
+func TestHealthClassifiesActualNetworkFailure(t *testing.T) {
+	up := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	url := up.URL
+	up.Close()
+	raw, _ := New(func(string) ([]byte, error) { return []byte("key"), nil })
+	g := raw.(*bifrostGenerator)
+	defer g.Close()
+	target := routing.Target{Provider: routing.Provider{ID: "p", BaseURL: url + "/v1"}, Model: routing.Model{ID: "m", UpstreamName: "up"}}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, e := g.Complete(ctx, target, TestRequest())
+	if routing.HealthOutcome(e).Kind != health.Transient {
+		t.Fatalf("network failure not counted: %T %v", e, e)
 	}
 }

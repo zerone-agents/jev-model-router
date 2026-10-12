@@ -16,6 +16,10 @@ func HealthOutcome(err error) health.Outcome {
 	if errors.Is(err, context.Canceled) || errors.Is(err, ErrGenerationCapacity) {
 		return health.Outcome{}
 	}
+	var transport *TransportFailure
+	if errors.As(err, &transport) {
+		return health.Outcome{Kind: health.Transient}
+	}
 	var u *UpstreamError
 	if errors.As(err, &u) {
 		o := health.Outcome{Status: u.Status, Code: u.ReportedCode, RetryAt: health.ParseRetryAfter(u.RetryAfter, time.Now())}
