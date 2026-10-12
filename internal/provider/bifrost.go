@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	bifrost "github.com/maximhq/bifrost/core"
 	"github.com/maximhq/bifrost/core/schemas"
+	"github.com/zerone-agents/jev-model-router/internal/health"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"io"
 	"strings"
@@ -19,6 +20,7 @@ type clientEntry struct {
 	last   time.Time
 }
 type bifrostGenerator struct {
+	health  *health.Service
 	resolve func(string) ([]byte, error)
 	mu      sync.Mutex
 	clients map[[32]byte]*clientEntry
@@ -78,7 +80,7 @@ func (g *bifrostGenerator) Close() error {
 	}
 	return nil
 }
-func (g *bifrostGenerator) Complete(ctx context.Context, t routing.Target, r routing.Request) (routing.Completion, error) {
+func (g *bifrostGenerator) complete(ctx context.Context, t routing.Target, r routing.Request) (routing.Completion, error) {
 	if e := Check(t, r); e != nil {
 		return routing.Completion{}, e
 	}
@@ -105,7 +107,7 @@ func (g *bifrostGenerator) Complete(ctx context.Context, t routing.Target, r rou
 	}
 	return completion(out)
 }
-func (g *bifrostGenerator) Stream(ctx context.Context, t routing.Target, r routing.Request) (routing.EventStream, error) {
+func (g *bifrostGenerator) stream(ctx context.Context, t routing.Target, r routing.Request) (routing.EventStream, error) {
 	if e := Check(t, r); e != nil {
 		return nil, e
 	}
@@ -256,7 +258,7 @@ func providerError(ctx context.Context, fail *schemas.BifrostError) error {
 			}
 		}
 	}
-	return &routing.UpstreamError{Status: status, Body: body, ReportedCode: reported, Details: details}
+	return &routing.UpstreamError{Status: status, Body: body, ReportedCode: reported, Details: details, RetryAfter: retryAfter(ctx)}
 }
 
 func safeError(ctx context.Context) error {

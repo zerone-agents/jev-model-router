@@ -16,3 +16,31 @@ func TestHealthClassification(t *testing.T) {
 		}
 	}
 }
+
+type healthMemory struct{ rows []health.Record }
+
+func (h healthMemory) LoadHealthKey(context.Context) ([32]byte, error)     { return [32]byte{1}, nil }
+func (h healthMemory) LoadHealth(context.Context) ([]health.Record, error) { return h.rows, nil }
+func (h healthMemory) SaveHealth(context.Context, health.Record) error     { return nil }
+
+type testCredential string
+
+func (c testCredential) Identity() string { return string(c) }
+func (c testCredential) Close() error     { return nil }
+func TestAutoExcludesIsolatedBeforeDecision(t *testing.T) {
+	s, r := planFixture()
+	svc := health.New(healthMemory{[]health.Record{{ID: "a", View: health.View{State: health.Isolated}}}}, health.DefaultPolicy(), nil)
+	p := Planner{Health: &HealthGate{Service: svc, Prepare: func(_ context.Context, t Target) (Target, error) {
+		t.Prepared = testCredential(t.Model.ID)
+		return t, nil
+	}}}
+	plan, e := p.Plan(context.Background(), s, r)
+	if e != nil || plan.ModelID != "b" || plan.Path != "single_candidate" {
+		t.Fatalf("%+v %v", plan, e)
+	}
+	r.Model = "a"
+	plan, e = p.Plan(context.Background(), s, r)
+	if e != nil || plan.ModelID != "a" {
+		t.Fatal("explicit blocked", e)
+	}
+}

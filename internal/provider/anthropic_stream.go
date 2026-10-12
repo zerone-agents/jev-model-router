@@ -49,7 +49,7 @@ type messagesStream struct {
 	frames     int
 }
 
-func (g *bifrostGenerator) StreamMessages(ctx context.Context, t routing.Target, p *PreparedMessages) (MessageStream, error) {
+func (g *bifrostGenerator) streamMessages(ctx context.Context, t routing.Target, p *PreparedMessages) (MessageStream, error) {
 	if err := p.Check(t); err != nil {
 		return nil, err
 	}

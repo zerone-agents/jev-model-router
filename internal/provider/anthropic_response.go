@@ -10,7 +10,7 @@ import (
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 )
 
-func (g *bifrostGenerator) CompleteMessages(ctx context.Context, t routing.Target, p *PreparedMessages) (json.RawMessage, error) {
+func (g *bifrostGenerator) completeMessages(ctx context.Context, t routing.Target, p *PreparedMessages) (json.RawMessage, error) {
 	if err := p.Check(t); err != nil {
 		return nil, err
 	}

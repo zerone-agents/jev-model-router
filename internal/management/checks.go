@@ -32,7 +32,9 @@ func (c *Checks) Inspect(ctx context.Context, r routing.Request) (routing.Plan, 
 	}
 	ctx, cancel := context.WithTimeout(ctx, d)
 	defer cancel()
-	return c.Planner.Plan(ctx, s, r)
+	plan, err := c.Planner.Plan(ctx, s, r)
+	defer plan.Close()
+	return plan, err
 }
 func (c *Checks) TestModel(ctx context.Context, id string) (TestResult, error) {
 	s, e := c.Store.Snapshot(ctx)
