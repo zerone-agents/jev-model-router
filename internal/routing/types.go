@@ -174,9 +174,10 @@ type Usage struct {
 	OutputTokens  int64           `json:"output_tokens"`
 }
 type Error struct {
-	Code      string `json:"code"`
-	Message   string `json:"message"`
-	Retryable bool   `json:"retryable"`
+	HealthExclusions []HealthExclusion `json:"health_exclusions,omitempty"`
+	Code             string            `json:"code"`
+	Message          string            `json:"message"`
+	Retryable        bool              `json:"retryable"`
 }
 
 func (e *Error) Error() string        { return e.Code + ": " + e.Message }

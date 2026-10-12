@@ -88,3 +88,22 @@ Playground makes real decision/generation calls and can incur charges. Discover 
 ### Alternative Jev endpoints
 
 Discover `decision.put` before configuring an alternative endpoint. Its optional `path` defaults to `/v1/systemone`; DefAPI requires base_url `https://api.defapi.org`, path `/api/v1/decisions`, model `typesafe/jev-1.13`, and a server-side `env:` or `file:` secret reference for the DefAPI key. Preserve `path` on replacements unless intentionally resetting it to the official default. Use `route.inspect` with multiple eligible candidates to verify the decision backend; one candidate bypasses Jev. Never put a real key in documentation or committed examples.
+
+### Inspect and recover generation health
+
+Discover the instance schema before using health fields. `models.list` and
+`models.get` expose observed health; `route.inspect` explains auto health exclusions,
+including no-candidate failures. These reads do not generate test completions.
+Unknown targets are eligible; isolated targets are excluded only from auto.
+
+To check recovery, run `models.test` with the model ID. This sends fixed text to
+the configured provider, may cost money, and updates health even for disabled
+models; it never enables a model. Read `data.ok`, `health`, and `persisted` rather
+than assuming top-level success means the provider succeeded. Retry a busy probe
+later. Explicit inference remains available for isolated models and can restore
+health on complete success. Do not resubmit read-only `health` fields in models.put.
+
+A `health_degraded` warning or absent health data means inspection/persistence is
+unavailable, not that every model is healthy. Check instance storage. Back up the
+whole SQLite database including its internal fingerprint key; do not delete the
+key to reset isolation. Key rotation is not implemented.

@@ -23,7 +23,7 @@ func (s *Store) LoadHealthKey(ctx context.Context) ([32]byte, error) {
 	e = tx.QueryRowContext(ctx, "SELECT fingerprint_key,version FROM health_meta WHERE id=1").Scan(&b, &version)
 	if errors.Is(e, sql.ErrNoRows) {
 		var n int
-		if tx.QueryRowContext(ctx, "SELECT count(*) FROM health_records").Scan(&n) != nil || n != 0 {
+		if tx.QueryRowContext(ctx, "SELECT (SELECT count(*) FROM health_records)+(SELECT count(*) FROM health_initialized)").Scan(&n) != nil || n != 0 {
 			return key, health.ErrUnavailable
 		}
 		// A migration receipt alone does not mean initialization succeeded.
@@ -31,6 +31,9 @@ func (s *Store) LoadHealthKey(ctx context.Context) ([32]byte, error) {
 			return key, health.ErrUnavailable
 		}
 		if _, e = tx.ExecContext(ctx, "INSERT INTO health_meta VALUES(1,?,1)", key[:]); e != nil {
+			return [32]byte{}, health.ErrUnavailable
+		}
+		if _, e = tx.ExecContext(ctx, "INSERT INTO health_initialized VALUES(1)"); e != nil {
 			return [32]byte{}, health.ErrUnavailable
 		}
 	} else if e != nil || version != 1 || len(b) != 32 {

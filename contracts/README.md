@@ -115,3 +115,24 @@ Jev 决策失败同样保留详情，Playground 标记为 routing，不发送选
 ## Decision endpoint
 
 `decision.put` supports optional `path`, appended to `base_url`; omitted means `/v1/systemone`. DefAPI uses `/api/v1/decisions` and model `typesafe/jev-1.13`. This is a full replacement: omitting a previously configured path restores the default. Authentication remains Bearer via `secret_ref`; request and Choice response schemas remain native Jev. Paths allow slash-separated alphanumeric, hyphen and underscore segments only, without query or fragment.
+
+## Generation health
+
+`models.list` items and `models.get.resource` include optional read-only `health`:
+state (`unknown`, `healthy`, `isolated`), nullable success/failure/next-probe times,
+and safe failure classification. Missing health plus `health_degraded` warns of
+unavailable observation/storage, not an unknown healthy candidate. Runtime schemas
+expand the shared `schemas/health.json`; configuration write schemas remain unchanged.
+
+`models.test` permits disabled/isolated targets, sends a fixed paid request and
+updates health without changing enabled/configuration version. Top-level `ok`
+means the operation completed; `data.ok` is the probe result. `data.persisted=false`
+means health storage is degraded. `health_probe_in_progress` (409/CLI 5) is retryable;
+`health_unavailable` (503/CLI 6) prevents unsafe automatic admission.
+
+`route.inspect` returns `health_exclusions` for isolated auto candidates, including
+in `no_candidates` error metadata. Explicit inspection does not generate or recover.
+The public Chat error can include these safe exclusions, never credential fingerprints.
+Model lists remain enabled-model lists; explicitly selecting an isolated model is
+allowed. The entire generation lifecycle shares one immutable credential snapshot
+with its health identity and error redaction, across all supported entrypoints.

@@ -81,3 +81,19 @@ func TestHealthStateRestartAndConfigVersion(t *testing.T) {
 		t.Fatal("health changed config version")
 	}
 }
+func TestHealthDeletedKeyRowDoesNotRegenerate(t *testing.T) {
+	s, e := Open(filepath.Join(t.TempDir(), "r.db"), nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	if _, e = s.LoadHealthKey(context.Background()); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.db.Exec("DELETE FROM health_meta"); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.LoadHealthKey(context.Background()); e == nil {
+		t.Fatal("deleted initialized key regenerated")
+	}
+}

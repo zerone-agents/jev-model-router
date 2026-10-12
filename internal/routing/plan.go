@@ -67,7 +67,9 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 	defer func() {
 		for _, t := range preparedTargets {
 			if retErr != nil || result.Target.Prepared != t.Prepared {
-				t.Prepared.Close()
+				if t.Prepared != nil {
+					t.Prepared.Close()
+				}
 			}
 		}
 	}()
@@ -189,7 +191,7 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 		if r.Model != "auto" {
 			return result, Fail("not_found", "model unavailable")
 		}
-		return result, Fail("no_candidates", "no enabled model can accept the complete request")
+		return result, &Error{Code: "no_candidates", Message: "no enabled model can accept the complete request", HealthExclusions: result.HealthExclusions}
 	}
 	selected := targets[0]
 	if r.Model != "auto" {

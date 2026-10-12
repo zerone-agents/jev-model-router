@@ -75,6 +75,14 @@
     "method_not_allowed": {
       "http_status": 405,
       "exit_code": 2
+    },
+    "health_unavailable": {
+      "http_status": 503,
+      "exit_code": 6
+    },
+    "health_probe_in_progress": {
+      "http_status": 409,
+      "exit_code": 5
     }
   },
   "retention": {
@@ -104,5 +112,13 @@
     "scope": "global configuration",
     "conflict": "config_conflict",
     "recovery": "Read the current resource and version, then deliberately prepare a new operation; never overwrite automatically."
+  },
+  "health": {
+    "filter": "auto_only",
+    "unknown": "eligible",
+    "isolated": "explicit_generation_allowed",
+    "recovery": "complete_success",
+    "diagnostics": "no_candidates errors may include health_exclusions with model_id, state, reason, next_probe_at",
+    "degraded": "health_degraded warning means health state or persistence is unavailable; missing health is not unknown"
   }
 }

@@ -3,22 +3,26 @@ package management
 import (
 	"context"
 	"encoding/json"
+	"github.com/zerone-agents/jev-model-router/internal/health"
 	"github.com/zerone-agents/jev-model-router/internal/provider"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"time"
 )
 
 type Checks struct {
+	Test                               func(context.Context, string) (TestResult, error)
 	Store                              ConfigStore
 	Planner                            *routing.Planner
 	Generator                          routing.Generator
 	DecisionTimeout, FirstEventTimeout time.Duration
 }
 type TestResult struct {
-	OK             bool   `json:"ok"`
-	Error          *Error `json:"error,omitempty"`
-	DurationMillis int64  `json:"duration_ms"`
-	ConfigVersion  int64  `json:"config_version"`
+	Health         *health.View `json:"health,omitempty"`
+	Persisted      *bool        `json:"persisted,omitempty"`
+	OK             bool         `json:"ok"`
+	Error          *Error       `json:"error,omitempty"`
+	DurationMillis int64        `json:"duration_ms"`
+	ConfigVersion  int64        `json:"config_version"`
 }
 
 func (c *Checks) Inspect(ctx context.Context, r routing.Request) (routing.Plan, error) {
@@ -37,6 +41,9 @@ func (c *Checks) Inspect(ctx context.Context, r routing.Request) (routing.Plan, 
 	return plan, err
 }
 func (c *Checks) TestModel(ctx context.Context, id string) (TestResult, error) {
+	if c.Test != nil {
+		return c.Test(ctx, id)
+	}
 	s, e := c.Store.Snapshot(ctx)
 	if e != nil {
 		return TestResult{}, e

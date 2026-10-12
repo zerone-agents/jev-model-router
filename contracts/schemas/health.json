@@ -1,0 +1,13 @@
+{
+ "type":"object",
+ "properties":{
+  "state":{"enum":["unknown","healthy","isolated"]},
+  "last_success_at":{"type":["string","null"]},
+  "last_failure_at":{"type":["string","null"]},
+  "next_probe_at":{"type":["string","null"]},
+  "reason":{"type":"string"},"message":{"type":"string"},
+  "upstream_status":{"type":"integer"},"upstream_code":{"type":"string"}
+ },
+ "required":["state","last_success_at","last_failure_at","next_probe_at"],
+ "additionalProperties":false
+}
