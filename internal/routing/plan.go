@@ -14,6 +14,7 @@ type Planner struct {
 	Estimate     func(Model, Request) (int64, bool, error)
 }
 type Plan struct {
+	DecisionInvoked           bool              `json:"-"`
 	HealthExclusionsTruncated bool              `json:"health_exclusions_truncated,omitempty"`
 	HealthExclusions          []HealthExclusion `json:"health_exclusions,omitempty"`
 	ConfigVersion             int64             `json:"config_version"`
@@ -245,7 +246,9 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 		for i, v := range targets {
 			models[i] = v.Model
 		}
+		result.DecisionInvoked = true
 		d, e := p.Decider.Choose(ctx, s.Decision, DecisionInput{Retry: options.Retry, Prompt: s.Prompt, Candidates: models, Request: r})
+		result.DecisionUsage = d.Usage
 		if e != nil {
 			return result, e
 		}
@@ -260,7 +263,6 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 		if !found {
 			return result, Fail("invalid_decision", "unknown selected model")
 		}
-		result.DecisionUsage = d.Usage
 	}
 	result.Target = selected
 	result.ModelID = selected.Model.ID

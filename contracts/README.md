@@ -148,3 +148,19 @@ Both attempts share a 180-second default total budget. Its internal cancellation
 Final errors retain their original protocol status and add diagnostic.attempts (at most two entries; combined diagnostics at most 32 KiB). fallback_exhausted means no eligible backup (HTTP 503 / CLI 6). Successful compatible responses contain only the final model and its reported usage. Detailed upstream bodies are sanitized and response-only, never persisted. Playground emits retry before replanning and route after each successful plan; one final done/error terminates the request. Inspect and health probes never execute fallback.
 
 Response writes use the earlier of the request deadline and the stream idle deadline. Client cancellation interrupts blocked writes. Terminal timeout errors are best effort on writable connections and do not receive a fresh idle interval after the total budget expires. Playground uses the same write boundary, including when the Auto deadline is earlier than its own limit.
+
+## Decision usage in routing records
+
+`records.list` exposes optional `decision_usage` on each record and attempt.
+`input_tokens` and `output_tokens` sum known decision usage, including failed
+decisions and Auto reselection. `complete=false` means one or more invoked
+decisions lack valid usage; the counts are only a lower bound, not a final cost.
+`invocations` counts decision adapter calls, including local failures before
+transmission, and is not a billable request count. Explicit and sole-candidate
+paths report zero invocations and complete zero usage. Historical records omit
+this object: treat their decision cost as unknown, never zero.
+
+These counts exclude generation usage. Use the actual inference request ID to
+join records with generation results; a separate `route.inspect` call incurs
+its own decision and cannot stand in for execution usage. Records remain best
+effort; missing records or `records_degraded` prevent complete reconciliation.

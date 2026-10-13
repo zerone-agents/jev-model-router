@@ -120,3 +120,19 @@ key to reset isolation. Key rotation is not implemented.
 Use `jev-router-cli schema status.get` and `jev-router-cli schema records.list` against the target instance before operating. `status.get` exposes effective `auto_fallback`; configuration uses the documented startup environment/file fields. Public Auto inference may perform one reselection after an eligible generation failure, so one request can incur two charges. Explicit model IDs do not switch.
 
 Use the returned Router request ID to find its `records.list` entry and inspect `attempts`; only safe metadata is persisted. Error responses can include sanitized response-only attempt details. Do not infer zero cost from missing usage or automatically replay a failed request. `route.inspect` evaluates one selection and does not forecast fallback.
+
+## Decision usage in routing records
+
+`records.list` exposes optional `decision_usage` on each record and attempt.
+`input_tokens` and `output_tokens` sum known decision usage, including failed
+decisions and Auto reselection. `complete=false` means one or more invoked
+decisions lack valid usage; the counts are only a lower bound, not a final cost.
+`invocations` counts decision adapter calls, including local failures before
+transmission, and is not a billable request count. Explicit and sole-candidate
+paths report zero invocations and complete zero usage. Historical records omit
+this object: treat their decision cost as unknown, never zero.
+
+These counts exclude generation usage. Use the actual inference request ID to
+join records with generation results; a separate `route.inspect` call incurs
+its own decision and cannot stand in for execution usage. Records remain best
+effort; missing records or `records_degraded` prevent complete reconciliation.

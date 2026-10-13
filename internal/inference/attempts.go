@@ -40,7 +40,7 @@ func (r *Request) Execute(req routing.Request, check func(routing.Target) error,
 		r.current = index
 		before := r.record.DecisionMillis
 		plan, err := r.PlanPrepared(req, check, estimate, summary)
-		a := AttemptSummary{Index: index, Stage: "routing", ModelID: plan.ModelID, Path: plan.Path, DecisionMillis: r.record.DecisionMillis - before, Outcome: "error"}
+		a := AttemptSummary{DecisionUsage: plan.RecordedDecisionUsage(), Index: index, Stage: "routing", ModelID: plan.ModelID, Path: plan.Path, DecisionMillis: r.record.DecisionMillis - before, Outcome: "error"}
 		result := AttemptResult{Err: err}
 		if err == nil {
 			a.Stage = "generation"
