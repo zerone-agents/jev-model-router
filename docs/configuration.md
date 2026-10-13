@@ -65,9 +65,9 @@ first_event_timeout 覆盖流建立到首个有效 SSE 事件，非流式及固�
 
 `encryption_key_ref` / `JEV_ROUTER_ENCRYPTION_KEY_REF` is an optional startup `env:` or absolute `file:` reference to a hex-encoded 32-byte AES-256-GCM master key. Configure it on the server only. Missing/empty environment material keeps legacy external-reference deployments working but rejects managed writes. Nonempty malformed keys, unreadable key files, unsupported references, or existing managed records without a matching key fail startup. All retained revisions are verified at startup, including records from deleted providers.
 
-Quickstart uses `env:JEV_ROUTER_ENCRYPTION_KEY`; generate the value once with `openssl rand -hex 32`. Back up it separately from SQLite and restore the same key with the database. Master-key rotation/re-encryption is not implemented; replacing this value makes existing records unreadable. Upstream-key replacement through `providers.put` is supported without restart.
+Quickstart uses `env:JEV_ROUTER_ENCRYPTION_KEY`; generate the value once with `openssl rand -hex 32`. Back up it separately from SQLite and restore the same key with the database. Master-key rotation/re-encryption is not implemented; replacing this value makes existing records unreadable. Upstream-key replacement through `providers.put` and `decision.put` is supported without restart.
 
-Provider writes accept exactly one of `api_key` and `secret_ref`. Inline keys are nonempty UTF-8, at most 16384 bytes, with no CR/LF/NUL. SQLite stores versioned authenticated ciphertext bound to the provider and immutable revision. Reads return references and masked status only; no reveal endpoint. `managed:` references belong to one provider and cannot be used for decision settings. Retaining such a reference preserves the key on metadata updates.
+`providers.put` and `decision.put` accept exactly one of `api_key` and `secret_ref`. Inline keys are nonempty UTF-8, at most 16384 bytes, with no CR/LF/NUL. SQLite stores versioned authenticated ciphertext bound to its provider or decision owner and immutable revision. Reads return references and masked status only; no reveal endpoint. `managed:` references belong either to one provider or to the decision backend and cannot be exchanged between these owners. Decision reads return only the reference, never the key. Retaining such a reference preserves the key on metadata updates.
 
 Key revisions are retained so captured request snapshots and successful idempotent receipts remain valid. Deleting a provider does not erase historical ciphertext or revoke upstream keys; revoke at the supplier for emergency response. Credential history garbage collection is deferred. Encryption protects a database-only leak, not a compromised running server with access to the master key. Keep TLS termination and proxy request-body logging configured accordingly. Neither requests nor keys belong in logs.
 
@@ -154,11 +154,11 @@ For DefAPI, use:
   "base_url": "https://api.defapi.org",
   "path": "/api/v1/decisions",
   "model": "typesafe/jev-1.13",
-  "secret_ref": "env:DEFAPI_API_KEY"
+  "api_key": "YOUR_DEFAPI_API_KEY"
 }
 ```
 
-The referenced key must be available to the server process. Both backends use Bearer authentication and native `state` / `questions` requests with Choice answers. Configuration writes do not test connectivity or change the deployed server environment.
+Prefer managed `api_key` with a configured encryption master key; alternatively use `secret_ref` with a server-side env/file reference. Both backends use Bearer authentication and native `state` / `questions` requests with Choice answers. Configuration writes do not test connectivity or change the deployed server environment.
 
 ## Generation upstream health
 

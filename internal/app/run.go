@@ -124,7 +124,7 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 				return routing.Fail("config_missing", "provider credential unavailable")
 			}
 		}
-		if s.Decision.Model != "" {
+		if s.Decision.Model != "" && !strings.HasPrefix(s.Decision.SecretRef, "managed:") {
 			if _, e := externalResolve(s.Decision.SecretRef); e != nil {
 				return routing.Fail("config_missing", "decision credential unavailable")
 			}
@@ -135,7 +135,7 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 	service.Health = gate
 	budget := decision.DefaultBudget()
 	budget.MaxBytes = cfg.DecisionMaxBytes
-	planner := &routing.Planner{Health: gate, Decider: decision.New(nil, externalResolve, budget), PrepareCheck: provider.PrepareCheck}
+	planner := &routing.Planner{Health: gate, Decider: decision.New(nil, resolve, budget), PrepareCheck: provider.PrepareCheck}
 	checks := management.Checks{Test: func(ctx context.Context, id string) (management.TestResult, error) {
 		return runtime.test(ctx, id, false)
 	}, Store: store, Planner: planner, Generator: gen, DecisionTimeout: cfg.DecisionTimeout, FirstEventTimeout: cfg.FirstEventTimeout}
