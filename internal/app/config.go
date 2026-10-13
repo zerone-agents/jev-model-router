@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/zerone-agents/jev-model-router/internal/decision"
 	"github.com/zerone-agents/jev-model-router/internal/health"
+	"github.com/zerone-agents/jev-model-router/internal/inference"
 	"github.com/zerone-agents/jev-model-router/internal/playground"
 	httptransport "github.com/zerone-agents/jev-model-router/internal/transport/http"
 	"net"
@@ -16,6 +17,7 @@ import (
 )
 
 type Config struct {
+	Fallback                                                       inference.FallbackConfig
 	Health                                                         health.Config
 	Playground                                                     playground.Limits
 	DecisionMaxBytes                                               int
@@ -28,7 +30,7 @@ type Config struct {
 }
 
 func LoadConfig(path string, lookup func(string) (string, bool)) (Config, error) {
-	c := Config{Health: health.DefaultConfig(), Playground: playground.DefaultLimits(), DecisionMaxBytes: decision.DefaultMaxBytes, Listen: "127.0.0.1:8080", Database: ".data/router.sqlite", SettingsRef: "env:JEV_ROUTER_SETTINGS_TOKEN", InferenceRef: "env:JEV_ROUTER_INFERENCE_TOKEN", DecisionTimeout: 10 * time.Second, FirstEventTimeout: 60 * time.Second, IdleTimeout: 60 * time.Second, RecordTimeout: 100 * time.Millisecond, MaxBodyBytes: 16 << 20, StreamBuffer: 8, RetentionDays: 7, RecordMaxCount: 100000}
+	c := Config{Fallback: inference.DefaultFallbackConfig(), Health: health.DefaultConfig(), Playground: playground.DefaultLimits(), DecisionMaxBytes: decision.DefaultMaxBytes, Listen: "127.0.0.1:8080", Database: ".data/router.sqlite", SettingsRef: "env:JEV_ROUTER_SETTINGS_TOKEN", InferenceRef: "env:JEV_ROUTER_INFERENCE_TOKEN", DecisionTimeout: 10 * time.Second, FirstEventTimeout: 60 * time.Second, IdleTimeout: 60 * time.Second, RecordTimeout: 100 * time.Millisecond, MaxBodyBytes: 16 << 20, StreamBuffer: 8, RetentionDays: 7, RecordMaxCount: 100000}
 	values := map[string]json.RawMessage{}
 	if path != "" {
 		b, e := os.ReadFile(path)
@@ -41,8 +43,8 @@ func LoadConfig(path string, lookup func(string) (string, bool)) (Config, error)
 		}
 	}
 	stringsMap := map[string]*string{"dashboard_origin": &c.DashboardOrigin, "encryption_key_ref": &c.EncryptionKeyRef, "listen": &c.Listen, "database": &c.Database, "settings_token_ref": &c.SettingsRef, "inference_token_ref": &c.InferenceRef}
-	durations := map[string]*time.Duration{"decision_timeout": &c.DecisionTimeout, "first_event_timeout": &c.FirstEventTimeout, "idle_timeout": &c.IdleTimeout, "record_timeout": &c.RecordTimeout}
-	numbers := map[string]bool{"decision_max_bytes": true, "max_body_bytes": true, "stream_buffer": true, "retention_days": true, "record_max_count": true}
+	durations := map[string]*time.Duration{"auto_fallback_timeout": &c.Fallback.Timeout, "decision_timeout": &c.DecisionTimeout, "first_event_timeout": &c.FirstEventTimeout, "idle_timeout": &c.IdleTimeout, "record_timeout": &c.RecordTimeout}
+	numbers := map[string]bool{"auto_fallback_enabled": true, "auto_fallback_max_retries": true, "decision_max_bytes": true, "max_body_bytes": true, "stream_buffer": true, "retention_days": true, "record_max_count": true}
 	for k := range c.Health.Numbers() {
 		numbers["health_"+k] = true
 	}
@@ -107,6 +109,21 @@ func LoadConfig(path string, lookup func(string) (string, bool)) (Config, error)
 		if !ok {
 			continue
 		}
+		if k == "auto_fallback_enabled" {
+			if v != "true" && v != "false" {
+				return c, errors.New("invalid auto_fallback_enabled boolean")
+			}
+			c.Fallback.Enabled = v == "true"
+			continue
+		}
+		if k == "auto_fallback_max_retries" {
+			n, e := strconv.Atoi(v)
+			if e != nil || n < 0 || n > 1 {
+				return c, errors.New("auto_fallback_max_retries must be 0 or 1")
+			}
+			c.Fallback.MaxRetries = n
+			continue
+		}
 		if k == "playground_enabled" {
 			if v != "true" && v != "false" {
 				return c, errors.New("invalid playground_enabled boolean")
@@ -155,6 +172,9 @@ func LoadConfig(path string, lookup func(string) (string, bool)) (Config, error)
 		return c, e
 	}
 	if e := c.Health.Validate(); e != nil {
+		return c, e
+	}
+	if e := c.Fallback.Validate(); e != nil {
 		return c, e
 	}
 	var err error

@@ -214,6 +214,7 @@ export function Playground({ client, lang, onError }: PageProps) {
     const names: Record<Phase, [string, string]> = {
       idle: ["", ""],
       waiting: ["Waiting for response…", "等待响应…"],
+      retrying: ["Retrying with another model…", "正在重新选择模型…"],
       thinking: ["Thinking…", "正在思考…"],
       responding: ["", ""],
       completed: ["", ""],
@@ -394,6 +395,48 @@ export function Playground({ client, lang, onError }: PageProps) {
                       {label(t.phase)}
                     </div>
                   )}
+                  {!!t.attempts?.length && (
+                    <details className="pg-attempts">
+                      <summary>
+                        {text(lang, "Routing attempts", "路由尝试")}
+                      </summary>
+                      {t.attempts.map((a) => (
+                        <div key={a.index}>
+                          <strong>
+                            #{a.index}{" "}
+                            {a.model_id || text(lang, "Router", "路由器")}
+                          </strong>
+                          <div>
+                            {a.stage === "routing"
+                              ? text(lang, "Routing", "选模")
+                              : text(lang, "Generation", "生成")}{" "}
+                            · {a.diagnostic?.code || a.outcome}
+                          </div>
+                          {a.diagnostic?.upstream_status && (
+                            <div>HTTP {a.diagnostic.upstream_status}</div>
+                          )}
+                          {a.diagnostic?.upstream_code && (
+                            <div>{a.diagnostic.upstream_code}</div>
+                          )}
+                          {a.diagnostic?.upstream_error && (
+                            <pre>
+                              {typeof a.diagnostic.upstream_error.body ===
+                              "string"
+                                ? a.diagnostic.upstream_error.body
+                                : JSON.stringify(
+                                    a.diagnostic.upstream_error.body,
+                                    null,
+                                    2,
+                                  )}
+                              {a.diagnostic.upstream_error.truncated
+                                ? text(lang, " (truncated)", "（已截断）")
+                                : ""}
+                            </pre>
+                          )}
+                        </div>
+                      ))}
+                    </details>
+                  )}
                   {t.usage && (
                     <small className="muted">
                       {text(lang, "Tokens", "Tokens")}: {t.usage.input_tokens} →{" "}
@@ -485,8 +528,8 @@ export function Playground({ client, lang, onError }: PageProps) {
           <p className="pg-notice">
             {text(
               lang,
-              "Uses real models and may incur charges. Conversations stay in this page and are lost on refresh.",
-              "会调用真实模型并可能产生费用。对话仅保存在当前页面，刷新后丢失。",
+              "Uses real models and may incur charges. Auto may make two paid generation calls. Conversations stay in this page and are lost on refresh.",
+              "会调用真实模型并可能产生费用；Auto 最多可能产生两次生成费用。对话仅保存在当前页面，刷新后丢失。",
             )}
           </p>
           {statusError != null && (

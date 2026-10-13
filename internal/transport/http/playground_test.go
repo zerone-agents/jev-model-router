@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -316,7 +317,7 @@ func TestPublicAndPlaygroundDiagnosticParity(t *testing.T) {
 	err := &routing.UpstreamError{Status: 401, ReportedCode: "invalid_api_key", Body: map[string]any{"message": "provider supplied", "code": "invalid_api_key"}}
 	public := errorBody(err)["error"].(map[string]any)["diagnostic"].(routing.Diagnostic)
 	pg := playgroundDiagnostic(err, "request", "generation")
-	if public != pg.Diagnostic {
+	if !reflect.DeepEqual(public, pg.Diagnostic) {
 		t.Fatalf("public=%+v playground=%+v", public, pg)
 	}
 	if _, ok := err.Body["diagnostic"]; ok {

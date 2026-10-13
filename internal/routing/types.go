@@ -217,6 +217,7 @@ type Generator interface {
 }
 
 type DecisionInput struct {
+	Retry      *RetryContext
 	Prompt     string
 	Candidates []Model
 	Request    Request

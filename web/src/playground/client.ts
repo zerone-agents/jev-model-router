@@ -10,6 +10,8 @@ export type PlaygroundInput = {
   stream: true;
 };
 export type Route = {
+  attempt?: number;
+  attempts?: Attempt[];
   request_id: string;
   model_id: string;
   path: string;
@@ -17,6 +19,7 @@ export type Route = {
   decision_ms: number;
 };
 export type Diagnostic = {
+  attempts?: Attempt[];
   upstream_error?: { body: unknown; truncated: boolean; request_id?: string };
   stage?: "request" | "routing" | "generation";
   request_id?: string;
@@ -24,10 +27,13 @@ export type Diagnostic = {
   upstream_code?: string;
 };
 export type PlaygroundEvent =
+  | { type: "retry"; attempt: number; attempts: Attempt[] }
   | ({ type: "route" } & Route)
   | { type: "delta"; content?: string; reasoning_content?: string }
   | {
       type: "done";
+      attempt?: number;
+      attempts?: Attempt[];
       finish_reason: string;
       usage?: {
         input_tokens: number;
@@ -36,6 +42,13 @@ export type PlaygroundEvent =
       };
     }
   | ({ type: "error"; code: string; message: string } & Diagnostic);
+export type Attempt = {
+  index: number;
+  stage: "routing" | "generation";
+  model_id?: string;
+  outcome: string;
+  diagnostic?: Diagnostic & { code: string; message?: string };
+};
 export type PlaygroundStatus = {
   enabled: boolean;
   limits: {
@@ -92,12 +105,40 @@ function diagnostic(v: Record<string, unknown>): Diagnostic {
   )
     throw new APIError("invalid_response");
   return {
+    attempts: readAttempts(v.attempts),
     upstream_error: v.upstream_error,
     stage: v.stage,
     request_id: v.request_id,
     upstream_status: v.upstream_status,
     upstream_code: v.upstream_code,
   } as Diagnostic;
+}
+function readAttempts(v: unknown): Attempt[] | undefined {
+  if (v === undefined) return undefined;
+  if (!Array.isArray(v) || v.length > 2 || JSON.stringify(v).length > 131072)
+    throw new APIError("invalid_response");
+  return v.map((a) => {
+    if (
+      !object(a) ||
+      !Number.isInteger(a.index) ||
+      Number(a.index) < 1 ||
+      Number(a.index) > 2 ||
+      !["routing", "generation"].includes(String(a.stage)) ||
+      typeof a.outcome !== "string" ||
+      (a.model_id !== undefined && typeof a.model_id !== "string")
+    )
+      throw new APIError("invalid_response");
+    if (a.diagnostic !== undefined) {
+      if (
+        !object(a.diagnostic) ||
+        a.diagnostic.attempts !== undefined ||
+        typeof a.diagnostic.code !== "string"
+      )
+        throw new APIError("invalid_response");
+      diagnostic(a.diagnostic);
+    }
+    return a as Attempt;
+  });
 }
 function decodeEvent(type: string, data: string): PlaygroundEvent {
   let v: unknown;
@@ -118,7 +159,13 @@ function decodeEvent(type: string, data: string): PlaygroundEvent {
     strings(["request_id", "model_id", "path"]) &&
     numbers(["config_version", "decision_ms"])
   )
-    return { ...v, type } as PlaygroundEvent;
+    return {
+      ...v,
+      attempts: readAttempts(v.attempts),
+      type,
+    } as PlaygroundEvent;
+  if (type === "retry" && v.attempt === 2)
+    return { type, attempt: 2, attempts: readAttempts(v.attempts) || [] };
   if (type === "delta" && optional(["content", "reasoning_content"]))
     return { ...v, type } as PlaygroundEvent;
   if (
@@ -126,7 +173,11 @@ function decodeEvent(type: string, data: string): PlaygroundEvent {
     strings(["finish_reason"]) &&
     ["stop", "length", "content_filter"].includes(v.finish_reason as string)
   )
-    return { ...v, type } as PlaygroundEvent;
+    return {
+      ...v,
+      attempts: readAttempts(v.attempts),
+      type,
+    } as PlaygroundEvent;
   if (type === "error" && strings(["code", "message"]))
     return {
       type,

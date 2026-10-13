@@ -1,7 +1,14 @@
-import type { Diagnostic, Message, PlaygroundEvent, Route } from "./client";
+import type {
+  Attempt,
+  Diagnostic,
+  Message,
+  PlaygroundEvent,
+  Route,
+} from "./client";
 export type Phase =
   | "idle"
   | "waiting"
+  | "retrying"
   | "thinking"
   | "responding"
   | "completed"
@@ -15,6 +22,7 @@ export type Turn = {
   reasoning: string;
   phase: Phase;
   route?: Route;
+  attempts?: Attempt[];
   diagnostic?: Diagnostic;
   errorCode?: string;
   limitScope?: string;
@@ -46,7 +54,7 @@ export const initialState = (): PlaygroundState => ({
   turns: [],
 });
 export const isActive = (phase: Phase) =>
-  ["waiting", "thinking", "responding"].includes(phase);
+  ["waiting", "retrying", "thinking", "responding"].includes(phase);
 export function reducePlayground(
   s: PlaygroundState,
   a: PlaygroundAction,
@@ -78,7 +86,15 @@ export function reducePlayground(
     }
   } else if (a.type === "event") {
     const e = a.event;
-    if (e.type === "route") turn.route = e;
+    if (e.type === "route") {
+      turn.route = e;
+      turn.attempts = e.attempts || turn.attempts;
+    }
+    if (e.type === "retry") {
+      turn.phase = "retrying";
+      turn.attempts = e.attempts;
+      turn.route = undefined;
+    }
     if (e.type === "delta") {
       turn.content += e.content || "";
       turn.reasoning += e.reasoning_content || "";
@@ -96,11 +112,13 @@ export function reducePlayground(
             ? "truncated"
             : "failed";
       turn.usage = e.usage;
+      turn.attempts = e.attempts || turn.attempts;
     }
     if (e.type === "error") {
       turn.phase = "failed";
       turn.errorCode = e.code;
       turn.diagnostic = e;
+      turn.attempts = e.attempts || turn.attempts;
     }
   }
   return { ...s, phase: turn.phase, turns: [...s.turns.slice(0, -1), turn] };

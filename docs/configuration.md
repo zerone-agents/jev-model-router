@@ -202,3 +202,14 @@ the complete database. Restart preserves target identities and isolation. A
 missing/corrupt initialized key never triggers automatic regeneration: automatic
 routing fails, while explicit generation can still be attempted. Fingerprint-key
 rotation is not supported. Treat the database and backups as private files.
+
+
+## Auto fallback
+
+| Config field | Environment variable | Default | Values |
+| --- | --- | --- | --- |
+| auto_fallback_enabled | JEV_ROUTER_AUTO_FALLBACK_ENABLED | true | true / false |
+| auto_fallback_max_retries | JEV_ROUTER_AUTO_FALLBACK_MAX_RETRIES | 1 | 0 or 1 |
+| auto_fallback_timeout | JEV_ROUTER_AUTO_FALLBACK_TIMEOUT | 180s | 1s–30m |
+
+Disabling fallback or setting retries to zero preserves single-attempt behavior. The total budget applies to enabled Auto fallback across both decisions and generations, including streaming. Earlier caller or Playground limits win. Stage limits still apply independently. Budget exhaustion is returned as timeout but does not penalize target health. Explicit requests retain their existing limits. One accepted Playground request consumes one quota unit and may make two paid generation calls.

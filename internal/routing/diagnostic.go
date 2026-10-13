@@ -1,18 +1,45 @@
 package routing
 
-import "errors"
+import (
+	"encoding/json"
+	"errors"
+)
 
 // Diagnostic combines a stable classification with sanitized upstream details.
 type Diagnostic struct {
-	UpstreamError  *UpstreamDetails `json:"upstream_error,omitempty"`
-	Code           string           `json:"code"`
-	Message        string           `json:"message"`
-	UpstreamStatus int              `json:"upstream_status,omitempty"`
-	UpstreamCode   string           `json:"upstream_code,omitempty"`
+	Attempts       []AttemptDiagnostic `json:"attempts,omitempty"`
+	UpstreamError  *UpstreamDetails    `json:"upstream_error,omitempty"`
+	Code           string              `json:"code"`
+	Message        string              `json:"message"`
+	UpstreamStatus int                 `json:"upstream_status,omitempty"`
+	UpstreamCode   string              `json:"upstream_code,omitempty"`
 }
 
-func Diagnose(err error) Diagnostic {
-	d := Diagnostic{Code: "internal_error", Message: "Request failed"}
+func Diagnose(err error) (d Diagnostic) {
+	defer func() {
+		var a *AttemptError
+		if errors.As(err, &a) {
+			d.Attempts = BoundAttempts(a.Attempts)
+			for i := range d.Attempts {
+				b, _ := json.Marshal(d)
+				if len(b) <= 32<<10 {
+					break
+				}
+				if v := d.Attempts[i].Diagnostic; v != nil && v.UpstreamError != nil {
+					v.UpstreamError.Body = nil
+					v.UpstreamError.Truncated = true
+				}
+			}
+			b, _ := json.Marshal(d)
+			if len(b) > 32<<10 && d.UpstreamError != nil {
+				u := *d.UpstreamError
+				u.Body = nil
+				u.Truncated = true
+				d.UpstreamError = &u
+			}
+		}
+	}()
+	d = Diagnostic{Code: "internal_error", Message: "Request failed"}
 	var up *UpstreamError
 	if errors.As(err, &up) {
 		d.Code, d.Message = "upstream_error", "Upstream provider failed"

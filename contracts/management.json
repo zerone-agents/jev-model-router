@@ -25,6 +25,33 @@
         },
         "records_degraded": {
           "type": "boolean"
+        },
+        "auto_fallback": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "max_retries": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "timeout_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1800
+            }
+          },
+          "required": [
+            "enabled",
+            "max_retries",
+            "timeout_seconds"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
@@ -1985,6 +2012,55 @@
               "request_summary": {
                 "type": "string",
                 "maxLength": 120
+              },
+              "attempts": {
+                "type": "array",
+                "maxItems": 2,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "index": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 2
+                    },
+                    "stage": {
+                      "enum": [
+                        "routing",
+                        "generation"
+                      ]
+                    },
+                    "model_id": {
+                      "type": "string"
+                    },
+                    "path": {
+                      "type": "string"
+                    },
+                    "decision_ms": {
+                      "type": "integer"
+                    },
+                    "duration_ms": {
+                      "type": "integer"
+                    },
+                    "outcome": {
+                      "enum": [
+                        "success",
+                        "error"
+                      ]
+                    },
+                    "error_code": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "index",
+                    "stage",
+                    "decision_ms",
+                    "duration_ms",
+                    "outcome"
+                  ]
+                }
               }
             },
             "required": [

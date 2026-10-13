@@ -1,134 +1,133 @@
-# 兼容范围与验证记录
+# Compatibility scope and verification evidence
 
-当前范围截至 v0.1.19。下方带日期的段落记录对应版本的验证证据，不代表每次发布均重新执行真实模型测试。
+The protocol scope below was recorded through v0.1.19; Auto fallback is the subsequent addition described here. Dated sections record verification for the respective versions, not real-model retesting on every release.
 
-| 客户端入口 | OpenAI 兼容上游 | 原生 Anthropic 上游 |
+| Client entrypoint | OpenAI-compatible upstream | Native Anthropic upstream |
 | --- | --- | --- |
-| Chat Completions | JSON / SSE | JSON / SSE，支持公布范围内的思考与工具续写 |
-| Anthropic Messages | JSON / SSE，经转换 | JSON / SSE，原生保真，见下文 #51 |
+| Chat Completions | JSON / SSE | JSON / SSE, including the documented thinking and tool continuations |
+| Anthropic Messages | JSON / SSE, converted | JSON / SSE, native preservation; see #51 below |
 
-## 基础转换与路由
+## Base conversion and routing
 
+2026-09-28: Bifrost Core was pinned to `v1.10.2-0.20260924033752-a8411cd54142`, with Go 1.27.0. SQLite uses the pure-Go modernc.org/sqlite v1.39.1 driver without CGO; race tests still require a supported native build environment. Dependencies are locked in go.mod/go.sum.
 
-2026-09-28：固定 Bifrost Core `v1.10.2-0.20260924033752-a8411cd54142`，Go 1.27.0；SQLite 使用纯 Go 驱动 modernc.org/sqlite v1.39.1，不要求 CGO（race 测试仍需要受支持的本机构建环境）。依赖锁在 go.mod/go.sum。
+`go test ./internal/compat -count=1 -v` checks the following boundaries against local simulated upstreams. It does not call paid models or establish compatibility with arbitrary remote services.
 
-`go test ./internal/compat -count=1 -v` 使用本地模拟上游验证以下边界，没有调用付费模型，不证明任意远程服务都兼容。
-
-| 输入/行为 | 结果与承诺 |
+| Input/behavior | Result and contract |
 | --- | --- |
-| 文本、图片 URL/内联 | 字段保留；图片 URL 服务零访问，SDK 不下载图片 |
-| tools、required tool_choice、parallel_tool_calls=false | 在已测 OpenAI/gpt-4o-mini 转换路径保留；其他模型仍需逐请求验证转换是否有损 |
-| temperature、top_p、stop、json_object、stream_options.include_usage | 已测转换保留，生产入口仍拒绝未知字段 |
-| max_completion_tokens / max_tokens，整数 16–10000000 | 入口归一化为 max_completion_tokens，已测 JSON/SSE 转换保留 |
-| 输出限制 <16 | Bifrost 会提高到 16；生产入口明确拒绝，固定连接测试使用 16 |
-| 429、503、SSE 503、200 SSE error、中途断流 | 选定上游仅一次，其他已配置上游零次；错误可观察 |
-| 签名/加密推理扩展、fallback、供应商覆盖 | 不在首版输入范围，生产入口必须拒绝 |
+| Text, image URLs/inline images | Fields preserved; no image URL fetches or SDK image downloads |
+| tools, required tool_choice, parallel_tool_calls=false | Preserved on the tested OpenAI/gpt-4o-mini conversion path; other models still require per-request conversion checks |
+| temperature, top_p, stop, json_object, stream_options.include_usage | Preserved in tested conversions; production entrypoints reject unknown fields |
+| max_completion_tokens / max_tokens, integer 16–10000000 | Normalized to max_completion_tokens; preserved through tested JSON/SSE conversions |
+| Output limit below 16 | Bifrost raises it to 16; production rejects it explicitly and fixed connection tests use 16 |
+| 429, 503, SSE 503, HTTP 200 SSE error, interrupted streams | Original baseline: one selected-upstream call, no calls to other targets, observable errors. Auto fallback now permits one reselection under the conditions below. |
+| Signed/encrypted reasoning extensions, client fallback or provider overrides | Outside the original input contract; later native support is documented separately below |
 
-Jev 原生协议依据 [API reference](https://docs.typesafe.ai/api)：state/questions，choice 最多 255 选项，响应为选择和概率/置信度，没有自由文本理由。fixtures 是文档形状的合成样例，非真实 API 结果。输入上限依据 [Models](https://docs.typesafe.ai/models)，上线前必须按配置模型复核；没有精确 tokenizer 证据时只提供有余量估算，不保证上游接受。
+The native Jev protocol follows the [API reference](https://docs.typesafe.ai/api): state/questions, at most 255 choices, and selection with probabilities/confidence rather than free-text explanations. Fixtures are synthetic examples of documented shapes, not actual API results. Input limits follow the [Models reference](https://docs.typesafe.ai/models) and must be checked against the configured model before deployment. Without an exact tokenizer, estimates include headroom but cannot guarantee upstream acceptance.
 
-生成参数需同时满足公布的 schema、模型能力声明和实际适配转换检查。此文件的 SDK 转换测试不是模型本身能力证明。本地测试已覆盖端到端取消、首包/空闲超时和有界事件缓冲；真实慢读 socket 的完整跨 SDK 压力场景仍待补充，实际模型质量需另行付费评测。
+Generation parameters must satisfy the published schema, model capability declarations and actual adapter conversion checks. SDK conversion tests do not prove model capabilities. Local tests cover cancellation, first-event/idle timeouts and bounded buffering. Full slow-reader socket stress across SDK paths remains separate work, as does paid model-quality evaluation.
 
-Jev 决策默认限制为 255 个候选、32,000 UTF-8 序列化字节（包含问题和选项），可通过 decision_max_bytes / JEV_ROUTER_DECISION_MAX_BYTES 修改。默认值参照官方单问题 32k token 上限采用保守字节估算；官方未提供字节推荐值，这不是精确 token 计数，详见 [启动配置](configuration.md#jev-决策输入预算)。保留全部候选、偏好、system/developer 指令和最新 user query；较旧回合按完整组从近到远加入，溢出时标记省略。Jev 不接收工具定义，工具执行仅保留调用 ID、工具名称和结果关联记录，不保留参数、输出及执行消息附带文本。图片结构替换为 image_present，不保留 URL 或内联数据。system/developer 与最新 query 的各文本段超限时分别保留首尾、从中间截断，并标记 content_truncated；仅不可裁剪元数据与最小首尾结构仍超限时失败。生成请求保持完整。
+Jev defaults to 255 candidates and 32,000 serialized UTF-8 bytes including questions and options, configurable with decision_max_bytes / JEV_ROUTER_DECISION_MAX_BYTES. This conservative byte estimate references the official single-question 32k-token limit; it is neither an official byte recommendation nor exact tokenization. See [startup configuration](configuration.md). All candidates, preferences, system/developer instructions and the latest user query are retained. Older turns are added as complete groups from newest to oldest, marking omissions. Jev receives no tool definitions; tool history retains call IDs, names and result associations, without arguments, outputs or attached execution text. Images become image_present without addresses or inline data. Oversized text segments in instructions or the latest query retain their beginning and end, omit the middle and mark content_truncated. Failure occurs only when mandatory metadata and minimal text framing still exceed the budget. The generation request remains complete.
 
-生成容量预检使用 `semantic_bytes_v1`：完整历史文本（含工具结果、reasoning/refusal）、工具名称和描述按 ceil(UTF-8 字节总数/4) 估算；工具参数按解码后的字符串字节数、工具 schema/response_format/tool_choice 按紧凑 JSON 字节数单独核算；每消息预留 4、每工具调用/定义预留 8、每张图片预留 8192。图片 URL/base64 不计作文本；model、stream、temperature 等非提示字段不计入。输入与输出分开，输出限额只加一次，OpenAI 上游未指定时预留 4096，不向上游注入该限额；原生 Anthropic 上游未指定时发送并预留 65536。`route.inspect.context_estimate` 返回方法、文本/结构化字节数、图片/framing、输入、输出预留及总估算；`context_exact=false` 表明它不是精确计数，也不保证多语言或视觉模型上界。
+Generation capacity estimation uses `semantic_bytes_v1`: full history text, including tool results and reasoning/refusal, plus tool names/descriptions is estimated as ceil(total UTF-8 bytes / 4). Tool arguments use decoded string bytes; tool schemas, response_format and tool_choice use compact JSON bytes, accounted separately. Framing reserves 4 per message, 8 per tool call/definition and 8192 per image. Image URL/base64 and non-prompt fields such as model/stream/temperature do not count as text. Input and output are separate; output is reserved once. Unspecified OpenAI output reserves 4096 without injecting that limit upstream; native Anthropic sends and reserves 65536. `route.inspect.context_estimate` reports the method, text/structured bytes, image/framing, input, output reserve and total. `context_exact=false` indicates a heuristic, not a multilingual or visual-model upper bound.
 
-`auto` 仅当所有通过非容量约束的模型都因非精确估算超限而被排除时，保留 ContextLimit 最大的全部模型作为保底候选，路径标记为 `context_estimate_fallback`；只有一个候选时直接执行，多个并列时仅将这些候选交给 Jev 选择一轮，候选列表和决策 usage 保留。若任一模型正常通过容量检查，沿用原流程；精确超限不进入此保底。能力、启用状态、供应商配置检查不能被绕过；显式模型跳过本地上下文预算估算与拦截，由上游判断容量，不换模。并列候选的 Jev 决策失败时明确报错，不任意选用模型；不重试上游；完整生成输入和输出限额保持不变，实际超限由上游处理。
+When every otherwise eligible Auto candidate exceeds a non-exact capacity estimate, all models tied for the largest ContextLimit become overflow candidates, with path `context_estimate_fallback`. A sole candidate executes directly; Jev selects among ties, preserving candidates and decision usage. Normal capacity matches take precedence; exact overflow never uses this path. Capability, enablement and provider checks remain mandatory. Explicit selection skips local capacity estimation and delegates limits to the upstream without switching models. Jev failures remain failures, with no arbitrary substitute. Generation inputs and output limits remain unchanged. This capacity policy is distinct from Auto fallback after an eligible generation failure: Auto can now reselect once before semantic output, excluding the failed model. SDK retries remain disabled; explicit requests never switch models.
 
-普通 `response_format.type=text` 不要求结构化输出能力，JSON 模式才要求。Jev 的必需输入同时包含输出格式/JSON Schema、tool_choice、parallel_tool_calls 和 max_completion_tokens，这些需求也占用决策预算。
+Plain `response_format.type=text` does not require structured-output capability; JSON modes do. Jev's required input also includes output format/JSON Schema, tool_choice, parallel_tool_calls and max_completion_tokens, all counted in its decision budget.
 
-SSE usage 按上游实际提供情况返回：未报告时省略，明确报告为零则保留。适配器仅在内存中检查 SDK 提供的原始帧以识别 usage 存在性，公开响应和记录不包含 SDK 原始元数据。空库或没有启用模型时 auto 返回 config_missing/503；启用模型均不满足当前请求时返回 no_candidates/422。
+SSE usage reflects upstream reporting: absent values are omitted and explicit zeros retained. The adapter checks raw SDK frames in memory only to detect usage presence; public responses and records contain no raw SDK metadata. An empty database or no enabled model gives Auto config_missing/503; enabled models that cannot satisfy the request give no_candidates/422.
 
-历史 assistant 工具调用允许 content:null 与省略 content 的等价表示；适配器附加的历史 tool_calls.index 不影响语义比较，非流式工具调用响应不输出该索引。流式 delta 保留 index；调用ID、函数名、参数字符串、消息顺序和工具结果仍必须完整保留。完整工具回合由跨 Bifrost/HTTP 的端到端测试覆盖。
+Historical assistant tool calls treat content:null and absent content as equivalent. Adapter-added tool_calls.index does not change semantic comparison and is omitted from non-streaming tool responses. Streaming deltas retain index; IDs, names, argument strings, ordering and results remain intact. End-to-end Bifrost/HTTP tests cover complete tool rounds.
 
-## 真实端点冒烟验证
+## Real-endpoint smoke checks
 
-已使用官方 Jev `jev-1.13.0` 和阿里云 `qwen3.8-flash` / `qwen3.8-max` 验证多候选选模到生成及记录查询的闭环。两个生成模型均验证了 JSON、SSE、`tool_choice=auto` 工具调用和省略顶层 tools 的工具历史续写。供应商 base_url 包含完整兼容前缀，适配器仅追加 `/chat/completions`，JSON 与 SSE 路径均有严格回归测试。
+Official Jev `jev-1.13.0` and Alibaba Cloud `qwen3.8-flash` / `qwen3.8-max` were used to verify multi-candidate selection, generation and record retrieval. Both generation models passed JSON, SSE, tool_choice=auto and tool-history continuation without top-level tools. Provider base_url includes the full compatibility prefix; the adapter appends only `/chat/completions`, with strict JSON/SSE regression tests.
 
-本次阿里云 thinking 模式组合拒绝 `tool_choice=required`；网关明确返回失败，不静默修改参数。生成输出可能因 token 上限返回 `finish_reason=length`，HTTP 成功不代表任务质量通过。以上只是已测组合的冒烟结果，不承诺全部模型、字段组合或稳定性能；真实图片、流式工具增量及供应商取消/超时仍需专项验证。
+The tested Alibaba thinking combination rejected tool_choice=required; the gateway returned failure without changing parameters. finish_reason=length can indicate output truncation: HTTP success is not task-quality success. These smoke checks do not establish all model/field combinations or stable performance. Real images, streaming tool deltas and provider cancellation/timeouts require separate verification.
 
-## agent-sdk 输出限制兼容（Issue #18）
+## agent-sdk output-limit compatibility (Issue #18)
 
-Chat Completions 与 `route.inspect` 接受 `max_tokens` 或 `max_completion_tokens`，二者只能出现一个，即使值相同或其中一个为 null 也拒绝。内部容量估算、Jev 决策输入和生成适配统一使用 `max_completion_tokens`，不会钳制或丢弃值。自动与显式选模均执行相同限制。
+Chat Completions and route.inspect accept either max_tokens or max_completion_tokens, never both, even if equal or one is null. Capacity estimation, Jev input and generation adaptation use max_completion_tokens without clamping or dropping values, for both Auto and explicit selection.
 
-Chat Completions 与 `route.inspect` 共享以下字段校验与诊断：冲突返回 HTTP 400 / `invalid_request`，消息说明两个字段互斥；范围外、null、字符串、布尔、数组、对象和非整数值返回同一错误码，消息指出字段及整数范围 16–10000000。其他未支持字段仍返回 `unsupported_request`；schema 错误尽可能指出顶层字段，不回显字段值、对话内容或 schema 原始错误。异常长度或字符的未知字段名使用通用提示。
+Both entrypoints share validation and diagnostics. Conflicting fields return HTTP 400 / invalid_request explaining mutual exclusion. Out-of-range, null, string, boolean, array, object and non-integer values use the same code and identify the field and integer range 16–10000000. Other unsupported fields remain unsupported_request. Schema errors identify top-level fields where possible without echoing values, conversations or raw schema errors; unusually long or malformed unknown field names receive generic messages.
 
-`go test ./internal/transport/http -run TestSDKOutputLimitThroughRouter -v` 使用生产 HTTP、路由和 Bifrost 路径加本地模拟生成端点，覆盖两种字段、两种选模路径、JSON/SSE、输出限制保留及无效请求不外发。路由测试另覆盖上下文预算、上下界和冲突。
+`go test ./internal/transport/http -run TestSDKOutputLimitThroughRouter -v` exercises production HTTP/routing/Bifrost with a local fake upstream: both fields, both selection modes, JSON/SSE, limit preservation and no outbound calls for invalid requests. Routing tests also cover capacity budgets, bounds and conflicts.
 
-2026-09-30 另用本地未经修改的 agent-sdk 4.0.0 `OpenAIProvider.createMessage` / `createMessageStream` 调用更新后的本地 Router，自动和显式选模的四次调用通过；未包装 fetch 或改写 SDK 请求。该项使用模拟生成端点，不代表部署环境或真实模型兼容验收。复现方式（SDK checkout 需已有 tsx）：
+2026-09-30: unmodified local agent-sdk 4.0.0 OpenAIProvider.createMessage/createMessageStream passed four Auto/explicit × JSON/SSE requests through the updated local Router. No fetch wrapper or request rewrite was used. The simulated generation endpoint establishes protocol behavior, not deployment or real-model acceptance. Reproduce with tsx installed in the SDK checkout:
 
 ```sh
 JEV_TEST_AGENT_SDK=/absolute/path/to/agent-sdk go test ./internal/transport/http -run TestUnmodifiedAgentSDK -count=1 -v
 ```
 
-未设置变量时此 SDK 集成测试明确跳过，常规 Go 回归仍执行。该次 #18 修复没有扩大推理参数或空 tools 数组的支持范围；推理参数的后续支持见下节。
+Without the variable, this SDK integration explicitly skips while ordinary Go regressions still run. Issue #18 did not broaden reasoning controls or empty-tools support; later reasoning support follows below.
 
-## agent-sdk 推理参数兼容（Issue #22）
+## agent-sdk reasoning controls (Issue #22)
 
-Chat Completions 和 `route.inspect` 接受以下显式控制：
+Chat Completions and route.inspect accept:
 
-- `chat_template_kwargs` 只允许必填的布尔字段 `enable_thinking`；支持 true 与 false，不接受空对象、null 或其他模板参数。
-- `reasoning_effort` 接受 `none`、`minimal`、`low`、`medium`、`high`、`xhigh`、`max`。这是入口词汇范围，不代表所有模型支持这些值。
-- SDK 的 `thinking: {type: "enabled"}` 对应上述 `chat_template_kwargs`；入口不接收 SDK 内部的顶层 `thinking` 对象。
+- chat_template_kwargs with the required boolean enable_thinking only; true/false are supported, while empty objects, null and other template fields are rejected.
+- reasoning_effort: none, minimal, low, medium, high, xhigh, max. This is entrypoint vocabulary, not a claim that every model supports every value.
+- SDK thinking: {type: "enabled"} maps to chat_template_kwargs; the SDK-internal top-level thinking object is not accepted.
 
-对于 OpenAI-compatible 上游，合法的 thinking / effort 参数不要求模型能力声明，单独或同时发送均原样转发，由上游判断是否支持。`auto`、显式选模和 `route.inspect` 都不依据推理能力声明拦截或过滤模型；格式、允许值及未知字段检查仍然保留。上游错误正常返回，不静默删除参数、降级或换模。
+Valid OpenAI-compatible thinking/effort controls require no model capability declaration and are forwarded unchanged, individually or together, for the upstream to validate. Auto, explicit selection and route.inspect do not filter on reasoning metadata. Shape, allowed-value and unknown-field checks remain. Unsupported upstream requests fail without silently stripping parameters or degrading them; only eligible operational generation failures can use Auto fallback.
 
-已有 `capabilities.reasoning` 数组保留读写兼容，仅作为说明性元数据；可省略，无需新增或更新配置。Jev state 的 requirements 仍包含实际请求的推理控制，计入必需部分字节预算。
+The existing capabilities.reasoning array retains read/write compatibility as optional descriptive metadata; no configuration migration is needed. Jev state requirements still include actual reasoning controls and count them in mandatory bytes.
 
-当前 OpenAI 兼容上游路径通过 Bifrost 的 ExtraParams 仅转发这两个已校验字段，绕开 OpenAI 模型名称对 effort 的自动归一化；不开放任意 overrides。适配检查使用与发送相同的转换、序列化及扩展合并函数。输出限额维持既有 max_completion_tokens 语义，不换算为 thinking budget；不增加重试、fallback 或静默降级。
+The OpenAI path forwards only these two validated extensions through Bifrost ExtraParams, bypassing model-name effort normalization without exposing arbitrary overrides. Validation uses the same conversion, serialization and extension merge as actual sending. Output limits keep max_completion_tokens semantics rather than becoming a thinking budget. No SDK retries or silent downgrade are introduced; bounded Auto reselection is an independent router policy.
 
-JSON message 与 SSE delta 保留文本 `reasoning_content`，仅含推理文本的 SSE 帧也属于有效输出，参与首包/空闲超时处理。允许 assistant 历史消息携带有界字符串 `reasoning_content`，以支持 SDK 回传 thinking 历史；签名、加密及其他 reasoning 扩展仍不支持。推理历史属于会话文本，可随其他对话内容发送给 Jev，并计入预算；不写入路由记录。
+JSON messages and SSE deltas preserve textual reasoning_content. Reasoning-only frames are valid output and participate in first-event/idle handling. Bounded reasoning_content strings in assistant history support SDK replay; signatures, encryption and other reasoning extensions remain outside this conversion contract. Reasoning history is conversation text, may reach Jev and counts toward budgets, but is not persisted in routing records.
 
-2026-10-01 本地验证：完整 Go 回归通过，未修改的本地 agent-sdk **3.5.1** 已通过 thinking、high effort、两者同时使用 × auto/显式模型 × JSON/SSE 的 12 次调用。该 SDK 仍发送 max_tokens，由 Router 既有兼容逻辑归一化；验证脚本打印实际 SDK 版本，不再假设本地 checkout 固定为 4.0.0。模拟上游检查实际发送的参数、输出预算、推理历史，并返回可断言的推理文本、正文及结束事件。另覆盖 false、各 effort 值在模型名称启发式下不被改写、无效组合零调用、推理阶段取消及路由检查一致性。
+2026-10-01 local verification: full Go regressions passed. Unmodified local agent-sdk **3.5.1** passed 12 thinking/high-effort/combined × Auto/explicit × JSON/SSE requests. It still sends max_tokens, normalized by existing Router logic. Verification prints the actual SDK version rather than assuming 4.0.0. Fake upstreams assert controls, output limits and reasoning history and return checkable reasoning, text and terminal events. Tests also cover false, effort preservation despite model-name heuristics, invalid combinations without calls, cancellation during reasoning and inspection consistency.
 
 ```sh
 JEV_TEST_AGENT_SDK=/absolute/path/to/agent-sdk go test ./internal/transport/http -run TestUnmodifiedAgentSDKReasoning -count=1 -v
 go test ./internal/provider -run Reasoning -count=1
 ```
 
-2026-10-01 随后完成真实阿里云对照：`qwen3.8-flash` 与 `qwen3.8-max` 的 thinking enabled、high effort 及两者组合，在未经修改的 SDK 直连、本地 Router 显式选模和 auto 路径上均通过 JSON/SSE 验证。已核对实际控制字段、1024 输出限额、非空正文/推理文本、stop 与 SSE DONE；auto 使用唯一合格候选，未调用真实 Jev。仅承诺本次已测组合，其他 effort 值及 thinking=false 仍需对应端点验证。逐次验收明细保留在本地，不作为公开性能基准。
+Later on 2026-10-01, real Alibaba qwen3.8-flash/qwen3.8-max passed thinking-enabled, high effort and their combination over JSON/SSE via unmodified direct SDK, local explicit Router and Auto. Checks covered actual controls, 1024 output limit, nonempty text/reasoning, stop and SSE DONE. Auto had one eligible candidate and did not call real Jev. Other effort values and thinking=false require endpoint-specific checks. Per-run details remain local and are not a public benchmark.
 
-## SDK 完整 Agent examples
+## Complete SDK Agent examples
 
-工具定义的 `function.description` 不再施加 4096 字符限制。SDK 的默认 Bash / Task 说明本身可能超过该值；网关完整保留说明，仍执行请求总大小（默认 16 MiB）与模型上下文容量检查；工具定义不进入 Jev 决策输入。`route.inspect` 与推理入口使用相同契约。
+The former 4096-character function.description limit is removed: default SDK Bash/Task descriptions can exceed it. Descriptions remain intact while total body size (default 16 MiB) and model context checks apply. Tool definitions do not reach Jev. route.inspect shares the inference contract.
 
-除 Provider 层验证外，新增原始 `examples/basic/01-simple-query.ts` 与 `examples/streaming/16-streaming.ts` 回归：SDK 加载默认工具池，经过真实 router/Bifrost，执行 Read，再将结果回传。模拟上游逐请求比较完整工具定义，JSON/SSE × 自动/显式模型四种组合均验证，不修改 SDK 示例源码：
+Original examples/basic/01-simple-query.ts and examples/streaming/16-streaming.ts load the default tool pool, call the production Router/Bifrost, execute Read and return its result. Fake upstreams compare complete tool definitions per request. JSON/SSE × Auto/explicit are covered without modifying SDK examples:
 
 ```sh
 JEV_TEST_AGENT_SDK=/path/to/agent-sdk go test ./internal/transport/http -run TestAgentSDKSimpleQuerySample -v -count=1
 ```
 
-真实上游验收可运行 `TestSDKLiveSamples`，需设置 `JEV_RUN_LIVE_SAMPLES=1`、`JEV_TEST_AGENT_SDK`、`JEV_LIVE_KEY_FILE`、`JEV_LIVE_BASE_URL`、`JEV_LIVE_MODEL`。可选 `JEV_SAMPLE_LOG_DIR` 保存本地输出。此测试会产生模型费用并执行 sample 的真实工具；请在受控环境运行。工作目录使用临时 fixture；两个使用固定 `/tmp` 文件名的示例会拒绝覆盖已有文件。当前验收模型应支持 tools、thinking 和 low/medium/high effort。这些测试验证协议和工具往返，不保证生成任务质量或全部 SDK examples 通过。
+Real-upstream TestSDKLiveSamples requires JEV_RUN_LIVE_SAMPLES=1, JEV_TEST_AGENT_SDK, JEV_LIVE_KEY_FILE, JEV_LIVE_BASE_URL and JEV_LIVE_MODEL. Optional JEV_SAMPLE_LOG_DIR retains local output. It incurs model fees and runs actual sample tools; use a controlled environment. Working directories are temporary fixtures, and two examples using fixed /tmp filenames refuse to overwrite existing files. The acceptance model should support tools, thinking and low/medium/high effort. These checks establish protocol/tool roundtrips, not task quality or all SDK examples.
 
-## 生成上游错误
+## Generation upstream errors
 
-生成供应商返回的 OpenAI 兼容错误保留 `error.message/type/code/param`，普通 JSON 与 SSE 建连失败保留上游 400–599 状态码。SSE 已发送响应头后无法更改 HTTP 状态，错误通过流内 `error` 对象返回；没有有效错误状态时使用 502。错误额外提供 error.diagnostic.upstream_error，保留脱敏后的 JSON 或纯文本正文（包含 HTML 文本）；不包含 Bifrost 内部诊断、原始请求或完整响应头。字段脱敏与长度限制见 contracts/README.md。网络异常、超时、取消及 SDK 内部错误仍使用 router 的稳定错误。内部记录和管理接口保留 `upstream_error` 分类及通用信息，不写入供应商错误内容。
+Validated OpenAI-compatible errors retain error.message/type/code/param and HTTP 400–599 for JSON or SSE connection failures. After SSE headers, errors use in-stream error objects; missing valid status defaults to 502. error.diagnostic.upstream_error contains sanitized JSON or plain-text bodies, including HTML text, excluding Bifrost internal diagnostics, original requests and full response headers. Redaction and bounds are in contracts/README.md. Network, timeout, cancellation and SDK-internal failures use stable Router errors. Records and management retain generic classification rather than provider error bodies.
 
-仅在原始响应能验证为结构化 error 对象（非空字符串 message，type/code/param 为字符串或 null）时透传。纯文本、HTML、格式错误和连接故障使用 safeError。当前 Bifrost 不保留 HTTP 200 流内错误的原始帧，因此该路径无法验证来源，也返回通用错误；不依据 IsBifrostError=false 推断来源。
+Top-level provider error fields require a validated structured error object with nonempty string message and string/null type/code/param. Plain text, HTML, malformed bodies and connection failures use safeError; sanitized details remain response-only. Bifrost itself discards raw HTTP 200 in-stream errors; the newer SDK-reader capture boundary described below retains these for validation. IsBifrostError=false alone is not proof of provenance.
 
 ## Anthropic Messages (Issue #23)
 
-本节描述 `/v1/messages` → OpenAI-compatible Chat Completions 的转换路径；原生 Anthropic 目标见下方 #51 专节。使用锁定 Bifrost 的 Anthropic→Responses→Chat 和返回转换；只对实测转换缺口补充消息分组合并、并行控制、显式推理参数及 usage/终态保护。已有 Chat Completions 的供应商原始错误透传规则不适用于此新入口。
+This section describes /v1/messages conversion to OpenAI-compatible Chat Completions; native Anthropic targets are documented under #51. The pinned Bifrost Anthropic→Responses→Chat conversions are supplemented only for observed gaps: message grouping, parallel controls, explicit reasoning parameters, usage and terminal validation. Messages retains its own error envelope instead of copying Chat's top-level provider errors.
 
-| 能力 | 当前范围及证据 |
+| Capability | Scope and evidence |
 | --- | --- |
-| 文本、顶层 system、auto/显式、JSON/SSE | 本地生产 Router/Bifrost 与模拟上游通过；官方 Anthropic SDK 0.52.0 四种模式通过 |
-| 图片 | HTTPS URL/base64 png/jpeg/webp/gif 转换；本地 fixture 检查字段保留，官方 SDK 续写回合含内联图片；不下载图片；真实视觉模型未验证 |
-| 普通 tools、tool_choice、disable_parallel_tool_use | 候选能力过滤和最终 wire 检查；官方 SDK 完整工具结果续写、SSE 参数增量和 ID/输入配对通过；is_error=true 明确拒绝 |
-| temperature/top_p、输出限额 | Messages temperature 为 0–1、top_p 为 0–1；max_tokens 必填，16–10000000，合法 JSON 整数形式归一化，不钳制 |
-| JSON Schema | output_config.format 转为现有 response_format；需要模型 structured_output 能力。无 schema 的 JSON object 可用 `{"type":"object"}` schema 表达；不新增非标准 json_object 字段 |
-| thinking/effort | adaptive→enable_thinking=true；disabled→false；显式 output_config.effort 的 low/medium/high/xhigh/max 原样转发，不由模型名改写，不注入默认 effort。官方 SDK unsigned thinking 历史、JSON/SSE 输出通过；真实模型未验证 |
-| 手动 thinking 预算 | enabled+budget_tokens 的形状可识别，但当前上游适配会丢掉独立预算，OpenAI 候选在任何生成调用前明确拒绝，不能称为预算支持 |
-| 原生签名/加密历史 | 明确拒绝。Bifrost 返回的空 payload Responses item 标记可回传，只用于关联，不宣称是 Claude 签名 |
-| usage | JSON 缺失则省略；SSE 初始 usage={}，最终 message_delta 补充真实报告的 input/output counts；真实零值保留；报告的缓存读写计数分别输出，普通 input_tokens 扣除这些计数，不把缓存输入算作普通输入。官方 SDK 0.52.0 能累积更新，这是与严格原生 Anthropic 初始数值 usage 的兼容差异；其他严格客户端未验证 |
-| stop_sequences | 请求原样转发；上游仅返回模糊 stop 且未给出匹配序列时明确失败，不猜测 end_turn/stop_sequence。已用模拟上游验证带 `stop:"END"` 的 JSON/SSE 匹配元数据；矛盾终态明确失败，真实供应商元数据仍未验证 |
-| refusal | 当前锁定转换器不能完整表达 refusal；JSON/SSE 明确返回安全的 upstream_error，禁止转换为空 content 的成功终态 |
-| 失败、取消、超时 | 本地测试通过流前 JSON、流内 error、无终态断流、首包/空闲超时、客户端取消；失败不发 message_stop，不换模；单请求不重试 |
+| Text, top-level system, Auto/explicit, JSON/SSE | Local production Router/Bifrost and fake upstreams; official Anthropic SDK 0.52.0 passed all four modes |
+| Images | HTTPS/base64 png/jpeg/webp/gif conversion; fixture field checks and SDK inline-image continuation; no downloads; real vision models unverified for this conversion |
+| Ordinary tools, tool_choice, disable_parallel_tool_use | Candidate and final-wire checks; official SDK result continuation, SSE argument deltas and ID/input matching; is_error=true rejected |
+| temperature/top_p, output limit | temperature/top_p 0–1; required max_tokens 16–10000000, valid JSON integer representations normalized without clamping |
+| JSON Schema | output_config.format maps to response_format, requiring structured_output. A generic JSON object uses {"type":"object"}; no nonstandard json_object field |
+| thinking/effort | adaptive→enable_thinking=true, disabled→false; explicit low/medium/high/xhigh/max preserved without model-name rewrites or defaults. SDK unsigned history and JSON/SSE outputs tested; real models unverified for this conversion |
+| Manual thinking budget | enabled+budget_tokens shape recognized, but this adapter would lose the independent budget; OpenAI candidates reject it before generation |
+| Native signed/encrypted history | Rejected. Empty-payload Responses item markers may roundtrip as associations, not Claude signatures |
+| usage | Missing JSON fields omitted. SSE starts with usage={} and final message_delta supplies reported counts, including real zeros. Cache read/write counts remain separate and are subtracted from ordinary input. SDK 0.52.0 accumulates updates; this differs from strictly numeric native initial usage. Other strict clients unverified |
+| stop_sequences | Forwarded unchanged; ambiguous stop without matched metadata fails rather than guessing end_turn/stop_sequence. Fake JSON/SSE matching stop:"END" tested; contradictory terminal metadata fails; real provider metadata unverified |
+| refusal | Pinned converter cannot fully represent it; JSON/SSE returns safe upstream_error rather than empty successful content |
+| Failures, cancellation, timeouts | Pre-stream JSON, in-stream error, missing terminal, first-event/idle timeout and cancellation tested. Failures emit no message_stop. Only Auto may reselect once before semantic output; explicit requests never retry. |
 
-必须使用 `anthropic-version: 2023-06-01`、JSON Content-Type 和 inference x-api-key/Bearer；同时提供认证头时必须均有效且身份/角色一致。settings 和 Cookie 不授权推理。非空 beta、cache_control、文档、服务端工具、原生 redacted_thinking、不可保持顺序的 assistant 混合块明确拒绝。普通 assistant 块顺序为 thinking→text→tool_use；tool_result 在 user 额外文本/图片之前，结果必须与此前调用配对。thinking-only assistant 历史通过空文本结构载体保留；同角色的连续 assistant 消息也执行跨消息块顺序检查，不接受文本/工具之后的 thinking。不承诺全量 Messages。
+Require anthropic-version: 2023-06-01, JSON Content-Type and inference x-api-key/Bearer. If both auth headers are present, both must be valid and identify the same principal/role. Settings and Cookies do not authorize inference. Nonempty beta, cache_control, documents, server tools, native redacted_thinking and unrepresentable mixed assistant ordering are rejected on this conversion path. Ordinary assistant blocks follow thinking→text→tool_use. tool_result precedes extra user text/images and matches prior calls. Thinking-only history uses an empty-text structural carrier. Consecutive assistant messages also enforce cross-message ordering, rejecting thinking after text/tools. This is not full Messages compatibility.
 
-所有错误使用 `{"type":"error","error":{"type":"…","message":"安全诊断"},"request_id":"…"}`。响应头 request-id/X-Request-ID 与 body request_id 一致；流内为 event:error，不发送成功终态。凭证无效 401/authentication_error，角色不符 403/permission_error，校验或不支持 400/invalid_request_error，方法 405，体积超限 413/request_too_large，显式模型不可用 404/not_found_error，无候选/决策预算 422/invalid_request_error，配置/存储故障 503/api_error，生成/转换/决策故障 502/api_error，超时 504/timeout_error，仍可写连接上的取消 499/api_error。上游 429/529 分别保留并映射 rate_limit_error/overloaded_error；可信的请求相关失败与 5xx 按公布分类保留状态；上游 401/402/403 映射 502/api_error。上游错误内容、诊断及其请求 ID 不直接透传。
+Errors use {"type":"error","error":{"type":"…","message":"safe diagnostic"},"request_id":"…"}. request-id/X-Request-ID headers match body request_id; SSE uses event:error without a successful terminal event. Mappings: invalid credentials 401/authentication_error; wrong role 403/permission_error; validation/unsupported 400/invalid_request_error; method 405; body size 413/request_too_large; unavailable explicit model 404/not_found_error; no candidates/decision budget 422/invalid_request_error; configuration/storage/fallback exhaustion 503/api_error; generation/conversion/decision 502/api_error; timeout 504/timeout_error; cancellation on a writable connection 499/api_error. Upstream 429/529 map to rate_limit_error/overloaded_error, trusted request failures and 5xx retain published classifications, and upstream 401/402/403 map to 502/api_error. Raw upstream identities do not replace Router request IDs; sanitized details use optional diagnostics.
 
-复现未经修改的官方 SDK 集成（Node 项目需已有 @anthropic-ai/sdk，打印实际版本）：
+Reproduce with an existing Node project containing @anthropic-ai/sdk; the test prints its version:
 
 ```sh
 JEV_TEST_ANTHROPIC_SDK=/absolute/path/to/node-project go test ./internal/transport/http -run TestUnmodifiedAnthropicSDK -count=1 -v
@@ -136,19 +135,19 @@ go test ./internal/compat -run Anthropic -count=1 -v
 go test ./internal/provider ./internal/transport/http -run 'PreparedMessages|Messages' -count=1
 ```
 
-SDK 测试不改写 fetch/请求；单次调用验证设置 maxRetries=0，四个完整回合共 8 次模拟生成请求；另有 1 次模拟断流验证 SDK 流内错误解析，认证失败和非法请求不外发。示例见 examples/anthropic-messages.mjs。官方 SDK 默认重试是客户端行为，不能误认为 Router 换模或重试。
+SDK tests do not rewrite fetch or requests. With maxRetries=0, four complete rounds make eight fake generation calls; an additional interrupted stream checks SDK error parsing. Authentication and invalid-input failures make no calls. See examples/anthropic-messages.mjs. Client SDK retries are distinct from Router reselection.
 
-Messages → OpenAI 转换仍有明确兼容差异：不支持独立 thinking 预算和原生签名历史，initial usage、停止元数据及 effort 词汇也与其他入口不同。以上 SDK 记录来自本地模拟上游，不应据此宣称覆盖全部 OpenAI 入口语义或所有线上模型；原生上游的 BigModel 验收见下节，不能作为此转换方向的验收。
+Messages→OpenAI differs in thinking budgets, signed history, initial usage, stop metadata and effort vocabulary. These fake-upstream SDK results do not establish every OpenAI semantic or every online model. Native BigModel checks below are not evidence for this conversion direction.
 
-Messages SSE 在 Bifrost 累计状态之前执行总预算：序列化后的已解码帧累计最多 16 MiB、最多 65536 帧，原始捕获单次最多 16 MiB。包含文本、thinking、工具参数/名称、ID 等元数据；超限明确失败并取消上游，不截断成成功输出。每个工具参数另限 1 MiB。该预算限制 adapter/converter 的累计数据，不宣称约束 SDK 解析一个巨大原始帧之前的瞬时内存分配。
+Before Bifrost accumulates Messages SSE state, serialized decoded frames are bounded to 16 MiB and 65536 frames; each raw capture is at most 16 MiB. Text, thinking, tool arguments/names and IDs all count. Overflow fails and cancels upstream without truncating into success. Each tool argument is also limited to 1 MiB. These bounds cover accumulated adapter/converter data, not transient allocation while parsing one huge raw SDK frame.
 
-路由记录的摘要从原始 Messages 最后一条 user 提取，不从合并后的 Chat 投影提取；仅有工具结果/图片时摘要为空。JSON 与 SSE 都拒绝重复工具 ID。同帧并行工具调用逐个进入锁定转换器，结束信号在该帧所有工具片段之后转换，保留调用 ID、索引和参数配对。
+Routing summaries come from the original last Messages user message, not the merged Chat projection; tool-result/image-only messages yield an empty summary. JSON/SSE reject duplicate tool IDs. Parallel calls within one frame enter the converter individually; terminal conversion follows all tool fragments, preserving IDs, indexes and arguments.
 
-SSE thinking 块被文本或工具输出关闭后，上游再次发送非空 thinking 时明确返回流内错误，不发送 message_stop；当前转换器无法重新打开该块，禁止静默丢弃恢复的片段。空 thinking 增量不触发此错误。
+After text/tools close an SSE thinking block, resumed nonempty thinking causes an in-stream error without message_stop: the converter cannot reopen that block and must not silently discard fragments. Empty thinking deltas do not trigger this failure.
 
 ## OpenAI clients with native Anthropic upstream (#50)
 
-Set provider protocol to `anthropic`. JSON and SSE use the same checked Bifrost conversion for messages, leading system/developer instructions, HTTPS/data images, ordinary function tools and tool results. Leading developer text maps to the same instruction level as system, preserving order. Mid-conversation instruction insertion, unsupported image detail and unrepresentable OpenAI fields are rejected before selection. JSON Schema requires the final native schema to preserve constraints; json_object is rejected. Sampling fields are rejected if the SDK would drop them, including model-name dependent rewrites. Tool-history JSON numbers retain their original precision, including integers beyond float64 exact range. Numeric compatibility checks compare exact values; schema constraints rounded by SDK conversion are rejected before sending. The prepared native body is sent through Bifrost’s public passthrough transport, preventing its Chat serializer from stripping unsigned thinking history. Responses still use Bifrost converters; SSE framing and terminal validation run before conversion. No retries or fallback occur.
+Set provider protocol to `anthropic`. JSON and SSE use the same checked Bifrost conversion for messages, leading system/developer instructions, HTTPS/data images, ordinary function tools and tool results. Leading developer text maps to the same instruction level as system, preserving order. Mid-conversation instruction insertion, unsupported image detail and unrepresentable OpenAI fields are rejected before selection. JSON Schema requires the final native schema to preserve constraints; json_object is rejected. Sampling fields are rejected if the SDK would drop them, including model-name dependent rewrites. Tool-history JSON numbers retain their original precision, including integers beyond float64 exact range. Numeric compatibility checks compare exact values; schema constraints rounded by SDK conversion are rejected before sending. The prepared native body is sent through Bifrost’s public passthrough transport, preventing its Chat serializer from stripping unsigned thinking history. Responses still use Bifrost converters; SSE framing and terminal validation run before conversion. No SDK retries occur. Auto may reselect once before semantic output; explicit requests never switch models.
 
 Thinking true maps to adaptive; false and effort none normalize to disabled. Tools can use default or enabled thinking on initial and continuation requests. Low/medium/high/max effort is preserved; minimal/xhigh and conflicting controls are rejected. Visible thinking is preserved in reasoning_content, including unsigned thinking alongside tools. Assistant reasoning_content is replayed as an unsigned native thinking block. By default, signed thinking with tools and encrypted thinking remain unsupported and fail explicitly; signatures are never fabricated. The verified BigModel profile is a narrow exception: HTTPS `open.bigmodel.cn/api/anthropic/v1` (default port or 443), with upstream model `glm-5.3` or `glm-5.3-flash`, accepts thinking/tool replay without response signatures. For these targets only, the adapter preserves visible thinking text and omits the optional signature. It does not claim native signature fidelity; proxies, other paths/models, and encrypted thinking are not covered. Standalone signed thinking retains its visible text only and does not provide a signed-history roundtrip.
 
@@ -158,11 +157,11 @@ Native errors retain HTTP 400–599 status and stable local summaries; sanitized
 
 Local production HTTP/Bifrost tests and unmodified OpenAI/Agent SDK tool roundtrips cover JSON/SSE. Reproduce with `JEV_TEST_OPENAI_SDK=<Node project with openai> JEV_TEST_AGENT_SDK=<agent-sdk checkout with tsx> go test ./internal/transport/http -run 'TestChatAnthropicUpstreamHTTP|TestNativeUpstreamSDKs' -v`. These use a simulated native upstream. BigModel real-upstream checks used Agent SDK v3.5.1 through a local Router, covering simple queries, multi-turn history, custom tools, streaming, streaming tools and effort controls on glm-5.3 and glm-5.3-flash. All 12 example runs completed; this is a bounded compatibility check, not a benchmark or validation of all Anthropic-compatible deployments. Successful effort requests do not prove distinct internal reasoning behavior. Per-run logs remain local. Native Messages client support is documented separately below.
 
-Anthropic 上游的 JSON Schema 格式不支持 OpenAI `json_schema.description` 指令；非空值在候选检查时返回 `unsupported_request`，避免静默丢失。格式名称不发送；schema 使用原生约束输出，`strict` 不作为原生字段发送。
+Native Anthropic JSON Schema does not support OpenAI `json_schema.description`; nonempty descriptions fail candidate checks with `unsupported_request` instead of being silently lost. Format names are not sent. Schemas use native constrained output; `strict` is not sent as a native field.
 
 ## Native Messages clients with native Anthropic upstream (#51)
 
-`POST /v1/messages` supports `protocol=anthropic` and `protocol=openai` targets for explicit and auto selection. Native prepared JSON is immutable; candidate checks and execution share its body builder. Only the request model becomes upstream_name and response model becomes the external ID. Native requests/responses never traverse Chat conversion. Unsupported fields exclude only the incompatible candidate; internal errors abort planning. There is no retry, fallback, image download or signature rewriting.
+`POST /v1/messages` supports `protocol=anthropic` and `protocol=openai` targets for explicit and auto selection. Native prepared JSON is immutable; candidate checks and execution share its body builder. Only the request model becomes upstream_name and response model becomes the external ID. Native requests/responses never traverse Chat conversion. Unsupported fields exclude only the incompatible candidate; internal errors abort planning. There is no SDK retry, image download or signature rewriting. Auto may reselect once before semantic output.
 
 | Native field | Contract |
 | --- | --- |

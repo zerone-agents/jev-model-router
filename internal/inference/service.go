@@ -13,19 +13,27 @@ type SnapshotStore interface {
 	Snapshot(context.Context) (routing.Snapshot, error)
 }
 type Service struct {
+	Fallback        FallbackConfig
 	Store           SnapshotStore
 	Planner         *routing.Planner
 	Recorder        *routing.Recorder
 	DecisionTimeout time.Duration
 }
 type Request struct {
-	service *Service
-	ctx     context.Context
-	record  routing.Record
+	OnRetry      func() error
+	snapshot     *routing.Snapshot
+	options      routing.PlanOptions
+	current      int
+	diagnostics  []routing.AttemptDiagnostic
+	service      *Service
+	ctx          context.Context
+	parent       context.Context
+	cancelBudget context.CancelFunc
+	record       routing.Record
 }
 
 func (s *Service) Begin(ctx context.Context, id string) *Request {
-	return &Request{service: s, ctx: ctx, record: routing.Record{RequestID: id, CreatedAt: time.Now().UTC()}}
+	return &Request{service: s, ctx: ctx, parent: ctx, record: routing.Record{RequestID: id, CreatedAt: time.Now().UTC()}}
 }
 func (r *Request) Plan(req routing.Request, check func(routing.Target) error) (routing.Plan, error) {
 	return r.PlanWithSummary(req, check, routing.RequestSummary(req))
@@ -42,24 +50,25 @@ func (r *Request) PlanPrepared(req routing.Request, check func(routing.Target) e
 		r.record.Mode = "auto"
 	}
 	r.record.RequestSummary = summary
-	snapshot, err := r.service.Store.Snapshot(r.ctx)
-	if err != nil {
-		return routing.Plan{}, err
+	if r.snapshot == nil {
+		snapshot, err := r.service.Store.Snapshot(r.ctx)
+		if err != nil {
+			return routing.Plan{}, err
+		}
+		r.snapshot = &snapshot
 	}
+	snapshot := *r.snapshot
 	r.record.ConfigVersion = snapshot.Version
-	ctx, cancel := context.WithTimeout(r.ctx, r.service.DecisionTimeout)
+	ctx, cancel := routing.WithStageTimeout(r.ctx, r.service.DecisionTimeout)
 	defer cancel()
 	start := time.Now()
-	var plan routing.Plan
-	if check == nil {
-		plan, err = r.service.Planner.Plan(ctx, snapshot, req)
-	} else {
-		plan, err = r.service.Planner.PlanPreparedWithEstimate(ctx, snapshot, req, check, estimate)
-	}
-	r.record.DecisionMillis = time.Since(start).Milliseconds()
+	plan, err := r.service.Planner.PlanWithOptions(ctx, snapshot, req, check, estimate, r.options)
+	r.record.DecisionMillis += time.Since(start).Milliseconds()
 	r.record.Path = plan.Path
 	r.record.CandidateIDs = plan.CandidateIDs
-	r.record.ModelID = plan.ModelID
+	if plan.ModelID != "" {
+		r.record.ModelID = plan.ModelID
+	}
 	if ctx.Err() == context.DeadlineExceeded {
 		return plan, routing.Fail("timeout", "decision timed out")
 	}
@@ -69,6 +78,9 @@ func (r *Request) PlanPrepared(req routing.Request, check func(routing.Target) e
 	return plan, err
 }
 func (r *Request) Finish(err error) {
+	if r.cancelBudget != nil {
+		defer r.cancelBudget()
+	}
 	r.record.Outcome = "success"
 	if err != nil {
 		r.record.Outcome = "error"
@@ -77,14 +89,19 @@ func (r *Request) Finish(err error) {
 	r.service.Recorder.Save(r.record)
 }
 
+// Context remains alive through terminal response writes until Finish releases it.
+func (r *Request) Context() context.Context { return r.ctx }
+
 type RouteMetadata struct {
-	RequestID      string `json:"request_id"`
-	ModelID        string `json:"model_id"`
-	Path           string `json:"path"`
-	ConfigVersion  int64  `json:"config_version"`
-	DecisionMillis int64  `json:"decision_ms"`
+	Attempt        int                         `json:"attempt,omitempty"`
+	Attempts       []routing.AttemptDiagnostic `json:"attempts,omitempty"`
+	RequestID      string                      `json:"request_id"`
+	ModelID        string                      `json:"model_id"`
+	Path           string                      `json:"path"`
+	ConfigVersion  int64                       `json:"config_version"`
+	DecisionMillis int64                       `json:"decision_ms"`
 }
 
 func (r *Request) Metadata() RouteMetadata {
-	return RouteMetadata{RequestID: r.record.RequestID, ModelID: r.record.ModelID, Path: r.record.Path, ConfigVersion: r.record.ConfigVersion, DecisionMillis: r.record.DecisionMillis}
+	return RouteMetadata{Attempt: r.current, Attempts: r.DiagnosticAttempts(), RequestID: r.record.RequestID, ModelID: r.record.ModelID, Path: r.record.Path, ConfigVersion: r.record.ConfigVersion, DecisionMillis: r.record.DecisionMillis}
 }

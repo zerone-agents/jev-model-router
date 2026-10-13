@@ -27,6 +27,10 @@ func errorBody(e error) map[string]any {
 			body["health_exclusions_truncated"] = true
 		}
 	}
+	var attempted *routing.AttemptError
+	if errors.As(e, &attempted) {
+		body["diagnostic"] = routing.Diagnose(e)
+	}
 	return map[string]any{"error": body}
 }
 func writeError(w http.ResponseWriter, e error) {

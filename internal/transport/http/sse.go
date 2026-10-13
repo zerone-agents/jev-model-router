@@ -69,20 +69,6 @@ func (b *bufferedStream) Close() error {
 	return nil
 }
 
-type prependStream struct {
-	first *routing.Event
-	rest  routing.EventStream
-}
-
-func (p *prependStream) Next(ctx context.Context) (routing.Event, error) {
-	if p.first != nil {
-		v := *p.first
-		p.first = nil
-		return v, nil
-	}
-	return p.rest.Next(ctx)
-}
-func (p *prependStream) Close() error { return p.rest.Close() }
 func validEvent(e routing.Event) bool {
 	if e.Usage != nil {
 		return true
@@ -112,15 +98,16 @@ func writeStream(ctx context.Context, w http.ResponseWriter, s routing.EventStre
 	finished := false
 	deadline := time.Now().Add(idle)
 	send := func(v any) error {
-		controller.SetWriteDeadline(time.Now().Add(idle))
-		b, e := json.Marshal(v)
-		if e != nil {
-			return e
-		}
-		if _, e = fmt.Fprintf(w, "data: %s\n\n", b); e != nil {
-			return e
-		}
-		return controller.Flush()
+		return writeWithinRequest(ctx, w, idle, func() error {
+			b, e := json.Marshal(v)
+			if e != nil {
+				return e
+			}
+			if _, e = fmt.Fprintf(w, "data: %s\n\n", b); e != nil {
+				return e
+			}
+			return controller.Flush()
+		})
 	}
 	for {
 		nextCtx, cancel := context.WithDeadline(ctx, deadline)
@@ -131,12 +118,12 @@ func writeStream(ctx context.Context, w http.ResponseWriter, s routing.EventStre
 			if !finished {
 				e = routing.Fail("upstream_error", "stream ended without completion")
 			} else {
-				controller.SetWriteDeadline(time.Now().Add(idle))
-				_, e = fmt.Fprint(w, "data: [DONE]\n\n")
-				if e == nil {
-					e = controller.Flush()
-				}
-				return e
+				return writeWithinRequest(ctx, w, idle, func() error {
+					if _, err := fmt.Fprint(w, "data: [DONE]\n\n"); err != nil {
+						return err
+					}
+					return controller.Flush()
+				})
 			}
 		}
 		if e != nil {

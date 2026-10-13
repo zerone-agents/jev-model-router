@@ -37,52 +37,46 @@ type chatOutput struct {
 
 // executeChat owns planning, provider dispatch and the first-event gate for
 // both the public API and Playground. Only policy and response encoding vary.
-// A zero buffer reads synchronously, retaining Playground's quota lease until
-// the provider reader exits; the public API retains its configured buffer.
+// Reads are synchronous, retaining the provider and Playground lease until the
+// reader exits. The typed preamble is bounded independently of SDK buffering.
 func executeChat(ctx context.Context, execution *inference.Request, executor *routing.Executor, req routing.Request, firstTimeout time.Duration, bufferSize int, output chatOutput) error {
-	plan, err := execution.Plan(req, nil)
-	if err != nil {
-		plan.Close()
-		return contextError(ctx, err)
-	}
-	defer plan.Close()
-	if output.planned != nil {
-		if err := output.planned(plan); err != nil {
-			return err
+	return execution.Execute(req, nil, nil, routing.RequestSummary(req), func(attemptCtx context.Context, plan routing.Plan, _ int) inference.AttemptResult {
+		if output.planned != nil {
+			if e := output.planned(plan); e != nil {
+				return inference.AttemptResult{Err: e, Committed: true}
+			}
 		}
-	}
-	if !req.Stream {
-		callCtx, cancel := context.WithTimeout(ctx, firstTimeout)
+		if !req.Stream {
+			callCtx, cancel := routing.WithStageTimeout(attemptCtx, firstTimeout)
+			defer cancel()
+			result, e := executor.Complete(callCtx, plan, req)
+			e = contextError(callCtx, e)
+			if e != nil {
+				return inference.AttemptResult{Err: e, RetryableGenerationFailure: routing.HealthOutcome(e).Kind != ""}
+			}
+			return inference.AttemptResult{Err: output.complete(result, plan), Committed: true}
+		}
+		streamCtx, stop := context.WithCancelCause(attemptCtx)
+		defer stop(context.Canceled)
+		firstCtx, cancel := routing.WithStageTimeout(streamCtx, firstTimeout)
 		defer cancel()
-		result, err := executor.Complete(callCtx, plan, req)
-		if err = contextError(callCtx, err); err != nil {
-			return err
+		stopOpening := context.AfterFunc(firstCtx, func() { stop(context.Cause(firstCtx)) })
+		defer stopOpening()
+		source, e := executor.Stream(streamCtx, plan, req)
+		if e != nil {
+			e = contextError(firstCtx, e)
+			return inference.AttemptResult{Err: e, RetryableGenerationFailure: routing.HealthOutcome(e).Kind != ""}
 		}
-		return output.complete(result, plan)
-	}
-	streamCtx, stop := context.WithCancelCause(ctx)
-	defer stop(context.Canceled)
-	timer := time.AfterFunc(firstTimeout, func() { stop(context.DeadlineExceeded) })
-	defer timer.Stop()
-	source, err := executor.Stream(streamCtx, plan, req)
-	if err != nil {
-		return contextError(streamCtx, err)
-	}
-	if bufferSize > 0 {
-		source = bufferStream(streamCtx, source, bufferSize)
-	}
-	defer source.Close()
-	for {
-		first, err := source.Next(streamCtx)
-		if err != nil {
-			return contextError(streamCtx, err)
+		defer source.Close()
+
+		replay, e := prepareChatStream(firstCtx, source)
+		if e != nil {
+			e = contextError(firstCtx, e)
+			return inference.AttemptResult{Err: e, RetryableGenerationFailure: routing.HealthOutcome(e).Kind != ""}
 		}
-		if !validEvent(first) {
-			continue
+		if !stopOpening() {
+			return inference.AttemptResult{Err: contextError(firstCtx, firstCtx.Err()), RetryableGenerationFailure: true}
 		}
-		if !timer.Stop() {
-			return routing.Fail("timeout", "first event timed out")
-		}
-		return output.stream(streamCtx, &prependStream{first: &first, rest: source}, plan)
-	}
+		return inference.AttemptResult{Err: output.stream(streamCtx, &diagnosticChat{EventStream: replay, r: execution}, plan), Committed: true}
+	})
 }

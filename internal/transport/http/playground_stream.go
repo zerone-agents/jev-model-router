@@ -11,7 +11,9 @@ import (
 )
 
 func writePlaygroundStream(ctx context.Context, w http.ResponseWriter, s routing.EventStream, route inference.RouteMetadata) error {
-	send := func(name string, value any) error { return sendPlaygroundEvent(w, name, value) }
+	send := func(name string, value any) error {
+		return writeWithinRequest(ctx, w, 0, func() error { return sendPlaygroundEvent(w, name, value) })
+	}
 	finish := ""
 	var usage *routing.Usage
 	fail := func(e error) error { send("error", playgroundDiagnostic(e, route.RequestID, "generation")); return e }
@@ -23,9 +25,11 @@ func writePlaygroundStream(ctx context.Context, w http.ResponseWriter, s routing
 				return fail(routing.Fail("upstream_error", "stream ended without completion"))
 			}
 			return send("done", struct {
-				Finish string         `json:"finish_reason"`
-				Usage  *routing.Usage `json:"usage,omitempty"`
-			}{finish, usage})
+				Attempt  int                         `json:"attempt,omitempty"`
+				Attempts []routing.AttemptDiagnostic `json:"attempts,omitempty"`
+				Finish   string                      `json:"finish_reason"`
+				Usage    *routing.Usage              `json:"usage,omitempty"`
+			}{route.Attempt, route.Attempts, finish, usage})
 		}
 		if e != nil {
 			return fail(e)

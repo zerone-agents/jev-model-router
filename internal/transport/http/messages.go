@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zerone-agents/jev-model-router/internal/inference"
 	"github.com/zerone-agents/jev-model-router/internal/management"
 	"github.com/zerone-agents/jev-model-router/internal/provider"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
@@ -82,72 +83,80 @@ func (s *server) messages(w http.ResponseWriter, r *http.Request) {
 		fail(err)
 		return
 	}
-	plan, err := execution.PlanPrepared(prepared.Projection(), prepared.Check, prepared.Estimate, prepared.Summary())
-	if err != nil {
-		plan.Close()
-		fail(err)
-		return
-	}
-	defer plan.Close()
+
 	gen, ok := s.executor.Generator.(messagesGenerator)
 	if !ok {
 		fail(routing.Fail("config_missing", "Messages generator unavailable"))
 		return
 	}
-	if !prepared.Projection().Stream {
-		ctx, cancel := context.WithTimeout(r.Context(), s.limits.FirstEventTimeout)
-		defer cancel()
-		result, err := gen.CompleteMessages(ctx, plan.Target, prepared)
-		err = contextError(ctx, err)
-		if err != nil {
-			fail(err)
-			return
+	started := false
+	finalErr = execution.Execute(prepared.Projection(), prepared.Check, prepared.Estimate, prepared.Summary(), func(attemptCtx context.Context, plan routing.Plan, _ int) inference.AttemptResult {
+		if !prepared.Projection().Stream {
+			ctx, cancel := routing.WithStageTimeout(attemptCtx, s.limits.FirstEventTimeout)
+			defer cancel()
+			result, e := gen.CompleteMessages(ctx, plan.Target, prepared)
+			e = contextError(ctx, e)
+			if e != nil {
+				return inference.AttemptResult{Err: e, RetryableGenerationFailure: routing.HealthOutcome(e).Kind != ""}
+			}
+			started = true
+			e = writeWithinRequest(attemptCtx, w, s.limits.IdleTimeout, func() error {
+				w.Header().Set("Content-Type", "application/json")
+				_, err := w.Write(append(result, '\n'))
+				return err
+			})
+			return inference.AttemptResult{Err: e, Committed: true}
 		}
-		http.NewResponseController(w).SetWriteDeadline(time.Now().Add(s.limits.IdleTimeout))
-		w.Header().Set("Content-Type", "application/json")
-		_, finalErr = w.Write(append(result, '\n'))
-		return
+		ctx, stop := context.WithCancelCause(attemptCtx)
+		defer stop(context.Canceled)
+		firstCtx, cancel := routing.WithStageTimeout(ctx, s.limits.FirstEventTimeout)
+		defer cancel()
+		stopOpening := context.AfterFunc(firstCtx, func() { stop(context.Cause(firstCtx)) })
+		defer stopOpening()
+		stream, e := gen.StreamMessages(ctx, plan.Target, prepared)
+		if e != nil {
+			e = contextError(firstCtx, e)
+			return inference.AttemptResult{Err: e, RetryableGenerationFailure: routing.HealthOutcome(e).Kind != ""}
+		}
+		defer stream.Close()
+		replay, e := prepareMessagesStream(firstCtx, stream)
+		if e != nil {
+			e = contextError(firstCtx, e)
+			return inference.AttemptResult{Err: e, RetryableGenerationFailure: routing.HealthOutcome(e).Kind != ""}
+		}
+		if !stopOpening() {
+			return inference.AttemptResult{Err: contextError(firstCtx, firstCtx.Err()), RetryableGenerationFailure: true}
+		}
+		first, e := replay.Next(ctx)
+		if e != nil {
+			return inference.AttemptResult{Err: e}
+		}
+		started = true
+		return inference.AttemptResult{Err: writeMessagesStream(ctx, w, &diagnosticMessages{MessageStream: replay, r: execution, terminal: first.Terminal}, first, id, s.limits.IdleTimeout), Committed: true}
+	})
+	if finalErr != nil && !started {
+		_ = writeWithinRequest(execution.Context(), w, s.limits.IdleTimeout, func() error { writeMessagesError(w, finalErr, id); return nil })
 	}
-	ctx, stop := context.WithCancelCause(r.Context())
-	defer stop(context.Canceled)
-	timer := time.AfterFunc(s.limits.FirstEventTimeout, func() { stop(context.DeadlineExceeded) })
-	defer timer.Stop()
-	stream, err := gen.StreamMessages(ctx, plan.Target, prepared)
-	if err != nil {
-		fail(contextError(ctx, err))
-		return
-	}
-	defer stream.Close()
-	// The provider's Bifrost channel is bounded. Pull one protocol event at a
-	// time; no goroutine accumulates an unbounded converted response.
-	first, err := stream.Next(ctx)
-	if err != nil {
-		fail(contextError(ctx, err))
-		return
-	}
-	if !timer.Stop() {
-		fail(routing.Fail("timeout", "first event timed out"))
-		return
-	}
-	finalErr = writeMessagesStream(ctx, w, stream, first, id, s.limits.IdleTimeout)
 }
+
 func writeMessagesStream(ctx context.Context, w http.ResponseWriter, stream provider.MessageStream, first provider.MessageEvent, id string, idle time.Duration) error {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	controller := http.NewResponseController(w)
 	send := func(e provider.MessageEvent) error {
-		controller.SetWriteDeadline(time.Now().Add(idle))
-		if _, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", e.Type, e.Data); err != nil {
-			return err
-		}
-		return controller.Flush()
+		return writeWithinRequest(ctx, w, idle, func() error {
+			if _, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", e.Type, e.Data); err != nil {
+				return err
+			}
+			return controller.Flush()
+		})
 	}
 	if err := send(first); err != nil {
 		return err
 	}
 	terminal := first.Terminal
 	for {
-		nextCtx, cancel := context.WithTimeout(ctx, idle)
+		nextCtx, cancel := routing.WithStageTimeout(ctx, idle)
 		e, err := stream.Next(nextCtx)
 		err = contextError(nextCtx, err)
 		cancel()
@@ -158,7 +167,7 @@ func writeMessagesStream(ctx context.Context, w http.ResponseWriter, stream prov
 			err = routing.Fail("upstream_error", "stream ended without completion")
 		}
 		if err != nil {
-			if ctx.Err() == nil {
+			if ctx.Err() == nil || errors.Is(context.Cause(ctx), routing.ErrRequestBudgetExhausted) || errors.Is(context.Cause(ctx), context.DeadlineExceeded) {
 				_, body := messagesError(err, id)
 				b, _ := json.Marshal(body)
 				_ = send(provider.MessageEvent{Type: "error", Data: b})

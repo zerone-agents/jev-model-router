@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"net/http"
-	"time"
 )
 
 func (s *server) chat(w http.ResponseWriter, r *http.Request) {
@@ -24,8 +23,9 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 	finalErr = executeChat(r.Context(), execution, s.executor, req, s.limits.FirstEventTimeout, s.limits.StreamBuffer, chatOutput{
 		complete: func(result routing.Completion, plan routing.Plan) error {
 			started = true
-			http.NewResponseController(w).SetWriteDeadline(time.Now().Add(s.limits.IdleTimeout))
-			return WriteCompletion(w, result, plan.ModelID, id)
+			return writeWithinRequest(execution.Context(), w, s.limits.IdleTimeout, func() error {
+				return WriteCompletion(w, result, plan.ModelID, id)
+			})
 		},
 		stream: func(ctx context.Context, stream routing.EventStream, plan routing.Plan) error {
 			started = true
@@ -33,7 +33,7 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 	if finalErr != nil && !started {
-		writeError(w, finalErr)
+		_ = writeWithinRequest(execution.Context(), w, s.limits.IdleTimeout, func() error { writeError(w, finalErr); return nil })
 	}
 
 }
