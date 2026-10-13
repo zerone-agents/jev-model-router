@@ -11,6 +11,19 @@ import (
 )
 
 func TestHealthRestartAndExplicitRecovery(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		status int
+		body   string
+	}{
+		{"quota", 429, `{"error":{"code":"insufficient_quota","message":"quota"}}`},
+		{"kimi_access_terminated", 403, `{"error":{"type":"access_terminated_error","message":"weekly usage limit reached"}}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) { testHealthRestartAndExplicitRecovery(t, tc.status, tc.body) })
+	}
+}
+
+func testHealthRestartAndExplicitRecovery(t *testing.T, status int, body string) {
 	t.Setenv("JEV_ROUTER_SETTINGS_TOKEN", "settings-test")
 	t.Setenv("JEV_ROUTER_INFERENCE_TOKEN", "inference-test")
 	t.Setenv("HEALTH_TEST_KEY", "provider-test")
@@ -21,8 +34,8 @@ func TestHealthRestartAndExplicitRecovery(t *testing.T) {
 		calls.Add(1)
 		w.Header().Set("Content-Type", "application/json")
 		if fail.Load() {
-			w.WriteHeader(429)
-			w.Write([]byte(`{"error":{"code":"insufficient_quota","message":"quota"}}`))
+			w.WriteHeader(status)
+			w.Write([]byte(body))
 			return
 		}
 		w.Write([]byte(`{"id":"c","object":"chat.completion","created":1,"model":"up","choices":[{"index":0,"message":{"role":"assistant","content":"OK"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
@@ -56,7 +69,7 @@ func TestHealthRestartAndExplicitRecovery(t *testing.T) {
 	chat := func(model string) *httptest.ResponseRecorder {
 		return post("/v1/chat/completions", "inference-test", `{"model":"`+model+`","messages":[{"role":"user","content":"hello"}]}`)
 	}
-	if w := chat("auto"); w.Code != 429 {
+	if w := chat("auto"); w.Code != status {
 		t.Fatalf("first upstream: %d %s", w.Code, w.Body)
 	}
 	if w := chat("auto"); w.Code != 422 || !strings.Contains(w.Body.String(), "health_exclusions") {

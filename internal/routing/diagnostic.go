@@ -41,7 +41,7 @@ func Diagnose(err error) Diagnostic {
 		}
 		value := ReportedErrorCode(map[string]any{"code": up.ReportedCode})
 		switch value {
-		case "insufficient_quota", "billing_error":
+		case "access_terminated_error", "insufficient_quota", "billing_error":
 			d.Code, d.Message = "upstream_quota", "Provider billing or quota limit reached"
 		case "content_filter", "content_policy_violation":
 			d.Code, d.Message = "upstream_content_rejected", "Provider rejected the content"
@@ -73,7 +73,7 @@ func ReportedErrorCode(body map[string]any) string {
 		}
 		switch value {
 		case "quota_exceeded", "model_not_found", "insufficient_balance", "context_length_exceeded", "unsupported_parameter",
-			"insufficient_quota", "billing_error", "content_filter", "content_policy_violation",
+			"access_terminated_error", "insufficient_quota", "billing_error", "content_filter", "content_policy_violation",
 			"authentication_error", "invalid_api_key", "rate_limit_error", "rate_limit_exceeded",
 			"invalid_request_error", "permission_error", "not_found_error", "conflict_error",
 			"request_too_large", "api_error", "timeout_error", "overloaded_error":
