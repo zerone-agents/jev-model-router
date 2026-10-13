@@ -143,22 +143,22 @@ RPM 是任意滚动 60 秒内的受理次数；每日按 UTC 零点重置。会�
 页面仅在内存保存对话，刷新或离开后丢失；失败、停止或截断的回合不会自动加入下一轮历史。思考正文不展示、不落浏览器持久存储；按协议需要携带的 reasoning 历史仍保留在当前页面内存。正文通过 Streamdown 渲染，原始 HTML 不执行、图片不加载，既有 CSP 不放宽。
 
 
-### Alternative Jev endpoints
+### Third-party Jev-compatible endpoints
 
 `decision.put` accepts optional `path`, appended to `base_url` after removing its trailing slash. Omission uses `/v1/systemone` for backward compatibility. Supply a slash-prefixed path of alphanumeric, hyphen or underscore segments; URLs, query strings and fragments are not accepted in this field. A replacement that omits `path` resets it to the default.
 
-For DefAPI, use:
+For a third-party Jev-compatible service, use its documented base URL, request path and model ID. The following values are illustrative placeholders:
 
 ```json
 {
-  "base_url": "https://api.defapi.org",
+  "base_url": "https://decision.example.com",
   "path": "/api/v1/decisions",
-  "model": "typesafe/jev-1.13",
-  "api_key": "YOUR_DEFAPI_API_KEY"
+  "model": "provider-model-id",
+  "api_key": "YOUR_API_KEY"
 }
 ```
 
-Prefer managed `api_key` with a configured encryption master key; alternatively use `secret_ref` with a server-side env/file reference. Both backends use Bearer authentication and native `state` / `questions` requests with Choice answers. Configuration writes do not test connectivity or change the deployed server environment.
+Prefer managed `api_key` with a configured encryption master key; alternatively use `secret_ref` with a server-side env/file reference. Supported services must use Bearer authentication and native `state` / `questions` requests with Choice answers. Configurable endpoints do not imply support for arbitrary decision protocols. Configuration writes do not test connectivity or change the deployed server environment.
 
 ## Generation upstream health
 

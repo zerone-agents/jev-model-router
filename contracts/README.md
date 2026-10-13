@@ -114,7 +114,7 @@ Jev 决策失败同样保留详情，Playground 标记为 routing，不发送选
 
 ## Decision endpoint
 
-`decision.put` supports optional `path`, appended to `base_url`; omitted means `/v1/systemone`. DefAPI uses `/api/v1/decisions` and model `typesafe/jev-1.13`. This is a full replacement: omitting a previously configured path restores the default. Authentication remains Bearer via managed `api_key` or external `secret_ref`; request and Choice response schemas remain native Jev. Paths allow slash-separated alphanumeric, hyphen and underscore segments only, without query or fragment.
+`decision.put` supports optional `path`, appended to `base_url`; omitted means `/v1/systemone`. For third-party Jev-compatible services, configure `base_url`, `path` and `model` according to their API documentation. This is a full replacement: omitting a previously configured path restores the default. Authentication remains Bearer via managed `api_key` or external `secret_ref`; request and Choice response schemas remain native Jev. Paths allow slash-separated alphanumeric, hyphen and underscore segments only, without query or fragment.
 
 ## Generation health
 

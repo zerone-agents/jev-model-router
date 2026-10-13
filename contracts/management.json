@@ -1043,7 +1043,7 @@
                   "type": "string",
                   "pattern": "^(/[A-Za-z0-9_-]+)+/?$",
                   "maxLength": 2048,
-                  "description": "Path appended to base_url; omitted defaults to /v1/systemone. DefAPI uses /api/v1/decisions."
+                  "description": "Path appended to base_url; omitted defaults to /v1/systemone. Set the path documented by the third-party Jev-compatible service."
                 }
               },
               "required": [
@@ -1102,7 +1102,7 @@
           "type": "string",
           "pattern": "^(/[A-Za-z0-9_-]+)+/?$",
           "maxLength": 2048,
-          "description": "Path appended to base_url; omitted defaults to /v1/systemone. DefAPI uses /api/v1/decisions."
+          "description": "Path appended to base_url; omitted defaults to /v1/systemone. Set the path documented by the third-party Jev-compatible service."
         },
         "api_key": {
           "type": "string",
@@ -1160,7 +1160,7 @@
               "type": "string",
               "pattern": "^(/[A-Za-z0-9_-]+)+/?$",
               "maxLength": 2048,
-              "description": "Path appended to base_url; omitted defaults to /v1/systemone. DefAPI uses /api/v1/decisions."
+              "description": "Path appended to base_url; omitted defaults to /v1/systemone. Set the path documented by the third-party Jev-compatible service."
             }
           },
           "required": [
@@ -1189,9 +1189,9 @@
         "secret_ref": "env:JEV_KEY"
       },
       {
-        "base_url": "https://api.defapi.org",
+        "base_url": "https://decision.example.com",
         "path": "/api/v1/decisions",
-        "model": "typesafe/jev-1.13",
+        "model": "provider-model-id",
         "api_key": "example-only-credential"
       }
     ],

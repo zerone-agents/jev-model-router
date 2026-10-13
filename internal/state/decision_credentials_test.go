@@ -12,7 +12,7 @@ import (
 )
 
 func decisionKeyCall(v int64, key, idem string) management.Call {
-	b, _ := json.Marshal(map[string]string{"base_url": "https://api.defapi.org", "path": "/api/v1/decisions", "model": "typesafe/jev-1.13", "api_key": key})
+	b, _ := json.Marshal(map[string]string{"base_url": "https://decision.example.com", "path": "/api/v1/decisions", "model": "provider-model-id", "api_key": key})
 	return management.Call{CapabilityID: "decision.put", Input: b, ExpectedVersion: &v, IdempotencyKey: idem}
 }
 func TestDecisionManagedCredentials(t *testing.T) {
