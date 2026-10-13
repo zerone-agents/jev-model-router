@@ -19,11 +19,11 @@ func TestManagedProviderWriteSchema(t *testing.T) {
 			t.Errorf("valid=%v: %v", tc.valid, err)
 		}
 	}
-	if Validate("decision.put", json.RawMessage(`{"base_url":"https://example.com","model":"jev","secret_ref":"managed:`+strings.Repeat("a", 32)+`"}`)) == nil {
-		t.Fatal("managed decision ref accepted")
+	if Validate("decision.put", json.RawMessage(`{"base_url":"https://example.com","model":"jev","secret_ref":"managed:`+strings.Repeat("a", 32)+`"}`)) != nil {
+		t.Fatal("managed decision ref rejected")
 	}
 	for _, c := range Catalog() {
-		if c.ID == "providers.put" {
+		if c.ID == "providers.put" || c.ID == "decision.put" {
 			if strings.Contains(string(c.OutputSchema), `"api_key"`) {
 				t.Fatal("write-only key in output")
 			}
@@ -41,6 +41,19 @@ func TestManagedKeyByteLimit(t *testing.T) {
 		b, _ := json.Marshal(map[string]string{"id": "p", "base_url": "https://example.com", "api_key": tc.k})
 		if err := Validate("providers.put", b); (err == nil) != tc.ok {
 			t.Errorf("bytes=%d expected valid=%v", len(tc.k), tc.ok)
+		}
+	}
+}
+
+func TestManagedDecisionWriteSchema(t *testing.T) {
+	for _, fields := range []string{`"api_key":"key"`, `"secret_ref":"env:KEY"`} {
+		if err := Validate("decision.put", json.RawMessage(`{"base_url":"https://example.com","model":"jev",`+fields+`}`)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, fields := range []string{`"api_key":""`, `"api_key":"key","secret_ref":"env:KEY"`, `"api_key":null`, `"api_key":"` + strings.Repeat("中", 5462) + `"`} {
+		if err := Validate("decision.put", json.RawMessage(`{"base_url":"https://example.com","model":"jev",`+fields+`}`)); err == nil {
+			t.Fatal("invalid key accepted")
 		}
 	}
 }

@@ -84,7 +84,7 @@ func (s *Store) Apply(ctx context.Context, principal string, c management.Call, 
 	canonical, _ := json.Marshal([]any{c.CapabilityID, *c.ExpectedVersion, v})
 	hash := sha256.Sum256(canonical)
 	digest := hex.EncodeToString(hash[:])
-	if c.CapabilityID == "providers.put" {
+	if c.CapabilityID == "providers.put" || c.CapabilityID == "decision.put" {
 		if obj, ok := v.(map[string]any); ok {
 			if _, hasKey := obj["api_key"]; hasKey {
 				if s.cipher == nil {
@@ -127,7 +127,7 @@ func (s *Store) Apply(ctx context.Context, principal string, c management.Call, 
 	if e = contracts.Validate(c.CapabilityID, c.Input); e != nil {
 		return management.Result{}, routing.Fail("invalid_request", "input does not match capability schema")
 	}
-	prepared, e := s.prepareProvider(ctx, tx, c)
+	prepared, e := s.prepareCredential(ctx, tx, c)
 	if e != nil {
 		return management.Result{}, e
 	}

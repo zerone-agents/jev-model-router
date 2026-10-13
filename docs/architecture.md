@@ -1,156 +1,149 @@
-# 架构
+# Architecture
 
-本文记录当前产品决策与实现边界。第一阶段的 Go/SQLite/CLI/Jev 路径已经实现；以下涉及第二阶段的内容仍是设计目标。
+This document records product decisions and implementation boundaries. The phase-one Go/SQLite/CLI/Jev path is implemented; references to phase two remain design goals.
 
-第一阶段由 [Issue #1](https://github.com/zerone-agents/jev-model-router/issues/1) 追踪，仅实现 Jev 单实例路由、CLI/SKILL 和 SQLite。本文中的 Laya、敏感会话锁定与 PostgreSQL 属于 [第二阶段 #2](https://github.com/zerone-agents/jev-model-router/issues/2)，不是首版能力。简单管理 UI 由 [Issue #8](https://github.com/zerone-agents/jev-model-router/issues/8) 独立交付，复用第一阶段管理 API。
+Phase one is tracked in [Issue #1](https://github.com/zerone-agents/jev-model-router/issues/1) and covers single-instance Jev routing, CLI/SKILL and SQLite. Laya, sensitive-session locking and PostgreSQL belong to [phase two #2](https://github.com/zerone-agents/jev-model-router/issues/2). The simple management UI is delivered separately through [Issue #8](https://github.com/zerone-agents/jev-model-router/issues/8), reusing the phase-one management API.
 
-## 入口与调用路径
+## Entry points and call paths
 
 ```mermaid
 flowchart TD
-    A[Agent 模型客户端] --> H[Chat Completions / Messages HTTP 入口]
-    H --> R[路由核心]
-    C[Agent CLI + SKILL] --> MH[管理 HTTP 入口]
-    U[简单 UI] --> MH[管理 HTTP 入口]
-    MH --> M[共享管理能力]
-    M --> S[配置与会话状态]
-    M -->|选模检查| R
+    A[Agent model client] --> H[Chat Completions / Messages HTTP entry]
+    H --> R[Routing core]
+    C[Agent CLI + SKILL] --> MH[Management HTTP entry]
+    U[Simple UI] --> MH
+    MH --> M[Shared management capabilities]
+    M --> S[Configuration and session state]
+    M -->|Inspect selection| R
     R --> S
-    R --> D[Jev / 本地 Laya 决策适配]
-    R --> P[生成供应商接口]
+    R --> D[Jev / local Laya decision adapter]
+    R --> P[Generation provider interface]
     P --> B[Bifrost Core]
-    B --> G[本地模型 / 云端 API]
+    B --> G[Local models / cloud APIs]
 ```
 
-CLI 和管理 HTTP handler 调用同一管理服务；服务负责认证、权限、版本检查及写入，HTTP 层负责认证；路由记录是尽力元数据，不是审计日志。首版运行中的网关拥有可变状态；CLI 通过管理 API 访问该实例，不另开 SQLite 写入通道。CLI 的启动/帮助等进程操作例外，不执行模型配置业务。
+The CLI and management HTTP handlers use the same management service for authorization, version checks and writes; the HTTP layer authenticates requests. Routing records are best-effort metadata, not an audit log. The running gateway owns mutable state. The CLI accesses that instance through the management API instead of opening a separate SQLite write path. Process operations such as startup and help do not perform model-configuration business operations.
 
-UI 只调用管理 API；API 是 CLI 与 UI 共享的内部传输边界，不要求首版同时交付 MCP。管理 API 与推理 API 可在同一 Go 进程服务，但使用不同路径和权限范围。
+The UI calls only the management API, the shared transport boundary for CLI and UI. An MCP server is not required in the first release. Management and inference APIs can run in one Go process with separate paths and permission scopes.
 
-首版区分 `inference` 与 `settings` 两种角色。前者可使用实例内全部已启用模型；后者是可信管理员，可修改供应商地址、模型映射和提示词，影响后续数据去向。两者是操作权限分工，不构成互不信任租户之间的隔离。
+The initial roles are `inference` and `settings`. Inference credentials can use every enabled model in the instance. Settings credentials identify trusted administrators who can change provider addresses, model mappings and prompts, affecting where subsequent data is sent. These roles separate operations; they do not isolate mutually untrusted tenants.
 
-## 目录
+## Directory layout
 
 ```text
-cmd/jev-router/           可执行入口与命令装配
+cmd/jev-router/           Executable entry point and command assembly
 internal/
-  app/                   依赖装配、服务生命周期
-  routing/               候选过滤、auto/显式选择、执行协调
-  management/            共享的模型/供应商/提示词管理与选模检查
-  decision/              Jev/Laya 类型化决策及各自协议适配
-  provider/              生成供应商接口与 Bifrost 适配
-  state/                 配置版本、会话状态和存储实现
+  app/                   Dependency assembly and service lifecycle
+  routing/               Candidate filtering, auto/explicit selection, execution
+  management/            Shared model/provider/prompt management and inspection
+  decision/              Typed Jev/Laya decisions and protocol adapters
+  provider/              Generation provider interface and Bifrost adapter
+  state/                 Configuration versions, sessions and storage
   transport/
-    cli/                 命令映射、schema 发现、机器输出
-    http/                推理与管理 handler、JSON/SSE 编解码
-contracts/               管理能力契约及验证约定
-templates/               唯一默认均衡提示词
-skills/jev-router/       随产品分发的使用技能
-services/laya/           本地 Python 预算验证与推理适配
-web/                     简单管理 UI
-docs/adr/                本地架构决策记录（Git 忽略）
+    cli/                 Command mapping, schema discovery, machine output
+    http/                Inference/management handlers and JSON/SSE encoding
+contracts/               Management contracts and validation conventions
+templates/               The single default balanced prompt
+skills/jev-router/       Usage skill distributed with the product
+services/laya/           Local Python budget validation and inference adapter
+web/                     Simple management UI
+docs/adr/                Local architecture decisions (Git-ignored)
 ```
 
-首版采用一个 Go module；当前不为目录预建空 Go package、泛用接口或多个 module。SDK 与存储依赖已锁定在 go.mod/go.sum；实际兼容范围见 compatibility.md。
+The initial implementation uses one Go module. It does not pre-create empty packages, generic interfaces or multiple modules. SDK and storage dependencies are pinned in go.mod/go.sum; see compatibility.md for the verified compatibility scope.
 
-## 核心边界
+## Core boundaries
 
-### 路由与决策
+### Routing and decisions
 
-`routing` 负责决定哪些模型允许被调用，以及执行一次选择；`decision` 负责将状态、提示词及候选描述转为 Jev/Laya 请求。核心不依赖 HTTP handler、Bifrost schema 或 UI 数据结构。所需接口由调用方按真实用例定义，不提前建立大而全的插件层。
+`routing` determines eligible models and executes one selection. `decision` converts state, prompts and candidate descriptions into Jev/Laya requests. The core does not depend on HTTP handlers, Bifrost schemas or UI data structures. Callers define interfaces for actual use cases instead of introducing a general plugin framework in advance.
 
-`auto` 为保留对外模型 ID，不允许任何启用或禁用的生成模型配置占用；创建及涉及 ID 的变更在保存前拒绝，保证模型列表和请求入口没有歧义。该约束不限制上游模型名称。
+`auto` is a reserved public model ID. Neither enabled nor disabled generation models may use it. Creation and ID changes are rejected before saving, keeping lists and request entry points unambiguous. Upstream model names are not subject to this restriction.
 
-`auto` 将合格候选及可编辑提示词交给决策后端；显式模型跳过任务选模，仍检查相同约束。显式模型失败不自动换模。Jev 模式不开启敏感路由；本地 Laya 可开启，本地锁定不因切换配置或普通后续消息解除。
+`auto` sends eligible candidates and the editable prompt to the decision backend. Explicit model requests skip task-based selection while retaining the same constraints, and failures never switch models automatically. Jev mode does not enable sensitive-data routing. Local Laya may enable it; configuration changes and ordinary follow-up messages do not release a local lock.
 
-首版每次 `auto` 独立选择，不做选模缓存或模型粘连。零候选报错，单候选直接执行，多候选使用 Jev 原生 `choice`，由适配器将选项映射为模型 ID 并严格校验。首版不要求或额外生成自然语言理由，区分显式指定、唯一候选、Jev 选择及估算超限保底四种路径；概率不转换为解释文本。可编辑提示词控制偏好，原生协议构造和候选边界由适配器负责。
+Each initial `auto` request selects independently, without caching or model stickiness. No candidates produces an error; one candidate executes directly; multiple candidates use native Jev `choice`, strictly validated and mapped to model IDs by the adapter. The implementation neither requires nor generates natural-language reasons. It distinguishes explicit selection, a sole candidate, Jev selection and an estimated-capacity fallback. Probabilities are not converted into explanations. Editable prompts govern preferences; the adapter owns native protocol construction and candidate boundaries.
 
-决策输入保留全部合格候选，模型描述在保存时按明确长度上限校验；先预算固定指令、可编辑提示词与候选，再容纳近期完整对话，工具调用与结果保持配对并标记省略。Jev 不接收工具定义；工具执行仅保留调用 ID、工具名称和结果关联记录，移除参数、输出及执行消息附带文本；生成请求仍保留全部原始内容。预算按决策后端原生协议核算，不套用聊天生成接口的输出预算假设。system/developer 与最新 query 文本超限时，各文本段独立保留首尾并从中间截断，插入 [...truncated...] 且设置 content_truncated；根据序列化字节数分配共同文本上限，小段保持完整。候选、要求和最小首尾结构仍放不下时，多候选 `auto` 才报决策输入超限；显式选择和单候选路径不受 Jev 输入预算约束，但仍检查生成模型容量。
+Decision input retains all eligible candidates. Model descriptions have explicit save-time length limits. Fixed instructions, editable preferences and candidates are budgeted first, followed by recent complete conversation groups, with tool calls and results paired and omissions marked. Jev receives no tool definitions. Tool history retains only call IDs, tool names and result associations; arguments, outputs and incidental execution-message text are removed. Generation requests retain the complete original content. Budgets follow the decision backend's native protocol rather than chat-generation output assumptions. Oversized system/developer and latest-query text segments retain their own beginning and end, truncate the middle with [...truncated...], and set content_truncated. A shared text limit is allocated by serialized byte size; short segments remain intact. Multi-candidate `auto` fails only when candidates, requirements and minimum beginning/end structure still exceed the decision budget. Explicit and sole-candidate paths bypass Jev input budgeting but still apply generation capacity rules.
 
-容量检查有可靠计数能力时精确计算，否则按语义文本、结构化内容、图片和 framing 分项估算，输出预留单独加一次并明确其局限，不宣称预检保证上游接受。auto 的全部合格候选仅因非精确估算超限时，选最大上下文模型保底，最大上下文并列时交给 Jev 选择一轮，唯一最大模型直接执行，标记 context_estimate_fallback；其他能力约束不放宽，显式模型跳过本地容量估算且不换模，由上游判断容量。上游仍可能返回上下文超限，此时明确失败，不裁剪生成请求或换模。这一首版估算约定不替代后续 Laya 对敏感输入完整性的验证。
+Capacity checks use reliable exact counts when available; otherwise they estimate semantic text, structured content, images and framing separately, add the output reserve once, and disclose the limitations. Preflight checks do not guarantee upstream acceptance. If every eligible auto candidate exceeds capacity only under an inexact estimate, the largest-context model is retained as a fallback. A sole largest model executes directly; ties go to Jev once. The path is marked context_estimate_fallback. Other capability constraints remain enforced. Explicit models skip local capacity estimates, delegate capacity to the upstream and never switch. An upstream context-limit error fails explicitly without truncating generation input or changing models. This initial estimation policy does not replace future Laya validation of sensitive-input completeness.
 
-提示词仅提供一份均衡模板。模型描述表达任务专长与偏好，结构化能力表达上下文、工具和格式限制。改变偏好修改提示词，改变协议约束修改能力配置，两者不相互替代。
+Only one balanced prompt template is provided. Descriptions express task specialties and preferences; structured capabilities express context, tool and format constraints. Preferences belong in prompts, protocol constraints in capability configuration; neither substitutes for the other.
 
-### 供应商与流式协议
+### Providers and streaming protocols
 
-`provider` 是 Bifrost 的封装边界，接受已选定目标；普通重试关闭、fallback 为空。不接受客户端原生加密/签名推理历史。Chat 到原生 Anthropic 使用已校验请求体经 Bifrost passthrough 发送；普通文本思考可续写，签名工具响应仅对兼容文档列明的 BigModel 目标允许省略签名，不伪造签名。模型映射、插件与额外控制字段均由服务端显式控制。
+`provider` encapsulates Bifrost and accepts an already-selected target. Ordinary retries are disabled and fallback is empty. Client-native encrypted/signed reasoning history is not accepted on the Chat conversion path. Chat-to-native-Anthropic uses validated bodies through Bifrost passthrough. Plain-text thinking can continue; signature omission for signed tool responses is allowed only for the BigModel targets listed in the compatibility documentation, without fabricating signatures. The server explicitly controls model mappings, plugins and extra control fields.
 
-`transport/http` 保持 `/v1/chat/completions` 和 `/v1/models` 的兼容格式。SSE 必须保留工具调用增量、usage 与错误，不把内部 SDK 元数据暴露为协议的一部分。取消从入口传到决策及生成服务；流开始后不拼接另一模型的输出。
+`transport/http` preserves compatible `/v1/chat/completions` and `/v1/models` formats. SSE retains tool-call deltas, usage and errors without exposing internal SDK metadata as protocol fields. Cancellation propagates to decision and generation services. A started stream never appends output from another model.
 
-`/v1/messages` 共享 `inference` 的配置快照、规划计时和路由记录生命周期。PreparedMessages 保存不可变原生 JSON，按目标选择 Bifrost Chat 转换或原生 Passthrough；原生路径只替换 model，不经过 Chat/Responses。独立决策投影排除 thinking、签名、redacted、工具参数/结果及图片内容/地址；请求级完整估算仍计入这些数据。`PlanPreparedWithEstimate` 在容量过滤及 Jev 前执行目标检查，不修改共享 Planner。
+`/v1/messages` shares the `inference` configuration snapshot, planning timing and record lifecycle. PreparedMessages stores immutable native JSON and selects Bifrost Chat conversion or native passthrough per target. The native path changes only model and bypasses Chat/Responses conversion. A separate decision projection excludes thinking, signatures, redacted content, tool arguments/results and image content/addresses; full request capacity estimates still count them. `PlanPreparedWithEstimate` performs target checks before capacity filtering and Jev without modifying the shared Planner.
 
-Messages 接受 inference 的 `x-api-key` 或 Bearer，同传必须同身份/角色；错误编码覆盖认证、流前 JSON 和流内 error，request-id 与 X-Request-ID 为同一 Router ID。原生目标保留 thinking 预算、签名/redacted、cache、usage 和停止语义；OpenAI 转换目标保持原限制。原生 SSE 在解析前有界读取，message_stop 等到干净 EOF；max_tokens 仅允许最后工具块的合法未完成对象前缀，不补全、不执行、不重试。完整范围见 [兼容矩阵](compatibility.md#native-messages-clients-with-native-anthropic-upstream-51)。
+Messages accepts inference `x-api-key` or Bearer credentials; when both are supplied they must identify the same principal and role. Error encoding covers authentication, pre-stream JSON and in-stream errors. request-id and X-Request-ID contain the same Router ID. Native targets retain thinking budgets, signatures/redacted blocks, cache, usage and stop semantics; OpenAI-converted targets retain their existing restrictions. Native SSE reads are bounded before parsing, and message_stop waits for clean EOF. max_tokens allows only a valid unfinished object prefix in the final tool block; the router does not complete, execute or retry it. See the [compatibility matrix](compatibility.md#native-messages-clients-with-native-anthropic-upstream-51).
 
-兼容承诺限定于公布的字段及供应商支持组合。生成请求不裁剪对话、不静默丢弃影响行为的参数；无法支持时明确报错。协议转换和上游模型名称替换允许进行，但不能改变已支持输入的语义。
+Compatibility promises cover only documented fields and supported provider combinations. Generation input is not truncated and behavior-changing parameters are not silently discarded. Unsupported combinations fail explicitly. Protocol conversion and upstream model-name substitution must preserve supported input semantics.
 
-当前可配置多个 OpenAI 兼容及原生 Anthropic 供应商和模型，按入口与上游协议组合执行转换检查；Gemini 等其他原生协议未接入，不因 Bifrost 提供适配即声明支持。端点自称兼容不替代本项目的字段组合验证。响应 `model` 使用选定的对外模型 ID，流式保持一致；请求 ID 放在响应头，路由元数据由管理接口查询，不向兼容响应体添加自定义字段。
+Multiple OpenAI-compatible and native Anthropic providers/models can be configured. Conversion checks depend on both entry and upstream protocols. Other native protocols such as Gemini are not integrated merely because Bifrost offers an adapter. A provider's compatibility claim does not replace field-combination verification. Response `model` uses the selected public ID consistently in streams. Request IDs appear in headers, and management APIs expose routing metadata; compatible response bodies receive no custom routing fields.
 
-图片输入仅在已验证的端点组合中转发 HTTPS URL 或内联内容；网关不主动下载远程图片，不替端点下载或重编码。不支持的组合明确拒绝。图片 URL 和内联内容均不进入 Jev 或路由记录，决策只接收文字及图片能力需求标记。
+Verified endpoint combinations forward HTTPS image URLs or inline content. The gateway does not fetch remote images, download on behalf of endpoints or re-encode content. Unsupported combinations fail explicitly. Image URLs and inline content enter neither Jev nor routing records; decisions receive only text and image-capability requirements.
 
-分别配置决策超时、生成首包超时和流式空闲超时。持续有效输出不触发空闲超时；客户端取消立即向上游传播。超时不触发重试或换模，已开始的流以错误结束，不伪装正常完成。具体阈值在实现与验证时确定，不将尚未测量的值当作服务承诺。
+Decision, first-generation-event and stream-idle timeouts are configured separately. Ongoing valid output does not trigger the idle timeout; client cancellation propagates immediately. Timeouts do not trigger retries or model switches. Started streams end with an error rather than pretending success. Thresholds are established through implementation and validation, not unmeasured service promises.
 
-### 管理与状态
+### Management and state
 
-管理能力的单一来源位于 `contracts/`，由实际 schema 定义输入、输出、副作用、权限、错误和示例。CLI 能力发现、管理 HTTP 描述和 UI 表单由相同契约驱动，避免入口间语义分叉。
+`contracts/` is the single source of management capability schemas: inputs, outputs, effects, permissions, errors and examples. CLI discovery, management HTTP descriptions and UI forms share these contracts.
 
-运行时配置可以修改：管理服务先校验完整候选配置，再原子保存并发布新版本。每次推理捕获一个不可变配置版本，新请求使用新版本，进行中的请求继续使用原版本。CLI/UI 的写入带预期配置版本，过期写入报 conflict；幂等键与认证身份、操作、输入摘要绑定。
+Runtime writes validate the complete proposed configuration, then atomically save and publish a new version. Each inference captures an immutable version. New requests use new versions; in-flight requests retain their originals. CLI/UI writes include an expected version; stale writes conflict. Idempotency keys bind to the authenticated identity, operation and input digest.
 
-普通禁用只影响新请求，不中断已捕获旧配置的请求，也不保证阻止它们随后发往已禁用目标。禁用不是紧急撤销；紧急停止通过停止实例或撤销上游密钥处理，首版不提供在途请求管理系统。
+Disabling affects new requests only. It neither interrupts requests holding old snapshots nor guarantees they cannot subsequently reach the disabled target. Disabling is not emergency revocation: stop the instance or revoke the upstream key. The initial implementation has no in-flight request management system.
 
-配置写入使用全局 `expected_version`，成功后版本递增；成功修改、版本递增及幂等结果在同一数据库事务提交。幂等记录持久化并保留 24 小时，重启后仍可重放有效期内的成功结果；命中成功记录先于配置版本检查，同键不同输入报冲突。校验失败不占用幂等键，修正后重试仍须满足版本检查。过期不保证原结果重放，CLI 不隐藏重试。
+Writes use global `expected_version`. The mutation, version increment and idempotent result commit in one transaction. Successful receipts persist for 24 hours and survive restart. Replay lookup precedes version checks; the same key with different input conflicts. Validation failures do not consume keys, and corrected retries still require a valid version. Expired receipts do not guarantee replay; the CLI does not hide retries.
 
-SQLite 保存配置元数据及路由记录中的有限用户文本摘要，不持久化完整对话；密钥支持外部 env:/file: 引用或通过管理 API 写入的托管凭证。托管凭证由独立部署的主密钥使用 AES-256-GCM 加密，保存为绑定供应商身份的不可变版本；读取配置时只返回引用与脱敏状态。配置写入与密文、幂等回执同事务提交，轮换后在途请求保留旧引用。旧密文暂不回收，主密钥轮换另行实现。第二阶段增加会话状态、单实例内按会话串行处理及本地锁定持久化；首版不为独立 auto 请求建立会话锁。数据库事务保持短时，不跨整段模型网络调用；跨副本锁和存储扩容另行设计。
+SQLite stores configuration metadata and limited user-text summaries, not full conversations. Credentials support external env:/file: references or managed writes through the API. A separately deployed master key encrypts managed credentials with AES-256-GCM. Immutable revisions bind to a provider or independent decision-backend identity; reads return references and masked status. Ciphertext, configuration and idempotent receipts commit together. Rotation preserves old references for in-flight requests. Historical ciphertext is not yet collected; master-key rotation needs separate implementation. Phase two adds session state, per-session serialization within one instance and persistent local locks. Initial independent auto requests have no session locks. Transactions remain short and never span model network calls; cross-replica locks and storage scaling require separate design.
 
-路由记录默认保留 7 天且最多 10 万条，两项均可配置，超限丢弃最旧记录。保存模型 ID、配置版本、选择路径、选模型耗时和执行结果等元数据，以及最后一条用户消息最多 120 字的文本摘要；不保存生成耗时、完整对话、工具参数/输出、图片地址或决策后端自由文本理由。首版 Jev 不提供自然语言理由，选模检查也不伪造理由。路由记录采用尽力保存，写入失败不阻断推理，但必须暴露告警和降级状态；配置写入失败仍明确报错。此记录不承担强制审计职责。
+Routing records default to seven days and at most 100,000 entries, both configurable, evicting oldest entries when exceeded. They contain model ID, configuration version, selection path, selection latency and outcome, plus at most 120 characters from the final user message. They exclude generation latency, full conversations, tool arguments/outputs, image addresses and free-form decision reasons. Initial Jev provides no natural-language reason, and inspection fabricates none. Recording is best effort: failures do not block inference but must surface warnings and degraded status. Configuration-write failures still fail explicitly. Records are not a mandatory audit mechanism.
 
-选模检查复用同一规划路径，但不执行生成、不修改会话锁或配置。返回结果携带配置版本、候选和决策元数据，以及实际执行会产生的状态变化；真正执行仍重新校验，检查结果不是授权令牌。检查可能有决策调用成本与外传，应在能力声明中明确。
+Route inspection reuses planning without generation or changes to configuration/session locks. Results include configuration version, candidates, decision metadata and state changes execution would cause. Actual execution validates again; inspection is not an authorization token. Capability descriptions disclose possible decision cost and external transmission.
 
-## CLI、SKILL 与 UI
+## CLI, SKILL and UI
 
-产品可执行名称为 `jev-router`。`serve` 提供 API 与嵌入式 `/dashboard/`，`schema`/`call` 负责机器管理，`dashboard` 仅打开已有实例页面或输出 URL。参数以离线帮助和实例契约为准。
+The executable is `jev-router`. `serve` provides APIs and embedded `/dashboard/`; `schema`/`call` provide machine management; `dashboard` opens an existing instance or prints its URL. Offline help and runtime contracts define arguments.
 
-CLI 管理与 dashboard 输出为结构化 JSON，日志走 stderr；stdout 不混入横幅或进度动画。管理响应与 Chat Completions 响应分开，模型接口不套 AgentUse 信封。
+CLI management and dashboard commands emit structured JSON, with logs on stderr and no banners or animations on stdout. Management responses are separate from Chat Completions responses; model APIs do not use the AgentUse envelope.
 
-SKILL 说明“何时发现能力、如何选择操作、如何理解失败及验证结果”，字段与命令以运行时 schema 为准。技能作为产品资产随仓库/发布包分发，当前不自动安装到开发者的个人技能目录。
+The SKILL explains when to discover capabilities, choose operations, interpret failures and verify results. Runtime schemas define fields and commands. The skill ships as a product asset in the repository/release package and is not automatically installed into developers' personal skill directories.
 
-管理 UI 提供状态、模型描述、提示词和路由记录的查看及辅助调整，并通过下述 Playground 专用能力提供有限额的文本生成体验；核心路由逻辑仍由共享服务负责。普通管理 API 权限不因 UI 而扩大，Playground 的 Settings 会话生成例外显式声明。React 静态资源由 Go embed 提供，业务调用仍走同源管理 API。浏览器一次性交换 settings 凭证为固定 7 天的 HttpOnly 会话；SQLite 仅保存会话哈希，重启保留有效会话，注销在服务端撤销当前请求会话。CLI 继续使用 Bearer。首版仅允许描述和提示词编辑，其他配置通过 CLI。
+The management UI supports inspection and adjustment of status, model descriptions, prompts and records, plus limited text generation through the dedicated Playground capability below. Shared services retain core routing logic. Ordinary management permissions do not expand because of the UI; the Settings-session generation exception is explicit. Go embeds React assets, and business calls use same-origin management APIs. The browser exchanges Settings credentials for fixed seven-day HttpOnly sessions. SQLite stores only session hashes; sessions survive restart and logout revokes the current request's session. CLI authentication remains Bearer. Initial editing is limited to descriptions and prompts; other configuration uses the CLI.
 
-## 实现顺序与验证边界
+## Implementation order and validation boundaries
 
-1. 定义并实现最小管理契约、CLI schema 和结构化错误，同时更新 SKILL。
-2. 实现模型配置、单一均衡模板、配置版本及状态持久化。
-3. 实现 Jev 选模、显式模型与 Bifrost 调用、Chat JSON/SSE。
-4. 实现 Laya 完整输入验证、敏感路由和会话锁定。
-5. 接入复用管理能力的简单 UI。
+1. Define and implement minimum management contracts, CLI schema and structured errors; update the SKILL.
+2. Implement model configuration, the single balanced template, versions and persistence.
+3. Implement Jev selection, explicit models, Bifrost calls and Chat JSON/SSE.
+4. Implement Laya complete-input validation, sensitive routing and session locking.
+5. Integrate the simple UI using shared management capabilities.
 
-测试随模块实现就近放置；跨边界测试验证 CLI/HTTP 行为一致、冲突与幂等、取消、SSE、显式模型无隐式回退及敏感内容不发往云端。真实模型选模质量与程序约束分别评测。
+Tests live beside modules. Cross-boundary tests cover CLI/HTTP consistency, conflicts, idempotency, cancellation, SSE, explicit selection without implicit fallback and sensitive data staying off cloud services. Real selection quality and program constraints are evaluated separately.
 
-首版评测使用代表性任务及其可接受模型集合，分别评估 `auto` 与固定模型的生成质量和选模偏好。评测方法见 [验证与评测](evaluation.md)；总费用与可比较延迟需独立研究。先实测建立基线，再设质量门槛；程序约束测试独立要求通过，选模效果不能抵消协议错误。
+Initial evaluations use representative tasks and acceptable model sets to compare `auto` and fixed-model generation quality and selection preferences. See [validation and evaluation](evaluation.md). Total cost and comparable latency need separate study. Establish measured baselines before quality thresholds. Program constraints must pass independently; selection quality cannot offset protocol errors.
 
-ArbiterOS 工具执行治理仍在后续阶段。当前架构不创建空治理接口、不宣称拥有执行沙箱或 AgentUse 认证。完整能力契约和风险分级遵循 [AgentUse 协议](https://www.zerone.run/zh/protocol)，以实现后的可重复检查验证。
+ArbiterOS tool-execution governance remains future work. The current architecture creates no empty governance interfaces and claims neither an execution sandbox nor AgentUse certification. Capability contracts and risk grading follow the [AgentUse protocol](https://www.zerone.run/zh/protocol), verified through repeatable checks after implementation.
 
-## 生成上游协议
+## Generation upstream protocols
 
-Provider.protocol 区分 openai 与 anthropic，旧配置默认 openai。OpenAI Chat 入口可在两种协议间选模；Messages 入口也支持两种协议，原生字段按候选协议检查。Bifrost 类型与转换保护留在 provider；请求级检查在候选容量过滤和 Jev 之前执行，只有 unsupported_request 可排除候选，内部故障直接返回。OpenAI Chat 客户端选择 Anthropic 时缺省输出限额和按目标估算预留均为 65536；Messages 客户端仍必填 max_tokens，OpenAI 保留 4096 估算且不注入限额。SDK 客户端缓存按协议、URL、凭证和配置隔离，不修改在途快照。
+Provider.protocol distinguishes openai and anthropic; old configurations default to openai. Both OpenAI Chat and Messages entries select across these protocols, checking native fields per candidate. Bifrost types and conversion guards remain in provider. Request checks precede capacity filtering and Jev; only unsupported_request excludes a candidate, while internal failures return directly. OpenAI Chat clients selecting Anthropic receive a default output limit and target reserve of 65536. Messages still requires max_tokens. OpenAI retains a 4096 estimate without injecting a limit. SDK caches isolate protocol, URL, credentials and configuration without mutating in-flight snapshots.
 
 ## Playground
 
-Dashboard 的受限文本生成采用独立 Cookie-only 端点，与公开 `/v1/chat/completions` 共用请求解码、规划、上游调用和首事件检查。Playground 在规划成功后立即发出 route，公开 Chat 仍等待首个有效事件提交流响应。入口分别保留认证、限额与响应编码；不通过回环 HTTP 调用自身，也不向浏览器暴露 inference 凭证。Playground 仍限制为文本流式输入，新能力需显式开放。两条路径复用 `internal/inference` 的快照、规划与记录以及现有 Executor。`internal/playground` 管理短时原子准入和单进程并发；`internal/state` 保存会话/实例滚动窗口与 UTC 日额度。准入先于模型调用，数据库失败不绕过额度，取消/失败不退款，执行退出才释放并发。
+Dashboard text generation uses a dedicated Cookie-only endpoint, sharing request decoding, planning, upstream calls and first-event checks with public `/v1/chat/completions`. Playground emits route immediately after planning; public Chat waits for its first valid event before committing a streaming response. Entry points retain separate authentication, limits and encoding. They do not call themselves over loopback HTTP or expose inference credentials to browsers. Playground remains limited to streaming text input; new capabilities require explicit enablement. Both paths share `internal/inference` snapshots, planning and records plus the existing Executor. `internal/playground` handles short atomic admission and single-process concurrency; `internal/state` stores session/instance rolling windows and UTC daily quotas. Admission precedes model calls. Database failures cannot bypass quotas; cancellations/failures are not refunded, and execution exit releases concurrency.
 
-这是 Settings 会话的明确权限扩展：管理员无需 inference 凭证即可通过 Playground 体验生成；普通 Settings Bearer、管理 call 和 /v1 推理认证不变。机器契约发布浏览器专用请求/流式协议，UI 没有隐藏的选模实现。首版输入仅文本，不执行工具。生成正文由 Streamdown 渲染，reasoning 仅驱动“正在思考”提示并按协议保留内存历史，CSP 保持不变。
+This explicitly extends Settings-session permissions: administrators can generate in Playground without inference credentials. Ordinary Settings Bearer, management call and /v1 authentication remain unchanged. Machine contracts publish the browser-specific request/stream protocol; the UI has no hidden selection implementation. Initial input is text-only and executes no tools. Streamdown renders generated text. Reasoning drives only the thinking indicator and protocol-required in-memory history; CSP is unchanged.
 
-## 上游错误诊断
+## Upstream error diagnostics
 
-决策和生成适配器在响应边界统一脱敏上游错误正文，routing.Diagnostic 携带可选 upstream_error 详情，公开 Chat/Messages 与 Playground 的 JSON/SSE 共用。详情保留结构化 JSON 或纯文本，限制大小并显式标记截断；UI 仅作转义文本展示。SDK 内部诊断、原始请求和未脱敏凭证不进入公开响应；错误详情不写入路由记录或浏览器持久存储。字段与限额以 contracts/README.md 为准。
+Decision and generation adapters sanitize upstream error bodies at response boundaries. routing.Diagnostic carries optional upstream_error details shared by public Chat/Messages and Playground JSON/SSE. Details retain structured JSON or plain text with bounded size and explicit truncation; the UI renders escaped text only. Internal SDK diagnostics, raw requests and unsanitized credentials never enter public responses. Details are not saved in routing records or browser persistent storage. contracts/README.md defines fields and limits.
 
-## 生成上游健康
+## Generation upstream health
 
-`internal/health` 维护独立于配置 enabled 的 unknown/healthy/isolated 状态。
-auto 在 Jev 前过滤已隔离目标，包含容量估算保底路径；显式指定仍向上游发送。
-每个目标按模型资源代际、供应商、协议、地址、上游模型与实际凭证代际隔离。
-provider 只解析一次凭证，规划携带不透明快照到调用，认证、客户端缓存和脱敏
-使用同一份凭证，迟到结果不能覆盖较新的观察。
+`internal/health` maintains unknown/healthy/isolated states independently of configuration enabled. Auto excludes isolated targets before Jev, including capacity fallback paths; explicit requests still reach the upstream. Identity is isolated by model-resource revision, provider, protocol, address, upstream model and actual credential revision. Provider resolves credentials once; planning carries an opaque snapshot through execution, authentication, client caching and redaction. Late results cannot overwrite newer observations.
 
-SQLite 保存健康状态和独立指纹密钥，更新不占配置版本；无托管主密钥也能跨
-重启保留隔离。正常流量提供被动观察；后台仅对启用且隔离的目标进行有界恢复
-探测，手动 models.test 共享探测并发边界。健康是调用可用性而非回答质量，
-Jev 决策本身不纳入隔离，不新增自动换模或重试。
+SQLite stores health and an independent fingerprint key. Health updates do not consume configuration versions, and isolation survives restart without a managed master key. Normal traffic supplies passive observations. Background recovery probes are bounded and target only enabled isolated models; manual models.test shares probe concurrency limits. Health measures availability rather than answer quality. Jev decisions are not isolated, and health introduces neither automatic model switching nor retries.

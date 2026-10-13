@@ -1,120 +1,120 @@
-# 管理能力契约
+# Management capability contracts
 
-机器契约在 `management.json` 和 `schemas/` 中，服务端校验与实例能力发现使用同一来源。`GET /admin/v1/schema`、`GET /admin/v1/schema/{capability}` 和 `POST /admin/v1/call/{capability}` 均要求 settings 凭证。UI 复用这些管理能力，提供状态、模型描述、提示词和路由记录的查看，以及描述/提示词编辑；Playground 使用本文末尾定义的独立 Cookie-only 流式能力。
+`management.json` and `schemas/` are the shared source for server validation and runtime discovery. `GET /admin/v1/schema`, `GET /admin/v1/schema/{capability}` and `POST /admin/v1/call/{capability}` require Settings credentials. The UI reuses these capabilities to inspect status, descriptions, prompts and routing records, and edit descriptions/prompts. Playground uses the separate Cookie-only streaming capability defined below.
 
-## 最小能力集合
+## Minimum capabilities
 
-| 业务目标 | 结果与副作用 |
+| Goal | Result and effects |
 | --- | --- |
-| 发现能力 | 返回版本、描述、schema、认证、风险及可用状态 |
-| 读取状态 | 返回实例与依赖状态，不泄露凭证 |
-| 列举/读取模型与供应商 | 分页、按权限过滤，返回模型描述和能力 |
-| 更新模型/供应商配置 | 校验并原子提交新配置版本 |
-| 读取/更新路由提示词 | 读取当前版本，写入用户修改；默认仅一份均衡模板 |
-| 检查路由选择 | 返回选择结果，不调用生成模型、不改变会话；可能调用决策 API |
-| 测试模型连接 | 对指定模型发送固定最小生成请求，可测试禁用模型；不接受任意对话，不自动启用，可能产生费用与外发 |
-| 查询路由记录 | 返回有界、分页的记录，包含最多 120 字的用户文本摘要，不包含完整对话或决策自由文本理由 |
+| Discover capabilities | Return versions, descriptions, schemas, authentication, risk and availability |
+| Read status | Return instance and dependency status without exposing credentials |
+| List/read models and providers | Paginate and filter by permissions; return descriptions and capabilities |
+| Update model/provider configuration | Validate and atomically publish a configuration version |
+| Read/update routing prompts | Read the current version and save edits; provide one default balanced template |
+| Inspect routing | Return selection without generation or session changes; may call the decision API |
+| Test connectivity | Send a fixed minimal generation request to a specified model, including disabled models; accept no arbitrary conversation, never enable automatically, and disclose cost/data transmission |
+| Query routing records | Return bounded paginated records, including a user-text summary of at most 120 characters, without full conversations or free-form decision reasons |
 
-首版管理能力使用可信管理员 `settings` 凭证；`inference` 仅提供模型列表与生成，能使用实例内全部启用模型。两者是操作分工，不是互不信任租户之间的隔离。
+Initial management capabilities use trusted administrator `settings` credentials. `inference` provides model lists and generation for all enabled models in the instance. These roles separate operations, not mutually untrusted tenants.
 
-配置按资源修改，保存前校验完整配置，成功即发布全局新版本，不自动发起网络检查。写入携带 `expected_version` 与幂等键，成功修改、版本递增和幂等结果在同一事务提交；成功结果保留 24 小时并可跨重启重放。命中成功记录先于版本检查；校验失败不占用幂等键，修正重试仍检查版本。版本冲突与幂等冲突分别使用 `config_conflict`、`idempotency_conflict`。
+Configuration changes replace resources and validate the complete configuration before publishing a global version. Saving does not initiate network checks. Writes carry `expected_version` and an idempotency key. Mutation, version increment and the idempotent result commit together. Successful receipts remain replayable for 24 hours across restarts. Replay lookup precedes version validation. Validation failures consume no key; corrected retries still check the version. Version and idempotency conflicts use `config_conflict` and `idempotency_conflict` respectively.
 
-CLI 的 `--help` 离线可用，`schema` 发现实例实际能力；复杂输入支持 JSON 文件或 stdin，结果默认 JSON、日志走 stderr，不弹交互确认，不隐藏重试。这些行为已由 CLI/HTTP 及端到端测试覆盖。
+CLI `--help` works offline; `schema` discovers actual instance capabilities. Complex input supports JSON files or stdin. Results default to JSON, logs use stderr, and the CLI neither prompts interactively nor hides retries. CLI/HTTP and end-to-end tests cover these behaviors.
 
-## 模型 ID 约束
+## Model ID constraints
 
-`auto` 是自动路由入口的保留对外 ID，生成模型无论是否启用均不得使用。模型创建及任何涉及对外 ID 的配置变更，必须由机器 schema 声明并由服务端校验拒绝，失败不改变配置或版本。此限制不针对上游模型名称。机器 schema、服务端事务校验及运行测试覆盖保留名；首版 ID 稳定，put 按 ID 创建或完整替换，不提供 rename。
+`auto` is reserved for automatic routing and cannot identify an enabled or disabled generation model. Machine schemas and server validation reject creation or public-ID changes using it before any configuration/version mutation. This restriction does not apply to upstream model names. Schema, transaction and runtime tests cover the reserved name. Initial IDs are stable: put creates or fully replaces by ID, with no rename operation.
 
-## 每项契约必须描述
+## Required contract metadata
 
-- 稳定 capability ID、description、输入输出 JSON Schema；参数约束、必填项和示例。
-- 所需认证与 scopes，副作用及费用/外传可能，L0–L3 风险与审批责任方。
-- 同步/异步结果语义、`operation_id`、稳定错误 code、`retryable` 与修复建议。
-- 列表分页与有界输出，写入幂等键、预期配置版本及冲突规则。
+- Stable capability ID, description, input/output JSON Schema, parameter constraints, required fields and examples.
+- Authentication/scopes, effects, possible cost/data transmission, L0–L3 risk and approval responsibility.
+- Synchronous/asynchronous result semantics, `operation_id`, stable error code, `retryable` and recovery guidance.
+- Pagination and bounded output, write idempotency keys, expected configuration versions and conflict rules.
 
-能力风险按实际影响分类，不能将所有“更新配置”机械地标成低风险。新增外传目的地、放宽敏感保护或改变权限，需要比修改普通模型描述更严格的执行边界。支持何种审批机制在实现该能力前确定并声明，不伪造审批句柄。
+Risk reflects actual impact; configuration writes are not universally low risk. New data destinations, relaxed sensitive-data protections or permission changes require stricter execution boundaries than description edits. Define and disclose approval mechanisms before implementation; never fabricate approval handles.
 
-只读 schema/status 不调用付费模型；选模检查不是无副作用的纯本地预览。任何异步能力只有在状态查询和终态都实现后才声明可用。
+Read-only schema/status operations do not call paid models. Route inspection is not a purely local, side-effect-free preview. Declare an asynchronous capability available only after status queries and terminal states are implemented.
 
-## 响应约定
+## Response conventions
 
-管理结果使用 `ok`、`data` 或 `error`、`warnings`、`meta`，其中 meta 包含 operation ID、timestamp 和 schema version；首版为同步管理能力，未暴露异步事件协议。CLI 将结构化错误映射到稳定非零退出码，并在契约中公布映射。
+Management results contain `ok`, `data` or `error`, `warnings` and `meta`. Meta includes operation ID, timestamp and schema version. Initial management operations are synchronous, with no asynchronous event protocol. The CLI maps structured errors to stable nonzero exit codes documented in the contract.
 
-这些约定只用于管理能力。`/v1/chat/completions` 保持其 JSON/SSE 格式，`/v1/messages` 使用 Anthropic JSON/SSE 格式，`/v1/models` 保持模型列表格式。公共模型列表不携带供应商凭证与管理元数据。
+These conventions apply only to management. `/v1/chat/completions` retains its JSON/SSE format, `/v1/messages` uses Anthropic JSON/SSE, and `/v1/models` retains its model-list format. Public model lists contain no provider credentials or management metadata.
 
-参考：[AgentUse 0.2.0 协议页面](https://www.zerone.run/zh/protocol)。本目录不表示已获得协议认证。
+Reference: [AgentUse 0.2.0 protocol](https://www.zerone.run/zh/protocol). This directory does not claim protocol certification.
 
-## 请求与输出 schema
+## Request and output schemas
 
-call body 为 `{"input":{...},"expected_version":1,"idempotency_key":"operation-key"}`；读操作只需 input。能力的 input_schema 验证 input，output_schema 描述成功响应的 data。写入返回 version/resource；models.test 的 data.ok 表示探测结果，顶层 ok 表示管理操作是否完成。错误和退出码在 schemas/results.json 中。
+The call body is `{"input":{...},"expected_version":1,"idempotency_key":"operation-key"}`; reads require only input. A capability's input_schema validates input, while output_schema describes successful response data. Writes return version/resource. For models.test, data.ok reports the probe outcome; top-level ok reports management-operation completion. schemas/results.json defines errors and exit codes.
 
-风险为声明给调用方的元数据，不是内置审批引擎。settings 是可信管理员，客户端按用户授权决定是否执行。schema/status 不产生上游调用，route.inspect/models.test 的外发与费用在能力描述中列出。
+Risk is metadata for callers, not a built-in approval engine. Settings users are trusted administrators; clients act on user authorization. schema/status makes no upstream calls. route.inspect/models.test descriptions disclose cost and external transmission.
 
-每项运行时能力包含 `call.method`、`call.path`、完整 `call.schema` 和 `call.protocol`。调用信封由 schemas/call.json 定义并用于写入边界校验；能力 input_schema 嵌入 call.schema.input。call.protocol 公布全局版本冲突恢复、成功幂等重放顺序/身份范围/24小时期限、失败不占键及通用 HTTP/CLI 错误映射。幂等期限与服务端过期计算来自同一 results.json 定义。仅查询单项 schema 也能获取完整调用与重试规则。
+Each runtime capability includes `call.method`, `call.path`, complete `call.schema` and `call.protocol`. schemas/call.json defines the write envelope and validates the boundary; capability input_schema is embedded in call.schema.input. call.protocol documents global-version recovery, successful replay ordering/identity scope/24-hour expiry, failure without key consumption, and shared HTTP/CLI error mappings. Idempotency expiry and server calculations share results.json. Querying one capability schema is sufficient to learn complete call and retry rules.
 
-提示词长度统一按 JSON Schema maxLength 的 Unicode 字符数计算（上限16384），保存整个配置时复用 prompt.put 校验。Jev 的序列化字节预算独立计算：可以保存的提示词仍可能使多候选决策超限，此时明确返回 budget_exceeded。
+Prompt lengths consistently use JSON Schema maxLength Unicode character counts, capped at 16384. Full-configuration saves reuse prompt.put validation. Jev serialized-byte budgets are independent: a valid saved prompt may still exceed the multi-candidate decision budget and return budget_exceeded.
 
-供应商详情 `providers.get` 返回只读 endpoint 和 `api_key_masked`：密钥超过 8 个字符时仅显示前 4 个字符及 `***`，短密钥全部打码，无法解析时返回 null。完整密钥不会进入管理响应，脱敏字段不参与配置写入。
+`providers.get` returns read-only endpoint and `api_key_masked`. Keys longer than eight characters expose only the first four plus `***`; shorter keys are fully masked, and unresolved keys return null. Full keys never enter management responses. Masked fields are not configuration inputs.
 
-## 托管供应商凭证
+## Managed credentials
 
-`providers.put` 的 `api_key` 与 `secret_ref` 二选一。`api_key` 只写，限非空 UTF-8、16384 字节以内且不含 CR/LF/NUL；schema 的 maxLength 同时限制字符数，共享运行时校验执行更严格的字节上限。写入需要服务端部署主密钥；密钥、供应商配置、全局版本与脱敏幂等结果同事务提交。响应仅含不可变的 `managed:<revision-id>` 引用，读取保持前缀脱敏；解析失败返回 null 和 `provider_credential_unavailable` 警告。引用必须属于同一供应商，不能用于决策后端。
+`providers.put` and `decision.put` accept exactly one of `api_key` and `secret_ref`. api_key is write-only, nonempty UTF-8, at most 16384 bytes and contains no CR/LF/NUL. Schema maxLength also limits characters; shared runtime validation enforces the stricter byte limit. Writes require a server master key. Credentials, resource configuration, global version and sanitized idempotent results commit together. Responses contain immutable `managed:<revision-id>` references. Provider details show masked prefixes; resolution failures return null and a `provider_credential_unavailable` warning. Provider references must belong to that provider; decision credentials bind to an independent decision-backend identity. References cannot cross these owners. Decision reads return only references, never plaintext.
 
-内联密钥写入使用主密钥派生的 HMAC 摘要识别幂等请求；SQL、回执和配置快照均不保存明文。缺失密钥或不可解密返回通用 `config_missing`，不降级为明文。更换供应商 Key 不改变已捕获请求的凭证版本。历史密文保留，删除不代表物理擦除或紧急撤销。CLI 拒绝非回环 HTTP 提交内联密钥且不跟随重定向；HTTPS 反向代理由部署方配置。
+Inline-key writes use a master-key-derived HMAC digest for idempotency. SQL, receipts and configuration snapshots store no plaintext. Missing or undecryptable keys return generic `config_missing`, without plaintext fallback. Provider rotation does not change credential revisions captured by in-flight requests. Historical ciphertext remains; deletion is neither physical erasure nor emergency revocation. The CLI rejects inline keys over non-loopback HTTP and does not follow redirects. Operators configure HTTPS reverse proxies.
 
-## Dashboard 会话认证
+## Dashboard session authentication
 
-`schemas/session.json` 是认证端点、有效期、容量、Cookie 和浏览器来源要求的机器契约，随 `call.protocol.session` 发布；认证端点不是配置能力，不消耗版本或幂等键。CLI 保持 Settings Bearer；普通管理请求仅在 Authorization 缺席时接受 Cookie，有效 Cookie 不会覆盖无效 Bearer。推理 API 使用 inference 凭证。Chat 和 models 保持 Bearer；`/v1/messages` 另接受 `x-api-key`，同传时两个凭证必须都有效且属于同一身份/角色，Cookie 不授予这些 /v1 端点的推理权限；独立 Playground 例外见下文。
+`schemas/session.json` defines authentication endpoints, lifetime, capacity, cookies and browser-origin requirements, published under `call.protocol.session`. Authentication endpoints are not configuration capabilities and consume neither versions nor idempotency keys. The CLI retains Settings Bearer authentication. Ordinary management accepts Cookie only when Authorization is absent; a valid cookie cannot override an invalid Bearer. Inference APIs require inference credentials. Chat and models retain Bearer; `/v1/messages` also accepts `x-api-key`, with both credentials required to be valid and share an identity/role if supplied together. Cookies grant no inference permission on these /v1 endpoints; Playground is the explicit exception below.
 
-登录用 Settings Bearer 与空 JSON 对象换取 HttpOnly Cookie，返回 expires_at/csrf_token；状态查询恢复 CSRF，注销只撤销请求会话。所有 Cookie POST 校验精确 Origin、JSON 与绑定该会话的 CSRF；GET 要求 X-Jev-Session: 1。响应禁止缓存。只有成功登录写 Cookie，状态、注销和错误均不清 Cookie，避免迟到响应删除另一标签页的新会话。遇到 CSRF 不匹配，显式恢复后重新决定操作，不自动重放。`session_limit` 为 HTTP 429 / CLI 6，retryable=false。
+Login exchanges Settings Bearer plus an empty JSON object for an HttpOnly cookie and expires_at/csrf_token. Status restores CSRF; logout revokes only its request session. Cookie POST requests validate exact Origin, JSON and session-bound CSRF; GET requires X-Jev-Session: 1. Responses disable caching. Only successful login writes cookies. Status, logout and errors never clear them, preventing late responses from deleting another tab's new session. CSRF mismatches require explicit recovery and a new operation decision, never automatic replay. `session_limit` maps to HTTP 429 / CLI 6 with retryable=false.
 
-## 模型列表排序
+## Model-list ordering
 
-`models.list` 默认按 ID 升序，传入 `sort: "enabled_first"` 时先列启用模型，再列禁用模型，组内按 ID 升序。排序在分页前执行；翻页时保持 sort 不变，并原样传入 next_cursor。也可传入从 0 开始的 `offset` 直接跳页，不可与非空 cursor 同时使用；响应包含模型总数 `total`。Dashboard 默认每页 20 条，可选择 10/50/100 条，采用启用优先排序。配置变更后刷新列表，重新从第一页读取。
+`models.list` defaults to ascending ID. `sort: "enabled_first"` places enabled models first, then disabled models, each group sorted by ID. Sorting precedes pagination. Keep sort unchanged and pass next_cursor unchanged across pages. A zero-based `offset` also permits direct navigation, but cannot be combined with a nonempty cursor. Responses include `total`. Dashboard defaults to 20 rows, offers 10/50/100 and uses enabled-first sorting. Configuration changes refresh the list from page one.
 
-`models.list` 支持 `query` 实时筛选：忽略大小写、去除首尾空白，按字面子串匹配模型 ID、描述、供应商 / 上游名称、位置和可见状态/能力标签。`language` 为 `en`（默认）或 `zh`，决定标签文案。筛选先于排序和分页，`total` 为匹配总数；搜索变化后从第一页读取。
+`models.list` supports live `query` filtering: case-insensitive, trimmed literal substring matching against model ID, description, provider/upstream names, location and visible status/capability labels. `language` is `en` by default or `zh`, selecting label wording. Filtering precedes sorting/pagination; total counts matches. Query changes restart at page one.
 
-## 推理控制与模型能力
+## Reasoning controls and model capabilities
 
-`chat.json` 与 `route.inspect` 校验 `chat_template_kwargs.enable_thinking` 和 `reasoning_effort` 的格式及允许值，拒绝未知模板字段。OpenAI 兼容上游的合法推理控制原样转发，不要求模型声明能力。原生 Anthropic 上游按归一化规则映射 thinking/effort，并在候选选择前拒绝无法保留的组合，见[兼容矩阵](../docs/compatibility.md#openai-clients-with-native-anthropic-upstream-50)。上游判断模型是否支持，失败不触发参数删除、降级或换模。
+`chat.json` and `route.inspect` validate formats and values of `chat_template_kwargs.enable_thinking` and `reasoning_effort`, rejecting unknown template fields. Valid controls pass unchanged to OpenAI-compatible upstreams without requiring declared capabilities. Native Anthropic maps thinking/effort through normalization rules and rejects combinations that cannot be preserved before candidate selection; see the [compatibility matrix](../docs/compatibility.md#openai-clients-with-native-anthropic-upstream-50). The upstream decides model support. Failures trigger neither parameter removal, downgrades nor model switching.
 
-既有可选 `capabilities.reasoning` 保留读写兼容，但仅作为说明性元数据，不参与请求校验、自动选模或显式选模。无配置、空数组或与请求不同的元数据均不会阻止推理参数透传。Jev 仍接收请求的推理控制并计入输入预算。Chat JSON/SSE 保留文本 reasoning_content，并允许 assistant 历史回传；签名/加密推理扩展不在本契约内。
+Optional `capabilities.reasoning` remains readable/writable for compatibility but is descriptive metadata only. It does not affect request validation or auto/explicit selection. Missing configuration, empty arrays or metadata differing from the request do not block control forwarding. Jev still receives reasoning requirements and counts them in its input budget. Chat JSON/SSE preserves textual reasoning_content and permits assistant-history replay; signed/encrypted reasoning extensions are outside this contract.
 
-## 路由记录分页与保留
+## Routing-record pagination and retention
 
-`records.list` 返回 `records`、`total` 和 `next_cursor`。默认每次 50 条，上限 200；支持从 0 开始的 `offset` 或既有游标，不允许非空 cursor 与非零 offset 混用。按写入顺序从新到旧，每次查询的总数和记录来自同一数据库快照；分页间新写入或清理可能改变页内容，不承诺跨请求快照。UI 默认每页 20 条，并提供 10/50/100 条和页码；清理后超出的页码回到最后有效页。
+`records.list` returns records, total and next_cursor. The default limit is 50, maximum 200. It supports zero-based offset or the existing cursor; nonempty cursor and nonzero offset cannot be mixed. Results follow reverse insertion order. Each query's count and rows share a database snapshot, but new writes/cleanup between pages may change contents; cross-request snapshots are not promised. UI defaults to 20 rows, offers 10/50/100 and page numbers, and returns to the last valid page after cleanup removes later pages.
 
-`decision_ms` 只计选模阶段（请求验证、候选过滤及需要时的决策调用），不含生成耗时；不再输出 `generation_ms`。`request_summary` 为最后一条 user 消息的文本片段，合并空白后最多 120 个 Unicode 字符，本地提取，不额外调用模型；无文本或旧记录时缺省。工具消息、图片地址和更早的消息不进入摘要。默认保留 7 天且最多 100000 条，数量超限按写入顺序丢弃最旧记录；天数和数量均可通过启动配置调整，详见 configuration.md。
+`decision_ms` covers selection only: validation, filtering and any decision call. It excludes generation time; generation_ms is no longer emitted. `request_summary` extracts text from the last user message locally, collapses whitespace and limits it to 120 Unicode characters without another model call. Missing text and older records omit it. Tool messages, image addresses and earlier messages are excluded. Default retention is seven days and 100000 records, evicting the oldest by insertion order. Startup configuration controls both; see configuration.md.
 
-`route.inspect` 的可选 `context_estimate` 返回 semantic_bytes_v1 分项和输入/输出预留总量；新增 path `context_estimate_fallback` 表示 auto 全部合格候选估算超限后的最大上下文保底，不代表精确容量足够。最大容量候选只有一个时直接选用；多个并列时仅将这些候选交给 Jev 选择一轮，path 仍为 context_estimate_fallback，保留完整 candidate_ids 和决策 usage。
+Optional `route.inspect.context_estimate` returns semantic_bytes_v1 components and total input/output reserve. The context_estimate_fallback path means all eligible auto candidates exceeded estimated capacity and the largest-context fallback was used; it does not establish exact capacity. One largest candidate executes directly; ties send only those candidates to Jev once. The path remains context_estimate_fallback, retaining complete candidate_ids and decision usage.
 
-显式模型的 route.inspect 不进行上下文估算，省略 context_estimate，context_exact=false 表示未计数；仍执行请求格式、启用及能力检查。
+Explicit-model route.inspect skips context estimation, omits context_estimate and sets context_exact=false to mean uncounted. It still validates request format, enabled state and capabilities.
 
-## Anthropic Messages 推理契约
+## Anthropic Messages inference contract
 
-`schemas/messages.json` 定义 POST /v1/messages 输入；provider 执行公共校验和目标级检查。原生 Anthropic 目标保留 thinking 预算、签名/redacted、工具结果 is_error、cache、sampling 和 metadata；OpenAI 候选拒绝无法保真的组合。max_tokens 必填16–10000000，enabled budget_tokens≥1024且小于max_tokens。原生 body 只改model，完整请求独立估算；决策投影不含敏感原生内容。版本固定2023-06-01，beta拒绝。详见 [原生 Messages 契约](../docs/compatibility.md#native-messages-clients-with-native-anthropic-upstream-51)。
+`schemas/messages.json` defines POST /v1/messages input; provider performs shared validation and target checks. Native Anthropic targets retain thinking budgets, signatures/redacted content, tool-result is_error, cache, sampling and metadata. OpenAI candidates reject combinations that cannot be preserved. max_tokens is required, from 16 to 10000000; enabled budget_tokens must be at least 1024 and below max_tokens. Native bodies change only model, while complete requests are estimated separately; decision projections omit sensitive native content. The version is fixed to 2023-06-01 and beta is rejected. See the [native Messages contract](../docs/compatibility.md#native-messages-clients-with-native-anthropic-upstream-51).
 
-该入口使用独立 Anthropic 错误信封，认证失败也包含顶层 type:error、error.type/message、request_id；request-id 与 X-Request-ID 相同。400/401/403/404/405/413/422/429/500/502/503/504/529 的映射和流内失败范围见 [兼容文档](../docs/compatibility.md#anthropic-messages-issue-23)。Messages 不套管理信封；上游错误的脱敏详情位于 error.diagnostic.upstream_error。
+This entry uses a separate Anthropic error envelope, including top-level type:error, error.type/message and request_id on authentication failures. request-id equals X-Request-ID. See [compatibility documentation](../docs/compatibility.md#anthropic-messages-issue-23) for 400/401/403/404/405/413/422/429/500/502/503/504/529 mappings and streaming failures. Messages does not use the management envelope; sanitized upstream details appear in error.diagnostic.upstream_error.
 
 Generation providers accept `protocol: "openai" | "anthropic"`. Omitted protocol defaults to `openai`, including replacement writes; preserve it when editing an Anthropic provider. Reads return the effective protocol. Existing stored rows need no migration or version increment. `base_url` is the API prefix (for example `https://api.anthropic.com/v1`).
 
-## Playground 浏览器生成
+## Playground browser generation
 
-`schemas/playground.json` 是专用端点、输入、流事件、认证与默认限额的单一来源，随 `call.protocol.playground` 发布，不是普通 `/call` 能力。`GET /admin/v1/playground` 返回启用状态、有效限额及当前会话/实例/UTC 日剩余额度快照；`POST /admin/v1/playground/completions` 接收 model、文本 user/assistant messages、stream:true，assistant 可携带协议需要的 reasoning_content。其余字段拒绝；输出限额由服务端注入。
+`schemas/playground.json` is the single source for dedicated endpoints, input, stream events, authentication and default limits. It is published under call.protocol.playground, not an ordinary /call capability. GET /admin/v1/playground returns enabled state, effective limits and remaining session/instance/UTC-day quotas. POST /admin/v1/playground/completions accepts model, text user/assistant messages and stream:true; assistant messages may include protocol-required reasoning_content. Other fields are rejected; the server injects output limits.
 
-两端点只接受 Dashboard Settings Cookie；GET 需要 X-Jev-Session，POST 需要 JSON、精确 Origin/Host 和绑定会话的 CSRF。任何 Authorization 替代均被拒绝，Cookie 不因此获得 /v1 推理权限。该能力是 Settings 角色的受限浏览器生成例外，Settings Bearer 及通用管理 call 不提供生成。
+Both endpoints accept only Dashboard Settings cookies. GET requires X-Jev-Session; POST requires JSON, exact Origin/Host and session-bound CSRF. Authorization cannot substitute for the cookie, and cookies gain no /v1 inference permissions. This is a restricted browser-generation exception for Settings; Settings Bearer and general management calls do not provide generation.
 
-准入前不调用上游，成功受理后费用/次数不退款，不自动重试或隐式换模。POST 直接复用一次实际推理规划，不能先 route.inspect 再生成。选模成功后立即发送 route，不等待上游首个事件；此后的生成失败均通过 SSE error 返回。SSE 按 route、delta、done/error 返回，delta 的 content/reasoning_content 分开；仅收到 finish_reason 后正常终止才发 done。EOF 无终态为中断；本端点不宣称 OpenAI SSE 兼容。HTTP 头前错误为 JSON error，流内错误为独立 error 事件；供应商错误体经过共享脱敏后可作为 upstream_error 详情返回。
+No upstream call occurs before admission. Accepted calls receive no cost/count refunds, automatic retries or implicit model switching. POST reuses one actual inference plan instead of calling route.inspect before generation. Successful selection emits route immediately without waiting for the first upstream event. Later generation failures are SSE errors. Event order is route, delta, done/error; delta separates content and reasoning_content. Only normal termination after finish_reason emits done. EOF without a terminal event is interruption. This endpoint does not claim OpenAI SSE compatibility. Pre-header errors are JSON; in-stream failures are separate error events. Shared sanitization may expose provider error bodies as upstream_error details.
 
-429 返回 playground_rate_limited、limit_scope、retry_after_seconds、可用时 reset_at，并带 Retry-After。实例 UTC 日额度持久化，并发为单进程；配置和全部默认值见 configuration.md。只有真实执行元数据进入路由展示，不产生 Jev 自由文本理由。
+429 responses include playground_rate_limited, limit_scope, retry_after_seconds, reset_at when available, and Retry-After. Instance UTC daily quotas persist; concurrency is single-process. configuration.md lists all defaults. Routing displays contain only actual execution metadata, never generated Jev explanations.
 
-Playground JSON/SSE 错误提供 stage（request/routing/generation）、Router request_id、可用的 upstream_status 和白名单 upstream_code。摘要仍使用稳定分类；新增可选 upstream_error 对象，包含 body（脱敏 JSON 或纯文本）、truncated（是否截断）及可用的 request_id（上游请求 ID，与 Router ID 分开）。公开 Chat 与 Messages 的 JSON/SSE 错误均通过 error.diagnostic.upstream_error 返回相同详情。供应商的未知错误码可保留在详情中，不冒充 Router 分类。
+Playground JSON/SSE errors provide stage (request/routing/generation), Router request_id and available upstream_status/allowlisted upstream_code. Summaries retain stable classifications. Optional upstream_error contains body (sanitized JSON or plain text), truncated and an available upstream request_id distinct from the Router ID. Public Chat/Messages JSON/SSE exposes the same details through error.diagnostic.upstream_error. Unknown provider codes may remain in details without becoming Router classifications.
 
-Jev 决策失败同样保留详情，Playground 标记为 routing，不发送选模成功事件或调用生成供应商。嵌套 JSON 字符串及带说明前后缀的 JSON 片段会解码并递归脱敏；损坏的结构从起点起省略，避免暴露无法确定边界的请求回显。认证字段、API key、密码、Cookie、结构化请求回显以及本次使用的供应商凭证会被屏蔽；URL 协议名匹配不区分大小写，用户信息、查询和片段被清除。详情不写入路由记录或浏览器存储，SDK 内部诊断和原始请求不作为错误正文来源。输入超过 64 KiB 时省略正文并标记 truncated，脱敏结果超过 16 KiB 时返回文本片段并标记 truncated；不能安全检查完整输入时不展示部分原文。HTML 仅作为文本显示。上游无可用正文或网络/解析错误时，保留通用错误。读取超时仍归类 timeout。
+Jev failures retain the same details, use routing stage in Playground, and emit neither a successful route nor generation calls. Nested JSON strings and JSON fragments with explanatory prefixes/suffixes are decoded and recursively sanitized. Malformed structures are omitted from their start to avoid exposing request echoes with unknown boundaries. Authentication fields, API keys, passwords, cookies, structured request echoes and the current provider credential are masked. URL scheme matching is case-insensitive; userinfo, queries and fragments are removed. Details enter neither routing records nor browser storage. Internal SDK diagnostics and raw requests are not sources of error bodies. Inputs above 64 KiB omit the body and mark truncated; sanitized output above 16 KiB returns a truncated text fragment. If the complete input cannot be inspected safely, no partial original text is shown. HTML is displayed only as text. Missing upstream bodies and network/parsing errors retain generic errors. Read timeouts remain timeout.
 
 ## Decision endpoint
 
-`decision.put` supports optional `path`, appended to `base_url`; omitted means `/v1/systemone`. DefAPI uses `/api/v1/decisions` and model `typesafe/jev-1.13`. This is a full replacement: omitting a previously configured path restores the default. Authentication remains Bearer via `secret_ref`; request and Choice response schemas remain native Jev. Paths allow slash-separated alphanumeric, hyphen and underscore segments only, without query or fragment.
+`decision.put` supports optional `path`, appended to `base_url`; omitted means `/v1/systemone`. For third-party Jev-compatible services, configure `base_url`, `path` and `model` according to their API documentation. This is a full replacement: omitting a previously configured path restores the default. Authentication remains Bearer via managed `api_key` or external `secret_ref`; request and Choice response schemas remain native Jev. Paths allow slash-separated alphanumeric, hyphen and underscore segments only, without query or fragment.
 
 ## Generation health
 

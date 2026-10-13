@@ -133,7 +133,7 @@ func Validate(id string, input json.RawMessage) error {
 	if e != nil {
 		return e
 	}
-	if id == "providers.put" {
+	if id == "providers.put" || id == "decision.put" {
 		if !utf8.Valid(input) {
 			return errors.New("invalid UTF-8 input")
 		}

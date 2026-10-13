@@ -32,7 +32,7 @@ func (s *Store) resolveManaged(ctx context.Context, q queryer, ref, owner string
 		return nil, credentialUnavailable()
 	}
 	if owner != "" && owner != providerID {
-		return nil, routing.Fail("invalid_request", "managed credential does not belong to provider")
+		return nil, routing.Fail("invalid_request", "managed credential does not belong to resource")
 	}
 	key, err := s.cipher.Open(providerID, revision, envelope)
 	if err != nil {
@@ -64,13 +64,15 @@ func (s *Store) verifyCredentials(ctx context.Context) error {
 	return nil
 }
 
-// prepareProvider stores only authenticated ciphertext and replaces the sensitive
+// prepareCredential stores only authenticated ciphertext and replaces the sensitive
 // write DTO with a public resource before mutation or receipt serialization.
-func (s *Store) prepareProvider(ctx context.Context, tx *sql.Tx, c management.Call) (management.Call, error) {
-	if c.CapabilityID != "providers.put" {
+func (s *Store) prepareCredential(ctx context.Context, tx *sql.Tx, c management.Call) (management.Call, error) {
+	if c.CapabilityID != "providers.put" && c.CapabilityID != "decision.put" {
 		return c, nil
 	}
 	var input struct {
+		Model     string                   `json:"model"`
+		Path      string                   `json:"path"`
 		Protocol  routing.ProviderProtocol `json:"protocol"`
 		ID        string                   `json:"id"`
 		BaseURL   string                   `json:"base_url"`
@@ -78,7 +80,11 @@ func (s *Store) prepareProvider(ctx context.Context, tx *sql.Tx, c management.Ca
 		APIKey    *string                  `json:"api_key"`
 	}
 	if json.Unmarshal(c.Input, &input) != nil {
-		return c, routing.Fail("invalid_request", "invalid provider input")
+		return c, routing.Fail("invalid_request", "invalid credential input")
+	}
+	owner := input.ID
+	if c.CapabilityID == "decision.put" {
+		owner = decisionCredentialOwner
 	}
 	if input.APIKey != nil {
 		if s.cipher == nil {
@@ -89,19 +95,32 @@ func (s *Store) prepareProvider(ctx context.Context, tx *sql.Tx, c management.Ca
 			return c, routing.Fail("internal_error", "credential encryption failed")
 		}
 		revision := hex.EncodeToString(random)
-		envelope, err := s.cipher.Seal(input.ID, revision, []byte(*input.APIKey))
+		envelope, err := s.cipher.Seal(owner, revision, []byte(*input.APIKey))
 		if err != nil {
 			return c, routing.Fail("internal_error", "credential encryption failed")
 		}
-		if _, err = tx.ExecContext(ctx, "INSERT INTO managed_credentials(revision_id,provider_id,envelope) VALUES(?,?,?)", revision, input.ID, envelope); err != nil {
+		if _, err = tx.ExecContext(ctx, "INSERT INTO managed_credentials(revision_id,provider_id,envelope) VALUES(?,?,?)", revision, owner, envelope); err != nil {
 			return c, storageError()
 		}
 		input.SecretRef = "managed:" + revision
 	}
+	if c.CapabilityID == "decision.put" {
+		c.Input, _ = json.Marshal(routing.DecisionConfig{BaseURL: input.BaseURL, Path: input.Path, Model: input.Model, SecretRef: input.SecretRef})
+		return c, nil
+	}
 	c.Input, _ = json.Marshal(routing.Provider{Protocol: input.Protocol, ID: input.ID, BaseURL: input.BaseURL, SecretRef: input.SecretRef})
 	return c, nil
 }
+
+// The leading colon cannot occur in a provider ID.
+const decisionCredentialOwner = ":decision"
+
 func (s *Store) validateManaged(ctx context.Context, q queryer, cfg routing.Snapshot) error {
+	if strings.HasPrefix(cfg.Decision.SecretRef, "managed:") {
+		if _, err := s.resolveManaged(ctx, q, cfg.Decision.SecretRef, decisionCredentialOwner); err != nil {
+			return err
+		}
+	}
 	for _, p := range cfg.Providers {
 		if strings.HasPrefix(p.SecretRef, "managed:") {
 			if _, err := s.resolveManaged(ctx, q, p.SecretRef, p.ID); err != nil {

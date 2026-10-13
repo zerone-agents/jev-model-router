@@ -16,18 +16,22 @@ Run `jev-router --help` and `jev-router --version` locally. Use `jev-router sche
 ## Configure and verify
 
 1. Read the relevant resource and version with `call <capability> --json <file|->`; simple reads also accept `--id`, `--cursor`, `--limit`.
-2. Prepare a complete replacement resource using its runtime schema. Use a server-resolved `secret_ref`, or submit write-only `api_key` when the instance schema supports managed credentials. Give models task-oriented descriptions and explicit capability declarations. External ID `auto` is reserved, including for disabled models.
+2. Prepare a complete replacement resource using its runtime schema. Prefer write-only `api_key` with encrypted managed storage for both LLM providers and the decision backend, following the credential-handling rules below. Use server-resolved `secret_ref` when external secret management is required. Give models task-oriented descriptions and explicit capability declarations. External ID `auto` is reserved, including for disabled models.
 3. Write with `--expected-version N --idempotency-key KEY`. On an unknown network outcome, retry the identical operation with the same key within 24 hours. A changed payload needs a new key; a version conflict needs a fresh read and a deliberate update.
 4. Create models disabled, run `models.test` with only their ID, then enable through `models.put` if authorized. The fixed test checks basic connectivity with `Reply OK.` and 16 output tokens; it does not prove all declared capabilities.
 5. Use `route.inspect` with a supported chat request to inspect selection. It generates no answer and changes no configuration; multiple candidates can invoke paid Jev. Read back saved resources and report the observed version and operation ID.
 
 Machine results go to stdout; diagnostics go to stderr. A top-level successful `models.test` operation can contain `data.ok=false`; inspect both levels. Distinguish saved configuration, successful connectivity and successful generation.
 
-## Managed provider credentials
+## Managed credentials
 
-Discover `providers.put` on the target server first: v0.1.1 does not support inline keys. The operator configures an encryption master key once; subsequent provider-key writes and replacements need no restart. Supply exactly one of `api_key` or `secret_ref` via a protected JSON file or stdin, over HTTPS (loopback HTTP permits local development and SSH tunnels). Keep key values out of command arguments and diagnostics. Responses contain an opaque managed reference; preserve it for metadata-only updates, and never copy it to a different provider or decision configuration.
+Prefer encrypted managed `api_key` configuration for both `providers.put` (LLM providers) and `decision.put`. Discover the target instance schema first. The operator provisions the encryption master key once; subsequent API key writes and rotations require no restart. External `env:` and `file:` references remain supported.
 
-Use the existing version/idempotency workflow for rotation too. A successful write returns no plaintext key. Read back masked status and explicitly run `models.test`; saving does not test upstream connectivity. Retained encrypted revisions keep in-flight requests on their captured credential. Deletion is not emergency revocation. Master-key changes require a separate migration, not this workflow; see [deployment and recovery](../../docs/configuration.md#managed-provider-credentials).
+**Default: ask the user to execute credential configuration themselves in their own terminal.** Provide commands with placeholders and hidden input or a protected local JSON file/stdin. Do not ask the user to paste a key into the conversation. Assist with submitting an actual API key only when the user explicitly confirms that their environment is secure and has no leakage risk, and explicitly provides that key to the Agent for configuration. Possession of an earlier key alone does not satisfy this condition. Keep keys out of shell arguments, history, logs, output, committed files and diagnostics.
+
+Supply exactly one of `api_key` or `secret_ref` over HTTPS (loopback HTTP permits local development and SSH tunnels). Use the version/idempotency workflow for writes and rotation. Responses return an opaque managed reference, never the plaintext key. Preserve the reference on metadata-only replacements. Provider references belong to their original provider; decision references belong to the decision backend. Never exchange references between those owners.
+
+Read back the saved configuration. For LLM providers, inspect masked status and explicitly run `models.test`. For the decision backend, use `route.inspect` with multiple eligible candidates, since a single candidate bypasses Jev. Saving alone does not test connectivity. Immutable encrypted revisions preserve credentials for in-flight requests. Deletion is not emergency revocation. Master-key rotation requires a separate migration; see [deployment and recovery](../../docs/configuration.md#managed-provider-credentials).
 
 ## Routing boundaries
 
@@ -85,9 +89,11 @@ Runtime discovery exposes `call.protocol.playground` for a browser-only, rate-li
 Playground makes real decision/generation calls and can incur charges. Discover the effective limits through its authenticated status endpoint. Do not bypass exhausted Playground quotas by switching credentials, sessions, or endpoints. Do not automatically retry a generated request after cancellation, a 429, or a partial stream.
 
 
-### Alternative Jev endpoints
+### Third-party Jev-compatible endpoints
 
-Discover `decision.put` before configuring an alternative endpoint. Its optional `path` defaults to `/v1/systemone`; DefAPI requires base_url `https://api.defapi.org`, path `/api/v1/decisions`, model `typesafe/jev-1.13`, and a server-side `env:` or `file:` secret reference for the DefAPI key. Preserve `path` on replacements unless intentionally resetting it to the official default. Use `route.inspect` with multiple eligible candidates to verify the decision backend; one candidate bypasses Jev. Never put a real key in documentation or committed examples.
+Discover `decision.put` before configuring a third-party Jev-compatible service. Set `base_url`, `path` and `model` from that service's API documentation; no third-party provider is special-cased. The optional `path` defaults to the official `/v1/systemone`. Supported services must accept Bearer authentication and native Jev `state` / `questions` requests, returning Choice answers. Verify compatibility rather than assuming any decision API is interchangeable.
+
+Prefer write-only `api_key`, following the credential-handling rules above; external `env:` or `file:` references remain supported. Preserve `path` on replacements unless intentionally resetting it to the official default. Use `route.inspect` with multiple eligible candidates to verify the decision backend; one candidate bypasses Jev. Never put a real key in documentation or committed examples.
 
 ### Inspect and recover generation health
 
