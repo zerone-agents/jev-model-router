@@ -10,17 +10,18 @@ import (
 )
 
 type Record struct {
-	RequestID      string    `json:"request_id"`
-	ConfigVersion  int64     `json:"config_version,omitempty"`
-	Mode           string    `json:"mode,omitempty"`
-	Path           string    `json:"path,omitempty"`
-	CandidateIDs   []string  `json:"candidate_ids,omitempty"`
-	ModelID        string    `json:"model_id,omitempty"`
-	DecisionMillis int64     `json:"decision_ms"`
-	RequestSummary string    `json:"request_summary,omitempty"`
-	Outcome        string    `json:"outcome"`
-	ErrorCode      string    `json:"error_code,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
+	Attempts       []AttemptSummary `json:"attempts,omitempty"`
+	RequestID      string           `json:"request_id"`
+	ConfigVersion  int64            `json:"config_version,omitempty"`
+	Mode           string           `json:"mode,omitempty"`
+	Path           string           `json:"path,omitempty"`
+	CandidateIDs   []string         `json:"candidate_ids,omitempty"`
+	ModelID        string           `json:"model_id,omitempty"`
+	DecisionMillis int64            `json:"decision_ms"`
+	RequestSummary string           `json:"request_summary,omitempty"`
+	Outcome        string           `json:"outcome"`
+	ErrorCode      string           `json:"error_code,omitempty"`
+	CreatedAt      time.Time        `json:"created_at"`
 }
 type RecordSink interface {
 	Append(context.Context, Record) error
