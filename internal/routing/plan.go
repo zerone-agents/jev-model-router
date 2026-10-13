@@ -27,7 +27,7 @@ type Plan struct {
 }
 
 func (p *Planner) Plan(ctx context.Context, s Snapshot, r Request) (Plan, error) {
-	return p.plan(ctx, s, r, nil, false, nil)
+	return p.plan(ctx, s, r, nil, false, nil, PlanOptions{})
 }
 
 // PlanPrepared checks the full request using a request-local adapter. Shared
@@ -47,10 +47,10 @@ func (p *Planner) PlanPreparedWithEstimate(ctx context.Context, s Snapshot, r Re
 	if check == nil {
 		return Plan{}, Fail("internal_error", "prepared request checker required")
 	}
-	return p.plan(ctx, s, r, check, true, estimate)
+	return p.plan(ctx, s, r, check, true, estimate, PlanOptions{})
 }
 
-func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Target) error, prepared bool, preparedEstimate PreparedEstimate) (result Plan, retErr error) {
+func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Target) error, prepared bool, preparedEstimate PreparedEstimate, options PlanOptions) (result Plan, retErr error) {
 	result = Plan{ConfigVersion: s.Version, CandidateIDs: []string{}}
 	if !prepared {
 		if e := ValidateRequest(r); e != nil {
@@ -104,6 +104,16 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 	exactOverflow := false
 	exact := map[string]bool{}
 	for _, m := range s.Models {
+		excluded := false
+		for _, id := range options.ExcludedModelIDs {
+			if id == m.ID {
+				excluded = true
+				break
+			}
+		}
+		if excluded && r.Model == "auto" {
+			continue
+		}
 		if r.Model != "auto" && m.ID != r.Model {
 			continue
 		}
@@ -235,7 +245,7 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 		for i, v := range targets {
 			models[i] = v.Model
 		}
-		d, e := p.Decider.Choose(ctx, s.Decision, DecisionInput{Prompt: s.Prompt, Candidates: models, Request: r})
+		d, e := p.Decider.Choose(ctx, s.Decision, DecisionInput{Retry: options.Retry, Prompt: s.Prompt, Candidates: models, Request: r})
 		if e != nil {
 			return result, e
 		}

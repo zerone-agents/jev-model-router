@@ -32,6 +32,7 @@ func normalize(p BudgetPolicy) BudgetPolicy {
 }
 
 type state struct {
+	Retry        *routing.RetryContext      `json:"retry_context,omitempty"`
 	Requirements map[string]json.RawMessage `json:"requirements,omitempty"`
 	Preference   string                     `json:"preference"`
 	Candidates   []routing.Model            `json:"candidates"`
@@ -113,7 +114,7 @@ func BuildState(in routing.DecisionInput, p BudgetPolicy) (json.RawMessage, erro
 		}
 		groups[len(groups)-1] = append(groups[len(groups)-1], m)
 	}
-	s := state{Preference: in.Prompt, Candidates: in.Candidates, Messages: fixed, Omitted: len(groups) > 1}
+	s := state{Retry: in.Retry, Preference: in.Prompt, Candidates: in.Candidates, Messages: fixed, Omitted: len(groups) > 1}
 	s.Requirements = map[string]json.RawMessage{}
 	for _, key := range []string{"response_format", "tool_choice", "parallel_tool_calls", "max_completion_tokens", "chat_template_kwargs", "reasoning_effort"} {
 		if v := in.Request.Options[key]; v != nil {
