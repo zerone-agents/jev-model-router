@@ -56,6 +56,18 @@ test("health sits beside enabled and a manual check restores an isolated model",
   await expect(row.locator(".badge.enabled + .health-isolated")).toBeVisible();
   await row.click();
   await expect(page.getByText("Isolated", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Refresh health" }),
+  ).toHaveCount(0);
+  const summary = page.locator(".health-summary");
+  const detailsBox = await summary.locator("dl").boundingBox();
+  const buttonBox = await summary
+    .getByRole("button", { name: "Check now", exact: true })
+    .boundingBox();
+  expect(detailsBox).not.toBeNull();
+  expect(buttonBox).not.toBeNull();
+  expect(buttonBox!.x).toBeGreaterThan(detailsBox!.x + detailsBox!.width);
+  expect(Math.abs(buttonBox!.y - detailsBox!.y)).toBeLessThan(2);
   await page.getByRole("button", { name: "Check now", exact: true }).click();
   await expect(page.getByText("Healthy", { exact: true })).toBeVisible();
   await expect(page.getByText("Connection check succeeded.")).toBeVisible();

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { type Lang, text } from "./i18n";
 import { type PageProps, ErrorBox } from "./components";
 import { APIError } from "./api";
@@ -46,6 +46,19 @@ export function HealthDetails(
   const [error, setError] = useState<unknown>();
   const [notice, setNotice] = useState("");
   const active = useRef<AbortController | null>(null);
+  const probing = useRef(false);
+  const refresh = useEffectEvent(() => void check(false));
+  useEffect(() => {
+    const visible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    const timer = window.setInterval(visible, 15000);
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, [id, client]);
   useEffect(
     () => () => {
       active.current?.abort();
@@ -54,12 +67,18 @@ export function HealthDetails(
     [id],
   );
   async function check(probe: boolean) {
-    if (active.current) return;
+    if (active.current) {
+      if (!probe || probing.current) return;
+      active.current.abort();
+    }
+    probing.current = probe;
     const c = new AbortController();
     active.current = c;
-    setBusy(true);
-    setError(undefined);
-    setNotice("");
+    if (probe) {
+      setBusy(true);
+      setError(undefined);
+      setNotice("");
+    }
     try {
       if (probe) {
         const r = await client.call<{
@@ -97,7 +116,7 @@ export function HealthDetails(
       if (!c.signal.aborted) onHealth(r.data.resource.health);
     } catch (e) {
       if (!c.signal.aborted) {
-        setError(e);
+        if (probe) setError(e);
         onError(e);
       }
     } finally {
@@ -115,20 +134,29 @@ export function HealthDetails(
       className="health-details"
       aria-label={text(lang, "Upstream health", "上游健康")}
     >
-      <dl>
-        <div>
-          <dt>{text(lang, "Last success", "最近成功")}</dt>
-          <dd>{date(h?.last_success_at)}</dd>
-        </div>
-        <div>
-          <dt>{text(lang, "Last failure", "最近失败")}</dt>
-          <dd>{date(h?.last_failure_at)}</dd>
-        </div>
-        <div>
-          <dt>{text(lang, "Next background check", "下次后台检测")}</dt>
-          <dd>{date(h?.next_probe_at)}</dd>
-        </div>
-      </dl>
+      <div className="health-summary">
+        <dl>
+          <div>
+            <dt>{text(lang, "Last success", "最近成功")}</dt>
+            <dd>{date(h?.last_success_at)}</dd>
+          </div>
+          <div>
+            <dt>{text(lang, "Last failure", "最近失败")}</dt>
+            <dd>{date(h?.last_failure_at)}</dd>
+          </div>
+          <div>
+            <dt>{text(lang, "Next background check", "下次后台检测")}</dt>
+            <dd>{date(h?.next_probe_at)}</dd>
+          </div>
+        </dl>
+        {props.canTest && (
+          <button disabled={busy} onClick={() => void check(true)}>
+            {busy
+              ? text(lang, "Checking…", "检测中…")
+              : text(lang, "Check now", "立即检测")}
+          </button>
+        )}
+      </div>
       {h?.reason && (
         <p className="health-reason">
           {text(
@@ -144,18 +172,6 @@ export function HealthDetails(
           {h.upstream_code ? ` · ${h.upstream_code}` : ""}
         </p>
       )}
-      <div className="health-actions">
-        {props.canTest && (
-          <button disabled={busy} onClick={() => void check(true)}>
-            {busy
-              ? text(lang, "Checking…", "检测中…")
-              : text(lang, "Check now", "立即检测")}
-          </button>
-        )}
-        <button disabled={busy} onClick={() => void check(false)}>
-          {text(lang, "Refresh health", "刷新健康状态")}
-        </button>
-      </div>
       {error !== undefined && <ErrorBox error={error} lang={lang} />}
       {notice && <p role="status">{notice}</p>}
     </section>

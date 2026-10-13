@@ -919,10 +919,16 @@ tr:has(details[open]) .request-summary-text {
   margin: 6px 0 0;
   font-size: 14px;
 }
-.health-actions {
+.health-summary {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 16px;
+}
+.health-summary > button {
+  flex-shrink: 0;
+  margin-left: auto;
 }
 .health-reason {
   overflow-wrap: anywhere;
