@@ -64,13 +64,16 @@ func (j *jev) Choose(ctx context.Context, c routing.DecisionConfig, in routing.D
 			return zero, decisionIOError(ctx, readErr)
 		}
 		var envelope struct {
-			Error map[string]any  `json:"error"`
+			Error json.RawMessage `json:"error"`
 			Usage json.RawMessage `json:"usage"`
 		}
 		reported := ""
 		if len(b) <= 65536 && json.Unmarshal(b, &envelope) == nil {
-			reported = routing.ReportedErrorCode(envelope.Error)
 			zero.Usage = parseUsage(envelope.Usage)
+			var upstreamError map[string]any
+			if json.Unmarshal(envelope.Error, &upstreamError) == nil {
+				reported = routing.ReportedErrorCode(upstreamError)
+			}
 		}
 		details := routing.SanitizeUpstream(b, string(key))
 		for _, header := range []string{"request-id", "x-request-id", "cf-ray"} {
@@ -87,14 +90,18 @@ func (j *jev) Choose(ctx context.Context, c routing.DecisionConfig, in routing.D
 		return zero, decisionIOError(ctx, e)
 	}
 	var out struct {
-		Answers map[string]struct{ Type, Choice string }
+		Answers json.RawMessage
 		Usage   json.RawMessage
 	}
 	if json.Unmarshal(b, &out) != nil {
 		return zero, routing.Fail("invalid_decision", "invalid decision response")
 	}
 	usage := parseUsage(out.Usage)
-	a := out.Answers["model"]
+	var answers map[string]struct{ Type, Choice string }
+	if json.Unmarshal(out.Answers, &answers) != nil {
+		return routing.Decision{Usage: usage}, routing.Fail("invalid_decision", "invalid decision response")
+	}
+	a := answers["model"]
 	if a.Type == "choice" {
 		for n, m := range in.Candidates {
 			if a.Choice == fmt.Sprintf("m%d", n) {
