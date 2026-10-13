@@ -1,14 +1,14 @@
-# 启动配置
+# Startup configuration
 
-运行时业务配置由管理 API 保存到 SQLite，环境变量和 JSON conf 只负责启动配置。优先级为 `JEV_ROUTER_<字段大写>` 环境变量 > JSON conf > 默认值。
+The management API persists runtime business configuration in SQLite. Environment variables and JSON configuration files control startup only. Precedence is `JEV_ROUTER_<UPPERCASE_FIELD>` environment variable > JSON configuration > default.
 
-| JSON 字段 | 默认值 |
+| JSON field | Default |
 | --- | --- |
 | listen | 127.0.0.1:8080 |
 | database | .data/router.sqlite |
 | settings_token_ref | env:JEV_ROUTER_SETTINGS_TOKEN |
 | inference_token_ref | env:JEV_ROUTER_INFERENCE_TOKEN |
-| encryption_key_ref | 空（仅使用外部凭证时无需设置） |
+| encryption_key_ref | Empty (not required when using external credentials only) |
 | decision_timeout | 10s |
 | decision_max_bytes | 32000 |
 | first_event_timeout | 60s |
@@ -19,47 +19,47 @@
 | retention_days | 7 |
 | record_max_count | 100000 |
 
-以上是通过本地边界测试的首版默认值，不代表真实模型延迟承诺。时长接受 Go duration 字符串；数值限额必须为正。
+These initial defaults passed local boundary tests; they are not latency promises for real models. Durations accept Go duration strings. Numeric limits must be positive.
 
-两种 Token 必须存在且不同。凭证引用支持 `env:NAME` 或 `file:/absolute/path`；文件末尾换行会去除。settings 是可信管理员，能改变生成请求目的地；不应交给不可信用户。这两种认证 Token 不存 SQL。供应商密钥可以使用外部引用，或按下方托管模式加密保存到 SQL；均不以明文回显于状态或错误。
+Both authentication tokens must exist and differ. Credential references support `env:NAME` or `file:/absolute/path`; trailing file newlines are removed. Settings identifies trusted administrators who can change generation destinations and must not be given to untrusted users. These two authentication tokens are not stored in SQL. Provider keys use external references or the encrypted managed mode below; status and errors never echo plaintext.
 
-普通禁用只影响新请求，紧急停止需要停止实例或撤销上游密钥。默认仅监听本机，暴露到网络时由部署方提供适当的 TLS 边界。
+Ordinary disabling affects new requests only. Emergency stopping requires stopping the instance or revoking upstream keys. The default listener is local; operators must provide an appropriate TLS boundary when exposing it to a network.
 
 
-CLI `--url` 优先于 `JEV_ROUTER_URL`，未设置时使用启动配置的 listen 地址。配置文件只供启动和 CLI 连接凭证引用；providers/models/decision/prompt 通过管理 API 保存。Jev base_url 为根地址（例如 `https://api.typesafe.ai`），生成 provider base_url 为兼容前缀（例如 `https://api.openai.com/v1`）。
+CLI `--url` overrides `JEV_ROUTER_URL`; otherwise the startup listen address is used. Configuration files provide startup settings and CLI credential references only. The management API stores providers/models/decision/prompt. Jev base_url is a root address (for example `https://api.typesafe.ai`); generation provider base_url is an API prefix (for example `https://api.openai.com/v1`).
 
-官方 Jev 配置使用 `https://api.typesafe.ai` 根地址和固定模型版本 `jev-1.13.0`。适配器追加 `/v1/systemone`，因此不要在决策 base_url 中再次填写 `/v1`。将以下 JSON 作为 `decision.put` 的输入，并由运行环境注入密钥：
+The official Jev configuration uses root address `https://api.typesafe.ai` and pinned model `jev-1.13.0`. The adapter appends `/v1/systemone`, so do not repeat `/v1` in decision base_url. The following `decision.put` example uses a key injected into the server environment:
 
 ```json
 {"base_url":"https://api.typesafe.ai","model":"jev-1.13.0","secret_ref":"env:TYPESAFE_API_KEY"}
 ```
 
-参见 [TypeSafe 官方 API 文档](https://docs.typesafe.ai/api)与[模型版本](https://docs.typesafe.ai/models)。生成供应商继续使用各自的 OpenAI 兼容前缀，与决策后端配置独立。
+See the [official TypeSafe API documentation](https://docs.typesafe.ai/api) and [model versions](https://docs.typesafe.ai/models). OpenAI-compatible generation providers retain their own API prefixes, independently of decision-backend configuration.
 
-JSON 示例：
+Example startup JSON:
 
 ```json
 {"listen":"127.0.0.1:8080","database":".data/router.sqlite","decision_timeout":"10s","first_event_timeout":"60s","idle_timeout":"60s"}
 ```
 
-first_event_timeout 覆盖流建立到首个有效 SSE 事件，非流式及固定连接测试则覆盖完整响应；之后以 idle_timeout 约束事件等待及下游写入，不设健康流总时长上限。生成客户端最多保留 16 组供应商地址/密钥快照，满载时明确拒绝额外目标，不偷换在途配置。
+first_event_timeout covers stream establishment through the first valid SSE event, or the complete response for non-streaming calls and fixed connectivity tests. Afterwards, idle_timeout bounds event waits and downstream writes without a total duration limit for a healthy stream. Generation clients retain at most 16 provider-address/key snapshots. When full, additional targets are rejected explicitly instead of replacing in-flight configuration.
 
-记录每次尝试最多等待 record_timeout。`retention_days`（1–3650，默认 7）限制保留天数；`record_max_count`（1–10000000，默认 100000）限制记录总数，对应环境变量 `JEV_ROUTER_RETENTION_DAYS` 和 `JEV_ROUTER_RECORD_MAX_COUNT`，重启生效。数量上限在每次写入事务内执行，超出后按写入顺序丢弃最旧记录；调低上限时启动阶段每批最多删除 1000 条。过期清理在启动及每小时分批执行，因此到期记录可能延迟至下一次清理移除。清理释放的 SQLite 页可供后续写入复用，不自动缩小数据库文件，也不承诺磁盘字节上限。后台清理或记录写入失败令 status.get 的 records_degraded 置 true 并给出 warning，状态持续到重启。记录不是事务审计，不承诺无损。数据库用于单实例进程，请勿多进程共享同一文件。
+Each recording attempt waits at most record_timeout. `retention_days` (1–3650, default 7) limits age; `record_max_count` (1–10000000, default 100000) limits count. Their environment variables are `JEV_ROUTER_RETENTION_DAYS` and `JEV_ROUTER_RECORD_MAX_COUNT`, effective after restart. Each write transaction enforces the count limit by evicting the oldest entries in insertion order. Startup cleanup after lowering the limit deletes at most 1000 entries per batch. Expiry cleanup runs in batches at startup and hourly, so expired entries may remain until the next pass. Freed SQLite pages are reusable, but cleanup neither shrinks the file automatically nor guarantees a disk-byte limit. Background cleanup or record-write failures set status.get records_degraded and a warning until restart. Records are not transactional audits and are not lossless. The database is for one instance process; do not share one file across processes.
 
 
-## 管理页面
+## Management dashboard
 
-`serve` 在同源 `/dashboard/` 提供管理 UI，无需 Node 运行时。`dashboard [--url URL] [--config file] [--no-open]` 使用 CLI 相同的地址优先级；从 listen 构造地址时将通配监听映射为本机 loopback。URL 必须是 HTTP(S) 根地址，不能含凭证、查询或片段。
+`serve` provides the same-origin `/dashboard/` UI without a Node runtime. `dashboard [--url URL] [--config file] [--no-open]` uses the same address precedence as the CLI; addresses derived from wildcard listeners map to local loopback. URLs must be HTTP(S) roots without credentials, queries or fragments.
 
-普通模式先执行最多 5 秒、无凭证且不跟随重定向的 HTML 可达检查，再通过系统浏览器打开；失败以 JSON 返回错误及有效地址供手动打开。`--no-open` 仅返回 JSON 地址，不执行探测，不启动服务。该命令不需要 settings 凭证。
+Normal mode first performs an unauthenticated HTML reachability check, with a maximum five-second timeout and no redirects, then opens the system browser. Failure returns a JSON error and effective URL for manual opening. `--no-open` only returns the URL as JSON, without probing or starting a service. This command requires no Settings credential.
 
-浏览器单独输入 Settings 凭证并交换为固定 7 天的 HttpOnly 会话，刷新或同凭证重启后可恢复；显式注销在服务端撤销当前请求会话。认证材料不写入 URL 或 Web Storage。UI 只访问同源 API，远程使用需部署 HTTPS 并配置公开 Origin，本机回环 HTTP 例外。UI 不管理账号、密钥或启动参数；完整生命周期与恢复规则见下方 Dashboard sessions。
+The browser separately accepts Settings credentials and exchanges them for a fixed seven-day HttpOnly session, recoverable after refresh or restart with the same credential. Explicit logout revokes its request session server-side. Authentication material enters neither URLs nor Web Storage. The UI accesses same-origin APIs only. Remote use requires HTTPS and a configured public Origin; local loopback HTTP is the exception. The UI does not manage accounts, keys or startup parameters. See Dashboard sessions below for lifecycle and recovery rules.
 
 ## Docker Compose
 
-推荐部署入口见 [Quickstart](../quickstart/README.zh-CN.md)。镜像内监听 `0.0.0.0:8080`，数据库为 `/data/router.sqlite`，Compose 默认仅发布宿主机 `127.0.0.1:8080`，并用命名卷保存数据。镜像以 UID/GID 10001 运行；使用自定义 bind mount 时需确保该用户可写入数据库目录。
+See [Quickstart](../quickstart/README.md) for the recommended deployment. The image listens on `0.0.0.0:8080` and stores SQLite at `/data/router.sqlite`. Compose publishes host `127.0.0.1:8080` by default and persists data in a named volume. The image runs as UID/GID 10001; custom bind mounts must allow that user to write the database directory.
 
-通过 `docker compose exec -T router jev-router …` 使用容器内 CLI，无需在宿主机安装 Go。JSON 文件通过 `--json -` 和 stdin 传入，宿主机路径不会自动出现在容器中。Compose 的 `.env` 仅为插值提供值；新增密钥引用对应的环境变量须显式注入服务。文件型引用需额外挂载文件并使用容器内绝对路径。
+Use the container CLI through `docker compose exec -T router jev-router …`, without installing Go on the host. Pass JSON through `--json -` and stdin; host paths do not automatically exist in the container. Compose `.env` supplies interpolation values only. Environment variables referenced by new credentials must also be explicitly injected into the service. File references require mounted files and container-absolute paths.
 
 ## Managed provider credentials
 
@@ -83,13 +83,16 @@ Logout revokes only its request session. Its now-useless cookie may remain until
 
 At most 128 active sessions are allowed. Expiry/logout frees capacity; replacement login can replace its own session at capacity. `session_limit` requires an existing logout or expiry, not automatic retries. Changing Settings or the origin policy on restart invalidates all sessions, including when an old Settings value is later restored. Inference-only rotation leaves sessions intact. When restoring a database backup, use a new Settings credential to invalidate backed-up sessions. Provider encryption keys are unrelated to session authentication.
 
-## Jev 决策输入预算
+<!-- Preserve existing inbound links after translating this heading. -->
+<a id="jev-&#20915;&#31574;&#36755;&#20837;&#39044;&#31639;"></a>
 
-`decision_max_bytes` 控制序列化后的 Jev 请求字节预算，环境变量为 `JEV_ROUTER_DECISION_MAX_BYTES`。例如 JSON 配置 `{"decision_max_bytes":64000}` 或环境变量 `JEV_ROUTER_DECISION_MAX_BYTES=64000`；环境变量优先，需重启。取值为 1 至 268435456 的整数；增大本地预算不改变上游限制。
+## Jev decision input budget
 
-2026-10-03 核对 [Jev 官方模型文档](https://docs.typesafe.ai/models)：请求总上下文 64k tokens，state 加最长问题 32k tokens。本项目只发一个选模问题，所以参照 32k；官方未给出字节预算推荐值。默认 32,000 **字节**是本地按每 token 一字节的保守启发式，不是官方 token 限制的精确换算，也不保证上游一定接受。需要更高利用率时，可按实际语言、模型和上游验证结果配置更大字节预算。
+`decision_max_bytes` limits the serialized Jev request byte budget; its environment variable is `JEV_ROUTER_DECISION_MAX_BYTES`. For example, use JSON `{"decision_max_bytes":64000}` or `JEV_ROUTER_DECISION_MAX_BYTES=64000`. Environment values take precedence and require restart. The accepted integer range is 1–268435456. Increasing the local budget does not change upstream limits.
 
-预算包含候选、偏好、系统指令、最新 query、问题与序列化开销。Jev 不接收工具定义；工具历史仅保留调用 ID、工具名称及结果关联记录，不包含参数、输出或执行消息的附带文本。较旧历史按完整组省略；system/developer 与最新 query 的各文本段独立保留首尾、从中间截断，插入 [...truncated...] 并标记 content_truncated。按实际序列化字节数调整共同文本上限，小段保持完整，中文与 emoji 不拆分。生成请求不裁剪；候选、要求及最小首尾结构仍超限时返回 budget_exceeded。auto 多候选和 route.inspect 使用相同预算，显式模型与单候选不调用 Jev。
+The [official Jev model documentation](https://docs.typesafe.ai/models), checked on 2026-10-03, specifies 64k tokens for total request context and 32k for state plus the longest question. This project sends one model-selection question and therefore uses 32k as the reference. The official documentation provides no recommended byte budget. The default 32,000 **bytes** is a conservative local one-byte-per-token heuristic, not an exact conversion of the token limit or a guarantee of upstream acceptance. Configure a larger byte budget for better utilization only based on actual language, model and upstream validation.
+
+The budget includes candidates, preferences, system instructions, latest query, question and serialization overhead. Jev receives no tool definitions. Tool history retains call IDs, names and result associations, excluding arguments, outputs and incidental execution-message text. Older history is omitted in complete groups. Each system/developer and latest-query text segment retains its beginning and end, truncates the middle with [...truncated...], and sets content_truncated. A common text limit is adjusted using actual serialized bytes; short segments remain complete, without splitting Chinese characters or emoji. Generation requests are never truncated. If candidates, requirements and minimum beginning/end structure still exceed the budget, return budget_exceeded. Multi-candidate auto and route.inspect use the same budget; explicit and sole-candidate paths do not call Jev.
 
 Generation providers accept `protocol: "openai" | "anthropic"`. Omitted protocol defaults to `openai`, including replacement writes; preserve it when editing an Anthropic provider. Reads return the effective protocol. Existing stored rows need no migration or version increment. `base_url` is the API prefix (for example `https://api.anthropic.com/v1`).
 
@@ -118,11 +121,11 @@ The provider API prefix includes `/v1`; the resulting endpoint is `https://open.
 
 ## Playground
 
-Dashboard 登录后可使用独立的 Cookie-only Playground 文本生成入口，无需另填 inference 凭证。它复用真实路由和生成服务，会向供应商发送内容并可能产生费用。现有 CLI / SDK 推理端点的权限及限制不变。
+After Dashboard login, the dedicated Cookie-only Playground supports text generation without a separate inference credential. It uses real routing/generation services, transmits content to providers and may incur charges. Existing CLI/SDK inference permissions and limits remain unchanged.
 
-启动配置（环境变量为 `JEV_ROUTER_` 加字段大写）如下：
+Startup configuration uses the following fields, with environment variables formed by `JEV_ROUTER_` plus the uppercase field name:
 
-| 字段 | 默认值 | 范围 |
+| Field | Default | Range |
 | --- | --- | --- |
 | `playground_enabled` | `true` | `true` / `false` |
 | `playground_session_rpm` | 6 | 1–1000000 |
@@ -130,17 +133,17 @@ Dashboard 登录后可使用独立的 Cookie-only Playground 文本生成入口�
 | `playground_session_concurrency` | 1 | 1–128 |
 | `playground_instance_concurrency` | 3 | 1–128 |
 | `playground_daily_requests` | 200 | 1–1000000 |
-| `playground_input_bytes` | 32768 | 1–16777216，不能超过 body 上限 |
+| `playground_input_bytes` | 32768 | 1–16777216, no greater than the body limit |
 | `playground_body_bytes` | 262144 | 1–16777216 |
 | `playground_max_messages` | 100 | 1–1000 |
 | `playground_output_tokens` | 4096 | 16–10000000 |
 | `playground_timeout` | `120s` | `1s`–`10m` |
 
-RPM 是任意滚动 60 秒内的受理次数；每日按 UTC 零点重置。会话窗口、实例窗口与日额度原子提交并保存到 SQLite，刷新页面、重新登录或重启不会重置实例额度。已受理的失败、取消和超时仍计数；认证及输入校验失败不计数。数据库准入失败时禁止调用上游。
+RPM counts admitted requests in any rolling 60-second window; daily quotas reset at midnight UTC. Session/instance windows and daily quotas commit atomically in SQLite. Refreshing, logging in again or restarting does not reset instance quotas. Admitted failures, cancellations and timeouts still count; authentication and input-validation failures do not. Database admission failure prevents upstream calls.
 
-并发限制作用于单实例单服务进程，多副本没有共享并发协调保证。取消会传播到上游，但不能撤销已产生的费用。限额约束调用量及输出，不是精确费用上限。输入字节包括完整正文和协议携带的 reasoning 历史；超限明确拒绝，不自动截断。
+Concurrency limits apply to a single instance process; replicas have no shared concurrency-coordination guarantee. Cancellation propagates upstream but cannot reverse incurred costs. Limits bound call volume and output, not exact spending. Input bytes include complete text and protocol-carried reasoning history. Over-limit input is rejected, never automatically truncated.
 
-页面仅在内存保存对话，刷新或离开后丢失；失败、停止或截断的回合不会自动加入下一轮历史。思考正文不展示、不落浏览器持久存储；按协议需要携带的 reasoning 历史仍保留在当前页面内存。正文通过 Streamdown 渲染，原始 HTML 不执行、图片不加载，既有 CSP 不放宽。
+The page keeps conversations in memory only; refresh or navigation loses them. Failed, stopped or truncated turns are not automatically added to subsequent history. Thinking text is not displayed or stored persistently in the browser; protocol-required reasoning history remains in page memory. Streamdown renders content without executing raw HTML or loading images; existing CSP remains unchanged.
 
 
 ### Third-party Jev-compatible endpoints

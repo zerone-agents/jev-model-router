@@ -16,6 +16,16 @@ read `docs/architecture.md` and `contracts/README.md`.
 When changing a CLI workflow, keep `skills/jev-router/SKILL.md` aligned with
 the implemented capability contract. Mark planned capabilities explicitly.
 
+## Documentation language checks
+
+Write Markdown documentation in English unless the filename has an explicit
+Chinese language suffix such as `.zh.md`, `.zh-CN.md`, or `-ZH.md`
+(case-insensitive). A Chinese directory name or heading is not an exception.
+Before completing documentation changes and during review, check the full
+contents of every added or modified Markdown file against this rule. Report
+violations under Standards; move Chinese documentation to an explicitly
+language-suffixed file and keep the default document in English.
+
 ## GitHub CLI execution
 
 Run `gh` commands outside the sandbox with the required escalation when
