@@ -105,3 +105,56 @@ func TestAgentAutoFallback(t *testing.T) {
 
 	}
 }
+
+// Exercise the actual provider error decoder, not a synthesized routing error:
+// an explicit request error must win over a misleading upstream 5xx status.
+func TestAutoDoesNotRetryUpstreamRequestTooLarge(t *testing.T) {
+	for _, native := range []bool{false, true} {
+		for _, messages := range []bool{false, true} {
+			for _, stream := range []bool{false, true} {
+				t.Run(fmt.Sprintf("native=%v/messages=%v/stream=%v", native, messages, stream), func(t *testing.T) {
+					i := newInstance(t)
+					var calls atomic.Int32
+					up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						calls.Add(1)
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(http.StatusInternalServerError)
+						fmt.Fprint(w, `{"error":{"type":"request_too_large","code":"request_too_large","message":"request exceeds upstream limit"}}`)
+					}))
+					defer up.Close()
+					i.put("providers.put", map[string]any{"id": "p", "base_url": up.URL + "/v1", "secret_ref": "env:TEST_PROVIDER_KEY", "protocol": map[bool]string{false: "openai", true: "anthropic"}[native]})
+					for _, id := range []string{"a", "b"} {
+						i.put("models.put", model(id, true))
+					}
+					i.put("decision.put", map[string]any{"base_url": i.upstream.URL, "model": "jev", "secret_ref": "env:TEST_PROVIDER_KEY"})
+					path := "/v1/chat/completions"
+					extra := ""
+					if messages {
+						path = "/v1/messages"
+						extra = `,"max_tokens":64`
+					}
+					req, _ := http.NewRequest("POST", i.server.URL+path, strings.NewReader(fmt.Sprintf(`{"model":"auto","messages":[{"role":"user","content":"hello"}],"stream":%t%s}`, stream, extra)))
+					req.Header.Set("Authorization", "Bearer inference-secret")
+					req.Header.Set("Content-Type", "application/json")
+					req.Header.Set("anthropic-version", "2023-06-01")
+					res, err := i.server.Client().Do(req)
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer res.Body.Close()
+					body, _ := io.ReadAll(res.Body)
+					if calls.Load() != 1 || i.calls.Load() != 1 {
+						t.Fatalf("request error retried: generation=%d decision=%d body=%s", calls.Load(), i.calls.Load(), body)
+					}
+					if res.StatusCode != 500 || !strings.Contains(string(body), `"upstream_code":"request_too_large"`) {
+						t.Fatalf("upstream error not preserved: status=%d body=%s", res.StatusCode, body)
+					}
+					records := i.call("records.list", map[string]any{}, 0, "")
+					if !records.OK || !strings.Contains(string(records.Data), `"index":1`) || strings.Contains(string(records.Data), `"index":2`) {
+						t.Fatalf("unexpected attempt records: %s", records.Data)
+					}
+				})
+			}
+		}
+	}
+}

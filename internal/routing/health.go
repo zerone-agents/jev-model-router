@@ -30,7 +30,7 @@ func HealthOutcome(err error) health.Outcome {
 		case "rate_limit_error", "rate_limit_exceeded":
 			o.Kind = health.Limited
 			return o
-		case "content_filter", "content_policy_violation", "context_length_exceeded", "invalid_request_error", "unsupported_parameter":
+		case "content_filter", "content_policy_violation", "context_length_exceeded", "invalid_request_error", "unsupported_parameter", "request_too_large":
 			return health.Outcome{}
 		}
 		if u.Status == 429 {

@@ -113,3 +113,14 @@ func TestPreparedHealthEstimateReleasesCredentials(t *testing.T) {
 		}
 	}
 }
+
+func TestRequestErrorCodePrecedesServerStatus(t *testing.T) {
+	for _, code := range []string{"content_filter", "content_policy_violation", "context_length_exceeded", "invalid_request_error", "unsupported_parameter", "request_too_large"} {
+		t.Run(code, func(t *testing.T) {
+			got := HealthOutcome(&UpstreamError{Status: 500, ReportedCode: code})
+			if got.Kind != "" || got.Success {
+				t.Fatalf("request error must remain health-neutral and ineligible for retry: %+v", got)
+			}
+		})
+	}
+}
