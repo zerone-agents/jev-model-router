@@ -10,6 +10,7 @@ import (
 )
 
 type Record struct {
+	DecisionUsage  *DecisionUsage   `json:"decision_usage,omitempty"`
 	Attempts       []AttemptSummary `json:"attempts,omitempty"`
 	RequestID      string           `json:"request_id"`
 	ConfigVersion  int64            `json:"config_version,omitempty"`

@@ -33,7 +33,7 @@ type Request struct {
 }
 
 func (s *Service) Begin(ctx context.Context, id string) *Request {
-	return &Request{service: s, ctx: ctx, parent: ctx, record: routing.Record{RequestID: id, CreatedAt: time.Now().UTC()}}
+	return &Request{service: s, ctx: ctx, parent: ctx, record: routing.Record{DecisionUsage: &routing.DecisionUsage{Complete: true}, RequestID: id, CreatedAt: time.Now().UTC()}}
 }
 func (r *Request) Plan(req routing.Request, check func(routing.Target) error) (routing.Plan, error) {
 	return r.PlanWithSummary(req, check, routing.RequestSummary(req))
@@ -64,6 +64,11 @@ func (r *Request) PlanPrepared(req routing.Request, check func(routing.Target) e
 	start := time.Now()
 	plan, err := r.service.Planner.PlanWithOptions(ctx, snapshot, req, check, estimate, r.options)
 	r.record.DecisionMillis += time.Since(start).Milliseconds()
+	u := plan.RecordedDecisionUsage()
+	r.record.DecisionUsage.InputTokens += u.InputTokens
+	r.record.DecisionUsage.OutputTokens += u.OutputTokens
+	r.record.DecisionUsage.Invocations += u.Invocations
+	r.record.DecisionUsage.Complete = r.record.DecisionUsage.Complete && u.Complete
 	r.record.Path = plan.Path
 	r.record.CandidateIDs = plan.CandidateIDs
 	if plan.ModelID != "" {

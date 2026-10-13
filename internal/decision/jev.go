@@ -64,11 +64,13 @@ func (j *jev) Choose(ctx context.Context, c routing.DecisionConfig, in routing.D
 			return zero, decisionIOError(ctx, readErr)
 		}
 		var envelope struct {
-			Error map[string]any `json:"error"`
+			Error map[string]any  `json:"error"`
+			Usage json.RawMessage `json:"usage"`
 		}
 		reported := ""
 		if len(b) <= 65536 && json.Unmarshal(b, &envelope) == nil {
 			reported = routing.ReportedErrorCode(envelope.Error)
+			zero.Usage = parseUsage(envelope.Usage)
 		}
 		details := routing.SanitizeUpstream(b, string(key))
 		for _, header := range []string{"request-id", "x-request-id", "cf-ray"} {
@@ -86,20 +88,21 @@ func (j *jev) Choose(ctx context.Context, c routing.DecisionConfig, in routing.D
 	}
 	var out struct {
 		Answers map[string]struct{ Type, Choice string }
-		Usage   *routing.Usage
+		Usage   json.RawMessage
 	}
 	if json.Unmarshal(b, &out) != nil {
 		return zero, routing.Fail("invalid_decision", "invalid decision response")
 	}
+	usage := parseUsage(out.Usage)
 	a := out.Answers["model"]
 	if a.Type == "choice" {
 		for n, m := range in.Candidates {
 			if a.Choice == fmt.Sprintf("m%d", n) {
-				return routing.Decision{ModelID: m.ID, Usage: out.Usage}, nil
+				return routing.Decision{ModelID: m.ID, Usage: usage}, nil
 			}
 		}
 	}
-	return zero, routing.Fail("invalid_decision", "decision selected an unknown candidate")
+	return routing.Decision{Usage: usage}, routing.Fail("invalid_decision", "decision selected an unknown candidate")
 }
 
 func decisionIOError(ctx context.Context, err error) error {
@@ -110,4 +113,20 @@ func decisionIOError(ctx context.Context, err error) error {
 		return routing.Fail("cancelled", "decision cancelled")
 	}
 	return routing.Fail("upstream_error", "decision transport failed")
+}
+
+// A partial or malformed usage object must not become a known zero count.
+func parseUsage(raw json.RawMessage) *routing.Usage {
+	var counts struct {
+		Input  *int64 `json:"input_tokens"`
+		Output *int64 `json:"output_tokens"`
+	}
+	if json.Unmarshal(raw, &counts) != nil || counts.Input == nil || counts.Output == nil || *counts.Input < 0 || *counts.Output < 0 {
+		return nil
+	}
+	var u routing.Usage
+	if json.Unmarshal(raw, &u) != nil {
+		return nil
+	}
+	return &u
 }

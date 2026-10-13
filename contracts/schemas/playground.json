@@ -258,6 +258,33 @@
                       ]
                     }
                   }
+                },
+                "decision_usage": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "input_tokens": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "output_tokens": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "invocations": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "complete": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "input_tokens",
+                    "output_tokens",
+                    "invocations",
+                    "complete"
+                  ]
                 }
               },
               "required": [
@@ -426,6 +453,33 @@
                       ]
                     }
                   }
+                },
+                "decision_usage": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "input_tokens": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "output_tokens": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "invocations": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "complete": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "input_tokens",
+                    "output_tokens",
+                    "invocations",
+                    "complete"
+                  ]
                 }
               },
               "required": [
@@ -583,6 +637,33 @@
                       ]
                     }
                   }
+                },
+                "decision_usage": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "input_tokens": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "output_tokens": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "invocations": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "complete": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "input_tokens",
+                    "output_tokens",
+                    "invocations",
+                    "complete"
+                  ]
                 }
               },
               "required": [
@@ -696,6 +777,33 @@
                       ]
                     }
                   }
+                },
+                "decision_usage": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "input_tokens": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "output_tokens": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "invocations": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "complete": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "input_tokens",
+                    "output_tokens",
+                    "invocations",
+                    "complete"
+                  ]
                 }
               },
               "required": [
@@ -873,6 +981,33 @@
                   ]
                 }
               }
+            },
+            "decision_usage": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "input_tokens": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "output_tokens": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "invocations": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "complete": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "input_tokens",
+                "output_tokens",
+                "invocations",
+                "complete"
+              ]
             }
           },
           "required": [
