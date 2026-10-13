@@ -20,6 +20,7 @@ type Service struct {
 	DecisionTimeout time.Duration
 }
 type Request struct {
+	OnRetry     func() error
 	snapshot    *routing.Snapshot
 	options     routing.PlanOptions
 	current     int

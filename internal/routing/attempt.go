@@ -1,5 +1,7 @@
 package routing
 
+import "encoding/json"
+
 // AttemptSummary is safe to persist; detailed upstream bodies are response-only.
 type AttemptSummary struct {
 	Index          int    `json:"index"`
@@ -22,3 +24,32 @@ type AttemptError struct {
 
 func (e *AttemptError) Error() string { return e.Cause.Error() }
 func (e *AttemptError) Unwrap() error { return e.Cause }
+
+func BoundAttempts(in []AttemptDiagnostic) []AttemptDiagnostic {
+	if len(in) > 2 {
+		in = in[:2]
+	}
+	out := append([]AttemptDiagnostic(nil), in...)
+	for i := range out {
+		if out[i].Diagnostic != nil {
+			d := *out[i].Diagnostic
+			d.Attempts = nil
+			if d.UpstreamError != nil {
+				u := *d.UpstreamError
+				d.UpstreamError = &u
+			}
+			out[i].Diagnostic = &d
+		}
+	}
+	for i := range out {
+		b, _ := json.Marshal(out)
+		if len(b) <= 30<<10 {
+			break
+		}
+		if d := out[i].Diagnostic; d != nil && d.UpstreamError != nil {
+			d.UpstreamError.Body = nil
+			d.UpstreamError.Truncated = true
+		}
+	}
+	return out
+}

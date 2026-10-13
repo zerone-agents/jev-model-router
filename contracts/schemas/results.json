@@ -83,6 +83,14 @@
     "health_probe_in_progress": {
       "http_status": 409,
       "exit_code": 5
+    },
+    "fallback_exhausted": {
+      "http_status": 503,
+      "exit_code": 6
+    },
+    "resource_exhausted": {
+      "http_status": 503,
+      "exit_code": 6
     }
   },
   "retention": {

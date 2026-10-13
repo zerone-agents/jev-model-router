@@ -19,6 +19,7 @@ type ConfigStore interface {
 }
 type Handler func(context.Context, string, Call) (Result, error)
 type Service struct {
+	Fallback        map[string]any
 	Health          *routing.HealthGate
 	store           ConfigStore
 	validate        func(routing.Snapshot) error
@@ -118,7 +119,7 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 			}
 		}
 		degraded := s.RecordsDegraded != nil && s.RecordsDegraded()
-		result := Success(map[string]any{"version": cfg.Version, "ready": n > 0 && (n == 1 || cfg.Decision.Model != ""), "enabled_models": n, "records_degraded": degraded}, time.Now())
+		result := Success(map[string]any{"version": cfg.Version, "ready": n > 0 && (n == 1 || cfg.Decision.Model != ""), "enabled_models": n, "records_degraded": degraded, "auto_fallback": s.Fallback}, time.Now())
 		if s.Health != nil && s.Health.Service.Warning() {
 			result.Warnings = append(result.Warnings, "health_degraded")
 		}

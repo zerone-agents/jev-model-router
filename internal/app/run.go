@@ -132,6 +132,7 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 		return nil
 	})
 	service.ResolveSecret = resolve
+	service.Fallback = cfg.Fallback.Status()
 	service.Health = gate
 	budget := decision.DefaultBudget()
 	budget.MaxBytes = cfg.DecisionMaxBytes
@@ -157,14 +158,14 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 		return management.Success(page, time.Now()), nil
 	})
 	auth := func(h string) (management.Principal, error) { return Authenticate(h, creds) }
-	api := httptransport.NewHandler(service, store, planner, &routing.Executor{Generator: gen}, auth, httptransport.Limits{Recorder: recorder, DecisionTimeout: cfg.DecisionTimeout, FirstEventTimeout: cfg.FirstEventTimeout, IdleTimeout: cfg.IdleTimeout, MaxBodyBytes: cfg.MaxBodyBytes, StreamBuffer: cfg.StreamBuffer})
+	api := httptransport.NewHandler(service, store, planner, &routing.Executor{Generator: gen}, auth, httptransport.Limits{Fallback: cfg.Fallback, Recorder: recorder, DecisionTimeout: cfg.DecisionTimeout, FirstEventTimeout: cfg.FirstEventTimeout, IdleTimeout: cfg.IdleTimeout, MaxBodyBytes: cfg.MaxBodyBytes, StreamBuffer: cfg.StreamBuffer})
 	sessionHTTP, e := httptransport.NewSessionHTTP(sessions, origin, auth)
 	if e != nil {
 		close()
 		return nil, nil, e
 	}
 	admin := httptransport.NewSessionManagementHandler(service, sessionHTTP)
-	pg := httptransport.NewPlaygroundHandler(sessionHTTP, playground.NewService(store, cfg.Playground, time.Now), &inference.Service{Store: store, Planner: planner, Recorder: recorder, DecisionTimeout: cfg.DecisionTimeout}, &routing.Executor{Generator: gen}, cfg.Playground)
+	pg := httptransport.NewPlaygroundHandler(sessionHTTP, playground.NewService(store, cfg.Playground, time.Now), &inference.Service{Store: store, Planner: planner, Recorder: recorder, DecisionTimeout: cfg.DecisionTimeout, Fallback: cfg.Fallback}, &routing.Executor{Generator: gen}, cfg.Playground)
 	dashboard := web.Handler()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/dashboard" || strings.HasPrefix(r.URL.Path, "/dashboard/") {

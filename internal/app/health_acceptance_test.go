@@ -56,7 +56,7 @@ func TestHealthRestartAndExplicitRecovery(t *testing.T) {
 	chat := func(model string) *httptest.ResponseRecorder {
 		return post("/v1/chat/completions", "inference-test", `{"model":"`+model+`","messages":[{"role":"user","content":"hello"}]}`)
 	}
-	if w := chat("auto"); w.Code != 429 {
+	if w := chat("auto"); w.Code != 503 || !strings.Contains(w.Body.String(), "fallback_exhausted") {
 		t.Fatalf("first upstream: %d %s", w.Code, w.Body)
 	}
 	if w := chat("auto"); w.Code != 422 || !strings.Contains(w.Body.String(), "health_exclusions") {

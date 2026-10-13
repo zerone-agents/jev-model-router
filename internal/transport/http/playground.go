@@ -68,7 +68,7 @@ func (p *playgroundHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer lease.Release()
-	ctx, cancel := context.WithTimeout(r.Context(), p.limits.Timeout)
+	ctx, cancel := context.WithTimeoutCause(r.Context(), p.limits.Timeout, routing.ErrRequestBudgetExhausted)
 	defer cancel()
 	// Bound response writes as well as upstream operations. Cancellation unblocks slow readers.
 	controller := http.NewResponseController(w)
@@ -79,6 +79,9 @@ func (p *playgroundHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	execution := p.inference.Begin(ctx, w.Header().Get("X-Request-ID"))
 	finalErr := routing.Fail("internal_error", "playground execution interrupted")
 	defer func() { execution.Finish(finalErr) }()
+	execution.OnRetry = func() error {
+		return sendPlaygroundEvent(w, "retry", map[string]any{"attempt": 2, "attempts": execution.DiagnosticAttempts()})
+	}
 	started, handedOff := false, false
 	finalErr = executeChat(ctx, execution, p.executor, req, p.limits.Timeout, 0, chatOutput{
 		planned: func(_ routing.Plan) error {
@@ -92,7 +95,7 @@ func (p *playgroundHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 	if finalErr != nil && !handedOff {
 		if started {
-			_ = sendPlaygroundEvent(w, "error", playgroundDiagnostic(finalErr, execution.Metadata().RequestID, "generation"))
+			_ = sendPlaygroundEvent(w, "error", playgroundDiagnostic(finalErr, execution.Metadata().RequestID, execution.ErrorStage()))
 		} else {
 			playgroundError(w, finalErr, "routing")
 		}

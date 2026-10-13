@@ -28,3 +28,13 @@ func TestStageDeadlineClassification(t *testing.T) {
 		t.Fatal("stage timeout ignored")
 	}
 }
+func TestInheritedDeadlineIsBudget(t *testing.T) {
+	p, c := context.WithTimeout(context.Background(), time.Millisecond)
+	defer c()
+	ctx, stop := WithRequestBudget(p, time.Now().Add(time.Second))
+	defer stop()
+	<-ctx.Done()
+	if !errors.Is(context.Cause(ctx), ErrRequestBudgetExhausted) {
+		t.Fatal(context.Cause(ctx))
+	}
+}

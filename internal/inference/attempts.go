@@ -22,7 +22,7 @@ func (r *Request) Execute(req routing.Request, check func(routing.Target) error,
 	cfg := r.service.Fallback
 	enabled := req.Model == "auto" && cfg.Enabled && cfg.MaxRetries == 1
 	if enabled {
-		ctx, cancel := context.WithDeadlineCause(r.ctx, r.record.CreatedAt.Add(cfg.Timeout), routing.ErrRequestBudgetExhausted)
+		ctx, cancel := routing.WithRequestBudget(r.ctx, r.record.CreatedAt.Add(cfg.Timeout))
 		defer cancel()
 		r.ctx = ctx
 	}
@@ -70,6 +70,11 @@ func (r *Request) Execute(req routing.Request, check func(routing.Target) error,
 		if !enabled || index == 2 || err != nil || result.Committed || !result.RetryableGenerationFailure || context.Cause(r.ctx) != nil {
 			return r.wrap(result.Err)
 		}
+		if r.OnRetry != nil {
+			if e := r.OnRetry(); e != nil {
+				return r.wrap(e)
+			}
+		}
 		diag := routing.Diagnose(result.Err)
 		retry = &routing.RetryContext{ModelID: plan.ModelID, Code: diag.Code, UpstreamStatus: diag.UpstreamStatus, UpstreamCode: diag.UpstreamCode}
 		excluded = append(excluded, plan.ModelID)
@@ -93,5 +98,5 @@ func (r *Request) wrap(e error) error {
 	return &routing.AttemptError{Cause: e, Attempts: r.DiagnosticAttempts()}
 }
 func (r *Request) DiagnosticAttempts() []routing.AttemptDiagnostic {
-	return append([]routing.AttemptDiagnostic(nil), r.diagnostics...)
+	return routing.BoundAttempts(r.diagnostics)
 }

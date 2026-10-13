@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"github.com/zerone-agents/jev-model-router/internal/inference"
 	"github.com/zerone-agents/jev-model-router/internal/management"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
@@ -13,6 +14,7 @@ import (
 )
 
 type Limits struct {
+	Fallback                                        inference.FallbackConfig
 	Recorder                                        *routing.Recorder
 	DecisionTimeout, FirstEventTimeout, IdleTimeout time.Duration
 	MaxBodyBytes                                    int64
@@ -49,7 +51,7 @@ type server struct {
 func NewHandler(service *management.Service, store management.ConfigStore, planner *routing.Planner, executor *routing.Executor, auth func(string) (management.Principal, error), limits Limits) http.Handler {
 	admin := NewManagementHandler(service, auth)
 	limits = limits.defaults()
-	s := server{store: store, planner: planner, executor: executor, limits: limits, inference: &inference.Service{Store: store, Planner: planner, Recorder: limits.Recorder, DecisionTimeout: limits.DecisionTimeout}}
+	s := server{store: store, planner: planner, executor: executor, limits: limits, inference: &inference.Service{Store: store, Planner: planner, Recorder: limits.Recorder, DecisionTimeout: limits.DecisionTimeout, Fallback: limits.Fallback}}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/admin/") {
 			admin.ServeHTTP(w, r)
@@ -112,7 +114,11 @@ func (s *server) models(w http.ResponseWriter, r *http.Request) {
 func contextError(ctx context.Context, e error) error {
 	// Read Err once: a timer can fire between successive classification checks.
 	state := ctx.Err()
-	if state == context.DeadlineExceeded || context.Cause(ctx) == context.DeadlineExceeded {
+	if state == context.DeadlineExceeded || context.Cause(ctx) == routing.ErrRequestBudgetExhausted || context.Cause(ctx) == context.DeadlineExceeded {
+		var a *routing.AttemptError
+		if errors.As(e, &a) {
+			return e
+		}
 		return routing.Fail("timeout", "request timed out")
 	}
 	if state != nil {
@@ -121,6 +127,10 @@ func contextError(ctx context.Context, e error) error {
 	// Bifrost watches the inherited deadline with a separate timer. Its failure
 	// can arrive just before the parent context publishes DeadlineExceeded.
 	if deadline, ok := ctx.Deadline(); ok && !time.Now().Before(deadline) {
+		var a *routing.AttemptError
+		if errors.As(e, &a) {
+			return e
+		}
 		return routing.Fail("timeout", "request timed out")
 	}
 	return e

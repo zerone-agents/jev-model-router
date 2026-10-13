@@ -162,6 +162,112 @@
           "decision_ms": {
             "type": "integer",
             "minimum": 0
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2
+          },
+          "attempts": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2
+                },
+                "stage": {
+                  "enum": [
+                    "routing",
+                    "generation"
+                  ]
+                },
+                "model_id": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "decision_ms": {
+                  "type": "integer"
+                },
+                "duration_ms": {
+                  "type": "integer"
+                },
+                "outcome": {
+                  "enum": [
+                    "success",
+                    "error"
+                  ]
+                },
+                "error_code": {
+                  "type": "string"
+                },
+                "diagnostic": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "stage": {
+                      "enum": [
+                        "request",
+                        "routing",
+                        "generation"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "maxLength": 128
+                    },
+                    "upstream_status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "upstream_code": {
+                      "type": "string",
+                      "maxLength": 128
+                    },
+                    "upstream_error": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "body": {},
+                        "truncated": {
+                          "type": "boolean"
+                        },
+                        "request_id": {
+                          "type": "string",
+                          "maxLength": 128
+                        }
+                      },
+                      "required": [
+                        "body",
+                        "truncated"
+                      ]
+                    }
+                  }
+                }
+              },
+              "required": [
+                "index",
+                "stage",
+                "decision_ms",
+                "duration_ms",
+                "outcome"
+              ]
+            }
           }
         },
         "required": [
@@ -280,16 +386,230 @@
               "body",
               "truncated"
             ]
+          },
+          "attempts": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2
+                },
+                "stage": {
+                  "enum": [
+                    "routing",
+                    "generation"
+                  ]
+                },
+                "model_id": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "decision_ms": {
+                  "type": "integer"
+                },
+                "duration_ms": {
+                  "type": "integer"
+                },
+                "outcome": {
+                  "enum": [
+                    "success",
+                    "error"
+                  ]
+                },
+                "error_code": {
+                  "type": "string"
+                },
+                "diagnostic": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "stage": {
+                      "enum": [
+                        "request",
+                        "routing",
+                        "generation"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "maxLength": 128
+                    },
+                    "upstream_status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "upstream_code": {
+                      "type": "string",
+                      "maxLength": 128
+                    },
+                    "upstream_error": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "body": {},
+                        "truncated": {
+                          "type": "boolean"
+                        },
+                        "request_id": {
+                          "type": "string",
+                          "maxLength": 128
+                        }
+                      },
+                      "required": [
+                        "body",
+                        "truncated"
+                      ]
+                    }
+                  }
+                }
+              },
+              "required": [
+                "index",
+                "stage",
+                "decision_ms",
+                "duration_ms",
+                "outcome"
+              ]
+            }
           }
         },
         "required": [
           "code",
           "message"
         ]
+      },
+      "retry": {
+        "type": "object",
+        "properties": {
+          "attempt": {
+            "const": 2
+          },
+          "attempts": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2
+                },
+                "stage": {
+                  "enum": [
+                    "routing",
+                    "generation"
+                  ]
+                },
+                "model_id": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "decision_ms": {
+                  "type": "integer"
+                },
+                "duration_ms": {
+                  "type": "integer"
+                },
+                "outcome": {
+                  "enum": [
+                    "success",
+                    "error"
+                  ]
+                },
+                "error_code": {
+                  "type": "string"
+                },
+                "diagnostic": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "stage": {
+                      "enum": [
+                        "request",
+                        "routing",
+                        "generation"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "maxLength": 128
+                    },
+                    "upstream_status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "upstream_code": {
+                      "type": "string",
+                      "maxLength": 128
+                    },
+                    "upstream_error": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "body": {},
+                        "truncated": {
+                          "type": "boolean"
+                        },
+                        "request_id": {
+                          "type": "string",
+                          "maxLength": 128
+                        }
+                      },
+                      "required": [
+                        "body",
+                        "truncated"
+                      ]
+                    }
+                  }
+                }
+              },
+              "required": [
+                "index",
+                "stage",
+                "decision_ms",
+                "duration_ms",
+                "outcome"
+              ]
+            }
+          }
+        },
+        "required": [
+          "attempt",
+          "attempts"
+        ]
       }
     },
     "terminal": "Exactly one done or error; EOF without terminal is interrupted.",
-    "route_timing": "Route is flushed immediately after successful planning, before provider invocation. Subsequent failures are error events, including failures before the first content delta."
+    "route_timing": "Route follows each successful plan. Before one eligible retry, retry carries the first failed attempt. Exactly one terminal event follows the final attempt."
   },
   "errors": {
     "playground_rate_limited": {
@@ -356,6 +676,107 @@
           "body",
           "truncated"
         ]
+      },
+      "attempts": {
+        "type": "array",
+        "maxItems": 2,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "index": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2
+            },
+            "stage": {
+              "enum": [
+                "routing",
+                "generation"
+              ]
+            },
+            "model_id": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "decision_ms": {
+              "type": "integer"
+            },
+            "duration_ms": {
+              "type": "integer"
+            },
+            "outcome": {
+              "enum": [
+                "success",
+                "error"
+              ]
+            },
+            "error_code": {
+              "type": "string"
+            },
+            "diagnostic": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "retryable": {
+                  "type": "boolean"
+                },
+                "stage": {
+                  "enum": [
+                    "request",
+                    "routing",
+                    "generation"
+                  ]
+                },
+                "request_id": {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                "upstream_status": {
+                  "type": "integer",
+                  "minimum": 400,
+                  "maximum": 599
+                },
+                "upstream_code": {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                "upstream_error": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "body": {},
+                    "truncated": {
+                      "type": "boolean"
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "body",
+                    "truncated"
+                  ]
+                }
+              }
+            }
+          },
+          "required": [
+            "index",
+            "stage",
+            "decision_ms",
+            "duration_ms",
+            "outcome"
+          ]
+        }
       }
     },
     "policy": "JSON and SSE errors share stable local summaries and optional upstream_error {body, truncated}. Actual upstream JSON (including JSON encoded in detail strings) or plain text is sanitized before exposure. Credentials, authentication fields and structured request echoes are redacted. Input over 64 KiB is omitted; sanitized output over 16 KiB is a truncated text excerpt. HTML is inert text. SDK diagnostics and raw requests are never exposed or persisted."
