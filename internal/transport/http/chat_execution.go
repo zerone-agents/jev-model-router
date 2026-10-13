@@ -37,8 +37,8 @@ type chatOutput struct {
 
 // executeChat owns planning, provider dispatch and the first-event gate for
 // both the public API and Playground. Only policy and response encoding vary.
-// A zero buffer reads synchronously, retaining Playground's quota lease until
-// the provider reader exits; the public API retains its configured buffer.
+// Reads are synchronous, retaining the provider and Playground lease until the
+// reader exits. The typed preamble is bounded independently of SDK buffering.
 func executeChat(ctx context.Context, execution *inference.Request, executor *routing.Executor, req routing.Request, firstTimeout time.Duration, bufferSize int, output chatOutput) error {
 	return execution.Execute(req, nil, nil, routing.RequestSummary(req), func(attemptCtx context.Context, plan routing.Plan, _ int) inference.AttemptResult {
 		if output.planned != nil {

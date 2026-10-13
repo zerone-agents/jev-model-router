@@ -174,6 +174,9 @@ func LoadConfig(path string, lookup func(string) (string, bool)) (Config, error)
 	if e := c.Health.Validate(); e != nil {
 		return c, e
 	}
+	if e := c.Fallback.Validate(); e != nil {
+		return c, e
+	}
 	var err error
 	c.DashboardOrigin, err = httptransport.NormalizeDashboardOrigin(c.DashboardOrigin)
 	return c, err

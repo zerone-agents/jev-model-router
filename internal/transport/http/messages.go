@@ -100,9 +100,11 @@ func (s *server) messages(w http.ResponseWriter, r *http.Request) {
 				return inference.AttemptResult{Err: e, RetryableGenerationFailure: routing.HealthOutcome(e).Kind != ""}
 			}
 			started = true
-			http.NewResponseController(w).SetWriteDeadline(time.Now().Add(s.limits.IdleTimeout))
-			w.Header().Set("Content-Type", "application/json")
-			_, e = w.Write(append(result, '\n'))
+			e = writeWithinRequest(attemptCtx, w, s.limits.IdleTimeout, func() error {
+				w.Header().Set("Content-Type", "application/json")
+				_, err := w.Write(append(result, '\n'))
+				return err
+			})
 			return inference.AttemptResult{Err: e, Committed: true}
 		}
 		ctx, stop := context.WithCancelCause(attemptCtx)
@@ -133,7 +135,7 @@ func (s *server) messages(w http.ResponseWriter, r *http.Request) {
 		return inference.AttemptResult{Err: writeMessagesStream(ctx, w, &diagnosticMessages{MessageStream: replay, r: execution, terminal: first.Terminal}, first, id, s.limits.IdleTimeout), Committed: true}
 	})
 	if finalErr != nil && !started {
-		writeMessagesError(w, finalErr, id)
+		_ = writeWithinRequest(execution.Context(), w, s.limits.IdleTimeout, func() error { writeMessagesError(w, finalErr, id); return nil })
 	}
 }
 
@@ -142,11 +144,12 @@ func writeMessagesStream(ctx context.Context, w http.ResponseWriter, stream prov
 	w.Header().Set("Cache-Control", "no-cache")
 	controller := http.NewResponseController(w)
 	send := func(e provider.MessageEvent) error {
-		controller.SetWriteDeadline(time.Now().Add(idle))
-		if _, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", e.Type, e.Data); err != nil {
-			return err
-		}
-		return controller.Flush()
+		return writeWithinRequest(ctx, w, idle, func() error {
+			if _, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", e.Type, e.Data); err != nil {
+				return err
+			}
+			return controller.Flush()
+		})
 	}
 	if err := send(first); err != nil {
 		return err
@@ -164,7 +167,7 @@ func writeMessagesStream(ctx context.Context, w http.ResponseWriter, stream prov
 			err = routing.Fail("upstream_error", "stream ended without completion")
 		}
 		if err != nil {
-			if ctx.Err() == nil {
+			if ctx.Err() == nil || errors.Is(context.Cause(ctx), routing.ErrRequestBudgetExhausted) || errors.Is(context.Cause(ctx), context.DeadlineExceeded) {
 				_, body := messagesError(err, id)
 				b, _ := json.Marshal(body)
 				_ = send(provider.MessageEvent{Type: "error", Data: b})

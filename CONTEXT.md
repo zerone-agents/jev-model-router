@@ -1,60 +1,59 @@
-# 模型路由
+# Model routing
 
-为一次生成请求选择合适的模型，同时约束数据可以送往哪些部署位置。
+Select an appropriate model for a generation request while constraining where its data may be sent.
 
 ## Language
 
-**决策后端（Decision Backend）**：理解任务并返回类型化判断的模型服务，如 Jev 或 Laya。
-_Avoid_: 用“生成模型”指代决策后端。
+**Decision Backend**: A model service, such as Jev or Laya, that understands a task and returns typed judgments.
+_Avoid_: Calling the decision backend a generation model.
 
-**生成模型（Generation Model）**：实际生成回复或工具调用的模型，属于路由选择的目标。
+**Generation Model**: A routing target that produces the actual reply or tool call.
 
-**供应商（Provider）**：提供生成模型访问方式与凭证边界的服务方或本地部署。
+**Provider**: A service or local deployment defining access to generation models and their credential boundary.
 
-**模型描述（Model Description）**：提供给决策后端的自然语言说明，描述生成模型的能力、专长、弱项与成本速度特征。
-_Avoid_: 用“模型卡”暗示必须提供训练报告；用模型描述代替可验证的能力声明。
+**Model Description**: Natural-language guidance for the decision backend about a generation model's capabilities, specialties, weaknesses, cost and speed.
+_Avoid_: Calling it a model card that requires a training report, or substituting it for verifiable capability declarations.
 
-**模型能力（Model Capability）**：生成模型可接受的输入、上下文范围和输出/工具协议约束，与任务专长不同。
+**Model Capability**: Supported input, context range, output formats and tool-protocol constraints, distinct from task specialization.
 
-**候选集合（Eligible Models）**：对当前请求满足权限、部署位置及能力约束的生成模型集合。
+**Eligible Models**: Generation models satisfying the current request's permission, deployment-location and capability constraints.
 
-**路由提示词（Routing Prompt）**：用于比较候选模型的可编辑偏好说明，默认表达均衡选择目标。
+**Routing Prompt**: Editable preferences for comparing eligible models, with balanced selection as the default.
 
-**自动选模（Auto Selection）**：调用方将具体模型选择委托给路由器的模式。
+**Auto Selection**: The caller delegates model selection to the router.
 
-**显式选模（Explicit Selection）**：调用方指定已配置模型 ID 的模式，不代表豁免部署和能力约束。
+**Explicit Selection**: The caller names a configured model ID; deployment and capability constraints still apply.
 
-**敏感路由（Privacy Routing）**：按上下文敏感性限制生成请求去向的可选能力。
+**Privacy Routing**: An optional capability that constrains generation destinations according to context sensitivity.
 
-**本地锁定（Local-only Session）**：因敏感上下文或无法可靠判定而限制后续请求留在本地的会话状态。
-_Avoid_: 将任何一次使用本地生成模型都称为本地锁定。
+**Local-only Session**: Subsequent requests must remain local because context is sensitive or cannot be reliably classified.
+_Avoid_: Treating every use of a local generation model as a local-only session.
 
-**选模检查（Route Inspection）**：只获取选择结果而不调用生成模型的操作；仍可能调用决策服务，产生费用与数据外传。
-_Avoid_: 用“纯本地预览”或“零副作用 dry-run”泛指选模检查。
+**Route Inspection**: Select a model without generation. It can still call a decision service, incur cost and send data externally.
+_Avoid_: Describing inspection as a purely local preview or a zero-side-effect dry run.
 
-**管理能力（Management Capability）**：Agent 或人类用于发现、读取和调整路由器配置的单一业务操作，具有显式输入、结果与副作用。
+**Management Capability**: One discoverable business operation for an Agent or human to inspect or adjust the router, with explicit inputs, results and side effects.
 
-**推理角色（Inference Role）**：可调用实例内全部已启用生成模型的角色，支持自动或显式选模，不拥有配置管理权限。
+**Inference Role**: Can use every enabled generation model in the instance, through Auto or explicit selection, without configuration-management permissions.
 
-**配置角色（Settings Role）**：可信实例管理员，可管理配置、查看状态并执行路由检查和受限连接测试，不具有通用生成权限，但可改变后续请求的数据去向。Dashboard Cookie 会话可通过单独、有限额的 Playground 入口体验文本生成；该例外不扩大 Settings Bearer 或 /v1 推理权限。
-_Avoid_: 将角色分工等同于互不信任租户之间的安全隔离。
+**Settings Role**: A trusted instance administrator who manages configuration, reads status, inspects routing and performs bounded connection tests. It has no general generation permission but can change subsequent data destinations. Dashboard Cookie sessions can use the separate, rate-limited Playground text-generation endpoint; this exception does not extend Settings Bearer or /v1 inference permissions.
+_Avoid_: Equating these roles with security isolation between mutually untrusted tenants.
 
-**模型连接测试（Model Connection Test）**：对指定生成模型发送固定最小请求以检查基本调用可用性的管理操作，可用于禁用模型，可能产生费用与数据外发。
-_Avoid_: 将连接成功等同于所有声明能力均已验证，或将测试等同于启用模型。
+**Model Connection Test**: A management operation sending a fixed minimal request to check basic availability. It can test a disabled model and can incur cost and external data transfer.
+_Avoid_: Equating connection success with validation of all declared capabilities, or equating a test with enabling the model.
 
-**路由记录（Routing Record）**：用于排障和评测的请求级选择与执行元数据，包含最后一条用户消息最多 120 字的文本摘要，不保存完整对话、工具参数/输出、图片地址或决策后端自由文本理由。
-_Avoid_: 将尽力保存的路由记录称为强制审计。
+**Routing Record**: Request-level selection and execution metadata for troubleshooting and evaluation, including at most 120 characters from the last user message. It excludes full conversations, tool arguments/results, image addresses and free-text decision explanations.
+_Avoid_: Calling best-effort records mandatory auditing.
 
-**选择路径（Selection Path）**：本次模型选择的产生方式，分为调用方显式指定、唯一合格候选和决策后端选择。
-_Avoid_: 将选择路径或候选概率称为决策后端的自然语言理由。
+**Selection Path**: How the model was selected: explicit caller choice, the sole eligible candidate, or the decision backend.
+_Avoid_: Treating the path or candidate probability as a natural-language decision explanation.
 
-**生成上游健康（Generation Health）**：具体调用目标的基本可用性观察，状态为未知、健康、已隔离；独立于配置启用状态，不表示回答质量。隔离只排除 auto 候选，显式调用仍允许。
+**Generation Health**: Observed basic availability of an actual call target: unknown, healthy or isolated. It is separate from configuration enablement and answer quality. Isolation excludes Auto candidates; explicit calls remain allowed.
 
-**凭证快照（Credential Snapshot）**：provider 单次解析得到的不可变调用凭证，健康身份、实际认证、客户端复用和错误脱敏共用；核心只持有不透明句柄，不序列化凭证。
+**Credential Snapshot**: An immutable credential resolution shared by actual authentication, health identity, client reuse and error redaction. Core code holds an opaque handle and never serializes the credential.
 
-**恢复探测（Recovery Probe）**：向已隔离且启用的目标发送固定小请求以验证恢复的有界后台任务。完整调用成功恢复资格，到期本身不恢复；手动 models.test 可检测禁用目标但不自动启用。
+**Recovery Probe**: A bounded background task sending a fixed small request to an enabled, isolated target. A complete successful call restores eligibility; elapsed time alone does not. Manual models.test can test disabled targets without enabling them.
 
+**Auto Fallback**: At most one additional selection and generation attempt before semantic output, excluding the failed model while preserving request input and configuration version. It is distinct from largest-context estimate fallback and SDK retries.
 
-**Auto fallback**: At most one additional selection and generation attempt before semantic output, excluding the failed model while preserving request input and configuration version. It is distinct from largest-context estimate fallback and SDK retries.
-
-**Request budget exhaustion**: Local termination of the entire inference lifecycle. It is publicly a timeout but neither increments nor resets generation-health observations.
+**Request Budget Exhaustion**: Local termination of the entire inference lifecycle. It is publicly a timeout but neither increments nor resets generation-health observations.

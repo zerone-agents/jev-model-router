@@ -32,6 +32,8 @@ export type PlaygroundEvent =
   | { type: "delta"; content?: string; reasoning_content?: string }
   | {
       type: "done";
+      attempt?: number;
+      attempts?: Attempt[];
       finish_reason: string;
       usage?: {
         input_tokens: number;
@@ -171,7 +173,11 @@ function decodeEvent(type: string, data: string): PlaygroundEvent {
     strings(["finish_reason"]) &&
     ["stop", "length", "content_filter"].includes(v.finish_reason as string)
   )
-    return { ...v, type } as PlaygroundEvent;
+    return {
+      ...v,
+      attempts: readAttempts(v.attempts),
+      type,
+    } as PlaygroundEvent;
   if (type === "error" && strings(["code", "message"]))
     return {
       type,

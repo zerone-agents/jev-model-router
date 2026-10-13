@@ -112,6 +112,7 @@ export function reducePlayground(
             ? "truncated"
             : "failed";
       turn.usage = e.usage;
+      turn.attempts = e.attempts || turn.attempts;
     }
     if (e.type === "error") {
       turn.phase = "failed";

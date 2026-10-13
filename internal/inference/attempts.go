@@ -23,12 +23,15 @@ func (r *Request) Execute(req routing.Request, check func(routing.Target) error,
 	enabled := req.Model == "auto" && cfg.Enabled && cfg.MaxRetries == 1
 	if enabled {
 		ctx, cancel := routing.WithRequestBudget(r.ctx, r.record.CreatedAt.Add(cfg.Timeout))
-		defer cancel()
+		r.cancelBudget = cancel
 		r.ctx = ctx
 	}
 	var excluded []string
 	var retry *routing.RetryContext
 	for index := 1; index <= 2; index++ {
+		if r.parent.Err() != nil {
+			return r.wrap(terminalError(r.parent, r.parent.Err()))
+		}
 		if e := context.Cause(r.ctx); e != nil {
 			return r.wrap(terminalError(r.ctx, e))
 		}
@@ -45,6 +48,9 @@ func (r *Request) Execute(req routing.Request, check func(routing.Target) error,
 		}
 		plan.Close()
 		result.Err = terminalError(r.ctx, result.Err)
+		if r.parent.Err() != nil {
+			result.Err = terminalError(r.parent, result.Err)
+		}
 		if result.Err != nil && index > 1 {
 			var e *routing.Error
 			if errors.As(result.Err, &e) && e.Code == "no_candidates" {
@@ -67,7 +73,7 @@ func (r *Request) Execute(req routing.Request, check func(routing.Target) error,
 		if result.Err == nil {
 			return nil
 		}
-		if !enabled || index == 2 || err != nil || result.Committed || !result.RetryableGenerationFailure || context.Cause(r.ctx) != nil {
+		if !enabled || index == 2 || err != nil || result.Committed || !result.RetryableGenerationFailure || context.Cause(r.ctx) != nil || r.parent.Err() != nil {
 			return r.wrap(result.Err)
 		}
 		if r.OnRetry != nil {

@@ -70,23 +70,20 @@ func (p *playgroundHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer lease.Release()
 	ctx, cancel := context.WithTimeoutCause(r.Context(), p.limits.Timeout, routing.ErrRequestBudgetExhausted)
 	defer cancel()
-	// Bound response writes as well as upstream operations. Cancellation unblocks slow readers.
-	controller := http.NewResponseController(w)
-	deadline, _ := ctx.Deadline()
-	controller.SetWriteDeadline(deadline)
-	stopWrite := context.AfterFunc(ctx, func() { controller.SetWriteDeadline(time.Now()) })
-	defer stopWrite()
 	execution := p.inference.Begin(ctx, w.Header().Get("X-Request-ID"))
 	finalErr := routing.Fail("internal_error", "playground execution interrupted")
 	defer func() { execution.Finish(finalErr) }()
+	send := func(name string, value any) error {
+		return writeWithinRequest(execution.Context(), w, 0, func() error { return sendPlaygroundEvent(w, name, value) })
+	}
 	execution.OnRetry = func() error {
-		return sendPlaygroundEvent(w, "retry", map[string]any{"attempt": 2, "attempts": execution.DiagnosticAttempts()})
+		return send("retry", map[string]any{"attempt": 2, "attempts": execution.DiagnosticAttempts()})
 	}
 	started, handedOff := false, false
 	finalErr = executeChat(ctx, execution, p.executor, req, p.limits.Timeout, 0, chatOutput{
 		planned: func(_ routing.Plan) error {
 			started = true
-			return sendPlaygroundEvent(w, "route", execution.Metadata())
+			return send("route", execution.Metadata())
 		},
 		stream: func(streamCtx context.Context, stream routing.EventStream, _ routing.Plan) error {
 			handedOff = true
@@ -95,9 +92,9 @@ func (p *playgroundHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 	if finalErr != nil && !handedOff {
 		if started {
-			_ = sendPlaygroundEvent(w, "error", playgroundDiagnostic(finalErr, execution.Metadata().RequestID, execution.ErrorStage()))
+			_ = send("error", playgroundDiagnostic(finalErr, execution.Metadata().RequestID, execution.ErrorStage()))
 		} else {
-			playgroundError(w, finalErr, "routing")
+			_ = writeWithinRequest(execution.Context(), w, 0, func() error { playgroundError(w, finalErr, "routing"); return nil })
 		}
 	}
 

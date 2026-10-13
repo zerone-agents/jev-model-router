@@ -20,18 +20,20 @@ type Service struct {
 	DecisionTimeout time.Duration
 }
 type Request struct {
-	OnRetry     func() error
-	snapshot    *routing.Snapshot
-	options     routing.PlanOptions
-	current     int
-	diagnostics []routing.AttemptDiagnostic
-	service     *Service
-	ctx         context.Context
-	record      routing.Record
+	OnRetry      func() error
+	snapshot     *routing.Snapshot
+	options      routing.PlanOptions
+	current      int
+	diagnostics  []routing.AttemptDiagnostic
+	service      *Service
+	ctx          context.Context
+	parent       context.Context
+	cancelBudget context.CancelFunc
+	record       routing.Record
 }
 
 func (s *Service) Begin(ctx context.Context, id string) *Request {
-	return &Request{service: s, ctx: ctx, record: routing.Record{RequestID: id, CreatedAt: time.Now().UTC()}}
+	return &Request{service: s, ctx: ctx, parent: ctx, record: routing.Record{RequestID: id, CreatedAt: time.Now().UTC()}}
 }
 func (r *Request) Plan(req routing.Request, check func(routing.Target) error) (routing.Plan, error) {
 	return r.PlanWithSummary(req, check, routing.RequestSummary(req))
@@ -76,6 +78,9 @@ func (r *Request) PlanPrepared(req routing.Request, check func(routing.Target) e
 	return plan, err
 }
 func (r *Request) Finish(err error) {
+	if r.cancelBudget != nil {
+		defer r.cancelBudget()
+	}
 	r.record.Outcome = "success"
 	if err != nil {
 		r.record.Outcome = "error"
@@ -83,6 +88,9 @@ func (r *Request) Finish(err error) {
 	}
 	r.service.Recorder.Save(r.record)
 }
+
+// Context remains alive through terminal response writes until Finish releases it.
+func (r *Request) Context() context.Context { return r.ctx }
 
 type RouteMetadata struct {
 	Attempt        int                         `json:"attempt,omitempty"`
