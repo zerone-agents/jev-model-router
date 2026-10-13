@@ -10,8 +10,10 @@ services:
       JEV_ROUTER_INFERENCE_TOKEN: ${JEV_ROUTER_INFERENCE_TOKEN:?Set a different inference token in .env}
       JEV_ROUTER_ENCRYPTION_KEY_REF: env:JEV_ROUTER_ENCRYPTION_KEY
       JEV_ROUTER_ENCRYPTION_KEY: ${JEV_ROUTER_ENCRYPTION_KEY:-}
-      PROVIDER_API_KEY: ${PROVIDER_API_KEY:-}
       JEV_ROUTER_DECISION_MAX_BYTES: ${JEV_ROUTER_DECISION_MAX_BYTES:-32000}
+      # Backward compatibility for existing env: credential references.
+      # New installations should configure model keys through CLI/API instead.
+      PROVIDER_API_KEY: ${PROVIDER_API_KEY:-}
       TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
     volumes:
       - router_data:/data
