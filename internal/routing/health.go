@@ -13,7 +13,7 @@ func HealthOutcome(err error) health.Outcome {
 	if err == nil {
 		return health.Outcome{Success: true}
 	}
-	if errors.Is(err, context.Canceled) || errors.Is(err, ErrGenerationCapacity) {
+	if errors.Is(err, ErrRequestBudgetExhausted) || errors.Is(err, context.Canceled) || errors.Is(err, ErrGenerationCapacity) {
 		return health.Outcome{}
 	}
 	var transport *TransportFailure
