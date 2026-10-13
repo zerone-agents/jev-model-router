@@ -77,6 +77,6 @@ func executeChat(ctx context.Context, execution *inference.Request, executor *ro
 		if !stopOpening() {
 			return inference.AttemptResult{Err: contextError(firstCtx, firstCtx.Err()), RetryableGenerationFailure: true}
 		}
-		return inference.AttemptResult{Err: output.stream(streamCtx, diagnosticChat{replay, execution}, plan), Committed: true}
+		return inference.AttemptResult{Err: output.stream(streamCtx, &diagnosticChat{EventStream: replay, r: execution}, plan), Committed: true}
 	})
 }

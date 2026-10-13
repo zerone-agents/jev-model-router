@@ -53,3 +53,8 @@ _Avoid_: 将选择路径或候选概率称为决策后端的自然语言理由�
 **凭证快照（Credential Snapshot）**：provider 单次解析得到的不可变调用凭证，健康身份、实际认证、客户端复用和错误脱敏共用；核心只持有不透明句柄，不序列化凭证。
 
 **恢复探测（Recovery Probe）**：向已隔离且启用的目标发送固定小请求以验证恢复的有界后台任务。完整调用成功恢复资格，到期本身不恢复；手动 models.test 可检测禁用目标但不自动启用。
+
+
+**Auto fallback**: At most one additional selection and generation attempt before semantic output, excluding the failed model while preserving request input and configuration version. It is distinct from largest-context estimate fallback and SDK retries.
+
+**Request budget exhaustion**: Local termination of the entire inference lifecycle. It is publicly a timeout but neither increments nor resets generation-health observations.

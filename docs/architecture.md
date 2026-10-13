@@ -72,7 +72,7 @@ Only one balanced prompt template is provided. Descriptions express task special
 
 ### Providers and streaming protocols
 
-`provider` encapsulates Bifrost and accepts an already-selected target. Ordinary retries are disabled and fallback is empty. Client-native encrypted/signed reasoning history is not accepted on the Chat conversion path. Chat-to-native-Anthropic uses validated bodies through Bifrost passthrough. Plain-text thinking can continue; signature omission for signed tool responses is allowed only for the BigModel targets listed in the compatibility documentation, without fabricating signatures. The server explicitly controls model mappings, plugins and extra control fields.
+`provider` encapsulates Bifrost and accepts an already-selected target. SDK retries and SDK fallback remain disabled; bounded Auto reselection is owned by inference. Client-native encrypted/signed reasoning history is not accepted on the Chat conversion path. Chat-to-native-Anthropic uses validated bodies through Bifrost passthrough. Plain-text thinking can continue; signature omission for signed tool responses is allowed only for the BigModel targets listed in the compatibility documentation, without fabricating signatures. The server explicitly controls model mappings, plugins and extra control fields.
 
 `transport/http` preserves compatible `/v1/chat/completions` and `/v1/models` formats. SSE retains tool-call deltas, usage and errors without exposing internal SDK metadata as protocol fields. Cancellation propagates to decision and generation services. A started stream never appends output from another model.
 
@@ -86,7 +86,7 @@ Multiple OpenAI-compatible and native Anthropic providers/models can be configur
 
 Verified endpoint combinations forward HTTPS image URLs or inline content. The gateway does not fetch remote images, download on behalf of endpoints or re-encode content. Unsupported combinations fail explicitly. Image URLs and inline content enter neither Jev nor routing records; decisions receive only text and image-capability requirements.
 
-Decision, first-generation-event and stream-idle timeouts are configured separately. Ongoing valid output does not trigger the idle timeout; client cancellation propagates immediately. Timeouts do not trigger retries or model switches. Started streams end with an error rather than pretending success. Thresholds are established through implementation and validation, not unmeasured service promises.
+Decision, first-generation-event and stream-idle timeouts are configured separately. Ongoing valid output does not trigger the idle timeout; client cancellation propagates immediately. Eligible generation-stage timeouts before semantic output may trigger one Auto reselection. Shared request-budget exhaustion never triggers reselection or changes target health. Started streams end with an error rather than pretending success. Thresholds are established through implementation and validation, not unmeasured service promises.
 
 ### Management and state
 

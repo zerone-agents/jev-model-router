@@ -113,3 +113,10 @@ A `health_degraded` warning or absent health data means inspection/persistence i
 unavailable, not that every model is healthy. Check instance storage. Back up the
 whole SQLite database including its internal fingerprint key; do not delete the
 key to reset isolation. Key rotation is not implemented.
+
+
+## Inspect Auto fallback
+
+Use `jev-router-cli schema status.get` and `jev-router-cli schema records.list` against the target instance before operating. `status.get` exposes effective `auto_fallback`; configuration uses the documented startup environment/file fields. Public Auto inference may perform one reselection after an eligible generation failure, so one request can incur two charges. Explicit model IDs do not switch.
+
+Use the returned Router request ID to find its `records.list` entry and inspect `attempts`; only safe metadata is persisted. Error responses can include sanitized response-only attempt details. Do not infer zero cost from missing usage or automatically replay a failed request. `route.inspect` evaluates one selection and does not forecast fallback.

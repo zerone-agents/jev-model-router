@@ -130,7 +130,7 @@ func (s *server) messages(w http.ResponseWriter, r *http.Request) {
 			return inference.AttemptResult{Err: e}
 		}
 		started = true
-		return inference.AttemptResult{Err: writeMessagesStream(ctx, w, diagnosticMessages{replay, execution}, first, id, s.limits.IdleTimeout), Committed: true}
+		return inference.AttemptResult{Err: writeMessagesStream(ctx, w, &diagnosticMessages{MessageStream: replay, r: execution, terminal: first.Terminal}, first, id, s.limits.IdleTimeout), Committed: true}
 	})
 	if finalErr != nil && !started {
 		writeMessagesError(w, finalErr, id)

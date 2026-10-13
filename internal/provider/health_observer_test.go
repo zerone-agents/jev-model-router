@@ -6,11 +6,34 @@ import (
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"io"
 	"testing"
+	"time"
 )
 
 type observationStore struct {
 	writes int
 	last   health.Record
+}
+
+func TestBudgetDeadlineDoesNotChangeHealth(t *testing.T) {
+	store := &observationStore{}
+	service := health.New(store, health.DefaultPolicy(), nil)
+	g := &bifrostGenerator{health: service}
+	target := routing.Target{Prepared: &preparedCredential{id: "budget"}}
+	failed := g.observe(target)
+	failed(context.Background(), io.ErrUnexpectedEOF)
+	if store.writes != 1 || len(store.last.FailureTimes) != 1 {
+		t.Fatal("setup")
+	}
+	before := store.last
+	ctx, cancel := routing.WithRequestBudget(context.Background(), time.Now().Add(time.Millisecond))
+	defer cancel()
+	done := g.observe(target)
+	<-ctx.Done()
+	done(ctx, context.DeadlineExceeded)
+	done(context.Background(), nil)
+	if store.writes != 1 || len(store.last.FailureTimes) != len(before.FailureTimes) || store.last.State != before.State {
+		t.Fatalf("budget altered health: %+v", store.last)
+	}
 }
 
 func (*observationStore) LoadHealthKey(context.Context) ([32]byte, error)     { return [32]byte{1}, nil }

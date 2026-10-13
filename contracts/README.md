@@ -104,7 +104,7 @@ Generation providers accept `protocol: "openai" | "anthropic"`. Omitted protocol
 
 Both endpoints accept only Dashboard Settings cookies. GET requires X-Jev-Session; POST requires JSON, exact Origin/Host and session-bound CSRF. Authorization cannot substitute for the cookie, and cookies gain no /v1 inference permissions. This is a restricted browser-generation exception for Settings; Settings Bearer and general management calls do not provide generation.
 
-No upstream call occurs before admission. Accepted calls receive no cost/count refunds, automatic retries or implicit model switching. POST reuses one actual inference plan instead of calling route.inspect before generation. Successful selection emits route immediately without waiting for the first upstream event. Later generation failures are SSE errors. Event order is route, delta, done/error; delta separates content and reasoning_content. Only normal termination after finish_reason emits done. EOF without a terminal event is interruption. This endpoint does not claim OpenAI SSE compatibility. Pre-header errors are JSON; in-stream failures are separate error events. Shared sanitization may expose provider error bodies as upstream_error details.
+No upstream call occurs before admission. Accepted calls receive no cost/count refunds. Auto may reselect once under the fallback policy; both attempts share one admission lease and quota charge. POST uses the shared inference lifecycle instead of calling route.inspect before generation. Successful selection emits route immediately without waiting for the first upstream event. Later generation failures are SSE errors. Event order is route, delta, done/error; delta separates content and reasoning_content. Only normal termination after finish_reason emits done. EOF without a terminal event is interruption. This endpoint does not claim OpenAI SSE compatibility. Pre-header errors are JSON; in-stream failures are separate error events. Shared sanitization may expose provider error bodies as upstream_error details.
 
 429 responses include playground_rate_limited, limit_scope, retry_after_seconds, reset_at when available, and Retry-After. Instance UTC daily quotas persist; concurrency is single-process. configuration.md lists all defaults. Routing displays contain only actual execution metadata, never generated Jev explanations.
 
@@ -137,3 +137,12 @@ The public Chat error can include these safe exclusions, never credential finger
 Model lists remain enabled-model lists; explicitly selecting an isolated model is
 allowed. The entire generation lifecycle shares one immutable credential snapshot
 with its health identity and error redaction, across all supported entrypoints.
+
+
+## Auto fallback
+
+Enabled by default, Auto can make one additional selection and generation attempt after an eligible upstream failure, before any answer, reasoning, refusal or tool delta is forwarded. Failed model IDs are excluded from this request regardless of global isolation thresholds. A single remaining candidate executes directly; multiple remaining candidates return to Jev with a typed failure summary. Original input, configuration version and request ID are preserved. Explicit selection, decision failures, content/request errors, cancellation and downstream writes never trigger fallback.
+
+Both attempts share a 180-second default total budget. Its internal cancellation cause is health-neutral; genuine independent generation-stage timeouts still count toward health. Cancellation is best effort and both attempts may incur charges. status.get exposes auto_fallback {enabled,max_retries,timeout_seconds}. records.list exposes optional attempts containing only safe execution metadata; old records remain readable.
+
+Final errors retain their original protocol status and add diagnostic.attempts (at most two entries; combined diagnostics at most 32 KiB). fallback_exhausted means no eligible backup (HTTP 503 / CLI 6). Successful compatible responses contain only the final model and its reported usage. Detailed upstream bodies are sanitized and response-only, never persisted. Playground emits retry before replanning and route after each successful plan; one final done/error terminates the request. Inspect and health probes never execute fallback.

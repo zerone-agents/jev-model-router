@@ -21,21 +21,32 @@ func messagesSemanticEvent(e provider.MessageEvent) bool {
 		}
 		var kind string
 		_ = json.Unmarshal(block["type"], &kind)
-        if kind != "text" && kind != "thinking" {
+		if kind != "text" && kind != "thinking" {
 			return true
 		}
 		var txt string
-        _ = json.Unmarshal(block[kind], &txt)
+		_ = json.Unmarshal(block[kind], &txt)
 		return txt != ""
 	case "content_block_delta":
-        if json.Unmarshal(body["delta"], &block)!=nil{return true}
-        var kind string
-        _ = json.Unmarshal(block["type"], &kind)
-        field:=""
-        switch kind {case "text_delta":field="text";case "thinking_delta":field="thinking";default:return true}
-        var value string
-        if json.Unmarshal(block[field],&value)!=nil{return true}
-        return value!=""
+		if json.Unmarshal(body["delta"], &block) != nil {
+			return true
+		}
+		var kind string
+		_ = json.Unmarshal(block["type"], &kind)
+		field := ""
+		switch kind {
+		case "text_delta":
+			field = "text"
+		case "thinking_delta":
+			field = "thinking"
+		default:
+			return true
+		}
+		var value string
+		if json.Unmarshal(block[field], &value) != nil {
+			return true
+		}
+		return value != ""
 	case "message_start", "message_delta", "message_stop", "content_block_stop", "ping":
 		return false
 	default:

@@ -69,20 +69,6 @@ func (b *bufferedStream) Close() error {
 	return nil
 }
 
-type prependStream struct {
-	first *routing.Event
-	rest  routing.EventStream
-}
-
-func (p *prependStream) Next(ctx context.Context) (routing.Event, error) {
-	if p.first != nil {
-		v := *p.first
-		p.first = nil
-		return v, nil
-	}
-	return p.rest.Next(ctx)
-}
-func (p *prependStream) Close() error { return p.rest.Close() }
 func validEvent(e routing.Event) bool {
 	if e.Usage != nil {
 		return true

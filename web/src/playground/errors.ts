@@ -8,6 +8,10 @@ export function replyErrorText(
   lang: Lang,
 ) {
   const upstream: Record<string, [string, string]> = {
+    fallback_exhausted: [
+      "No eligible backup model is available.",
+      "没有可用的备用模型。",
+    ],
     upstream_authentication: [
       "Provider authentication failed. Check the provider API key.",
       "供应商认证失败，请检查供应商 API Key。",
