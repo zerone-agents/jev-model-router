@@ -1,6 +1,6 @@
 # Quick Start
 
-English | [简体中文](README.zh-CN.md)
+English | [Chinese](README.zh-CN.md)
 
 Run Jev Model Router with Docker Compose. One container serves the API and management UI; a named volume persists SQLite. Requires Docker with Compose and Git.
 
@@ -14,8 +14,7 @@ cd jev-model-router/quickstart
 cp .env.example .env
 ```
 
-Edit `.env`: set **two different** random values for `JEV_ROUTER_SETTINGS_TOKEN` and `JEV_ROUTER_INFERENCE_TOKEN` (run `openssl rand -hex 32` twice). Add your generation provider key and TypeSafe key when configuring those services. Keep `.env` private; it is ignored by Git and excluded from image builds. When using external environment references for more providers, explicitly add their variables to Compose as well as `.env`. Managed credentials below avoid this per-provider step.
-
+Edit `.env`: generate **three separate** values with `openssl rand -hex 32`. Set `JEV_ROUTER_SETTINGS_TOKEN`, `JEV_ROUTER_INFERENCE_TOKEN`, and `JEV_ROUTER_ENCRYPTION_KEY`. The first two authenticate clients; the third encrypts managed model credentials and must be backed up separately from SQLite. Run `chmod 600 .env`. Keep the file private; Git and image builds exclude it. Configure generation and decision API keys through the CLI/API after startup, rather than adding them to `.env`.
 ```sh
 docker compose up -d
 docker compose ps
@@ -32,6 +31,7 @@ The initial database has no providers or models. Container health confirms the m
 ```sh
 docker compose exec -T router jev-router schema
 docker compose exec -T router jev-router schema providers.put
+docker compose exec -T router jev-router schema decision.put
 docker compose exec -T router jev-router call status.get --json - <<'JSON'
 {}
 JSON
@@ -40,26 +40,27 @@ JSON
 Use the returned current version for each write. Example provider input:
 
 ```json
-{"id":"cloud","base_url":"https://api.openai.com/v1","secret_ref":"env:PROVIDER_API_KEY"}
+{"id":"cloud","base_url":"https://api.openai.com/v1","api_key":"YOUR_PROVIDER_API_KEY"}
 ```
 
-Save it as `provider.json` on your host, then send it through stdin (replace `VERSION` with the current version):
+Run credential configuration yourself in your terminal. Create `provider.json` privately (for example, set `umask 077` before creating it), replace the placeholder locally, and pass it through stdin. Do not put the real key in command arguments, shell history or chat. Replace `VERSION` with the current configuration version:
 
 ```sh
 docker compose exec -T router jev-router call providers.put \
   --json - --expected-version VERSION --idempotency-key setup-provider-1 < provider.json
 ```
 
-Follow the [companion SKILL](../skills/jev-router/SKILL.md) to create a disabled model, test it, and enable it. Multiple-candidate `auto` also needs `decision.put`, using `https://api.typesafe.ai`, `jev-1.13.0`, and `env:TYPESAFE_API_KEY`. Configuration remains managed through the shared API; `.env` does not create model resources. Model connection tests and routing checks may call paid services.
+Follow the [companion SKILL](../skills/jev-router/SKILL.md) to create a disabled model, test it, and enable it. Multiple-candidate `auto` also needs `decision.put`. Discover its schema first; then create a protected `decision.json` with `base_url`, `model` and write-only `api_key`, plus `path` when required by a third-party Jev-compatible service. Official Jev uses `https://api.typesafe.ai` and `jev-1.13.0`. Submit it with `docker compose exec -T router jev-router call decision.put --json - --expected-version VERSION --idempotency-key setup-decision-1 < decision.json`, using a freshly read version. Remove local credential files after verified success. Configuration remains managed through the shared API; `.env` does not create model resources. Model connection tests and routing checks may call paid services.
 
 Inside the container, `localhost` is the container itself. Use a reachable upstream hostname, not the host machine's loopback address. After changing environment keys, recreate the service with `docker compose up -d`.
 
 ## Remotely managed API keys
 
-The current release supports managed credentials. Check `jev-router schema providers.put` for `api_key` when connecting to an older server. Generate one master key with `openssl rand -hex 32` and place it in `JEV_ROUTER_ENCRYPTION_KEY` in the server's private `.env` (`chmod 600 .env`). Recreate the container once. Back up this master key separately from SQLite; losing it makes stored provider keys unrecoverable. Never commit it or share rendered Compose configuration containing its value.
+Check both `jev-router schema providers.put` and `jev-router schema decision.put` for write-only `api_key`; older published images may support only provider credentials. If `decision.put` lacks this field, upgrade to a release containing managed decision credentials or use the source-build override below. Do not assume `latest` includes unreleased changes.
 
-After that setup, add or replace provider API keys through the remote CLI using a protected JSON file or stdin. The input has `id`, `base_url`, and write-only `api_key` instead of `secret_ref`. No Compose edit or restart is needed for subsequent provider-key changes. Keep `TYPESAFE_API_KEY` for decision-backend credentials. Existing `env:`/`file:` provider references remain supported.
+With `JEV_ROUTER_ENCRYPTION_KEY` configured at startup, add or rotate generation and decision API keys through protected JSON files or stdin. Supply exactly one of `api_key` and `secret_ref`. Managed key changes require no Compose edits or restarts. Existing `env:`/`file:` references remain supported. Optional `PROVIDER_API_KEY` and `TYPESAFE_API_KEY` mappings are retained only for existing deployments; additional external variables require explicit Compose mappings as well as `.env` values. Preserve those variables until existing references have been migrated.
 
+Users should execute key configuration themselves. An Agent may assist with actual keys only after the user explicitly confirms a secure environment without leakage risk and explicitly provides the key for configuration. Never commit keys or share rendered Compose configuration containing them. Back up the encryption master key separately; losing it makes managed keys unrecoverable.
 See [remote CLI instructions](../docs/cli-installation.md#managed-provider-keys) and [encryption and recovery](../docs/configuration.md#managed-provider-credentials). Remote secret submission requires HTTPS; loopback HTTP also works through an SSH tunnel. The reverse proxy must terminate TLS before forwarding privately to the container. Managed keys are never returned in plaintext. Old encrypted revisions are retained for in-flight requests; deleting a provider does not erase historical ciphertext/backups. Master-key rotation is not implemented: changing its value prevents startup with existing managed records.
 
 ## Build from source

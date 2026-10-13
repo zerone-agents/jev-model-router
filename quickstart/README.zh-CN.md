@@ -14,8 +14,7 @@ cd jev-model-router/quickstart
 cp .env.example .env
 ```
 
-编辑 `.env`：分别运行两次 `openssl rand -hex 32`，为 `JEV_ROUTER_SETTINGS_TOKEN` 和 `JEV_ROUTER_INFERENCE_TOKEN` 设置**不同的**随机凭证。配置生成供应商和 TypeSafe 时填入相应 API Key。`.env` 已被 Git 和镜像构建忽略，请妥善保管。选择外部环境变量引用时，更多供应商的变量需要同时添加到 Compose 和 `.env`；下方托管凭证方式可省去每个供应商的这一步。
-
+编辑 `.env`：分别运行三次 `openssl rand -hex 32`，设置不同的 `JEV_ROUTER_SETTINGS_TOKEN`、`JEV_ROUTER_INFERENCE_TOKEN` 和 `JEV_ROUTER_ENCRYPTION_KEY`。前两项用于客户端认证，第三项用于加密托管模型凭证，必须与 SQLite 分开备份。执行 `chmod 600 .env`。该文件已被 Git 和镜像构建忽略，请妥善保管。生成与决策模型的 API Key 推荐启动后通过 CLI/API 配置，不再默认填入 `.env`。
 ```sh
 docker compose up -d
 docker compose ps
@@ -27,10 +26,11 @@ docker compose ps
 
 ## 远程管理 API Key
 
-当前正式版已支持托管凭证。连接旧实例时，用 `jev-router schema providers.put` 确认是否接受 `api_key`。用 `openssl rand -hex 32` 生成一次主密钥，填入云端私有 `.env` 的 `JEV_ROUTER_ENCRYPTION_KEY`（执行 `chmod 600 .env`），然后重建一次容器。主密钥需与 SQLite 分开备份；丢失后无法恢复已存储的供应商密钥。不要提交主密钥，也不要分享包含密钥值的 Compose 渲染结果。
+先分别查询 `jev-router schema providers.put` 和 `jev-router schema decision.put`，确认均支持只写的 `api_key`。旧发布镜像可能仅支持供应商密钥托管；若 `decision.put` 尚无此字段，请升级到包含该功能的版本，或使用下方源码构建方式。不要假定 `latest` 已包含尚未发布的改动。
 
-此后通过本地 CLI 的私有 JSON 文件或 stdin 添加、更换供应商 API Key。输入包含 `id`、`base_url` 和只写的 `api_key`，替代 `secret_ref`。后续供应商密钥变更无需修改 Compose 或重启。决策后端继续使用 `TYPESAFE_API_KEY`；现有供应商的 `env:`/`file:` 引用也继续支持。
+启动时配置加密主密钥后，通过私有 JSON 文件或 stdin 添加、轮换生成与决策 API Key，`api_key` 和 `secret_ref` 二选一。后续托管密钥变更无需修改 Compose 或重启。现有 `env:`/`file:` 引用继续支持；Compose 保留可选 `PROVIDER_API_KEY` 和 `TYPESAFE_API_KEY` 映射，仅用于兼容旧部署。更多外部环境变量须同时写入 `.env` 并显式映射到 Compose；已有引用迁移完成前请保留其变量。
 
+默认请用户自行在命令行配置密钥。只有用户明确确认环境安全、无泄漏风险，并明确将 API Key 提供给 Agent 用于配置时，Agent 才协助操作。不要提交密钥或分享含密钥的 Compose 渲染结果；加密主密钥应单独备份，丢失后无法恢复托管密钥。
 详见[远程 CLI 操作](../docs/cli-installation.zh-CN.md#托管供应商密钥)与[加密及恢复说明](../docs/configuration.md#managed-provider-credentials)。远程提交密钥要求 HTTPS，也可经 SSH 隧道使用回环 HTTP。反向代理终止 TLS 后应通过私有网络转发至容器。接口不返回明文密钥。旧密文版本会保留供在途请求使用；删除供应商不会清除历史密文及备份。尚未实现主密钥轮换，直接改值会导致存在托管记录的实例启动失败。
 
 ## 配置模型
@@ -40,6 +40,7 @@ docker compose ps
 ```sh
 docker compose exec -T router jev-router schema
 docker compose exec -T router jev-router schema providers.put
+docker compose exec -T router jev-router schema decision.put
 docker compose exec -T router jev-router call status.get --json - <<'JSON'
 {}
 JSON
@@ -48,17 +49,17 @@ JSON
 每次写入使用读取到的当前版本。供应商输入示例：
 
 ```json
-{"id":"cloud","base_url":"https://api.openai.com/v1","secret_ref":"env:PROVIDER_API_KEY"}
+{"id":"cloud","base_url":"https://api.openai.com/v1","api_key":"YOUR_PROVIDER_API_KEY"}
 ```
 
-保存为宿主机上的 `provider.json`，通过 stdin 传入（将 `VERSION` 替换为当前版本）：
+请自行在终端创建私有 `provider.json`（例如先执行 `umask 077`），在本地替换示例占位值，再通过 stdin 传入。真实密钥不要放进命令参数、Shell 历史或聊天中；将 `VERSION` 替换为当前配置版本：
 
 ```sh
 docker compose exec -T router jev-router call providers.put \
   --json - --expected-version VERSION --idempotency-key setup-provider-1 < provider.json
 ```
 
-按[配套 SKILL](../skills/jev-router/SKILL.md)创建禁用模型、测试并启用。多候选 `auto` 还需通过 `decision.put` 配置 `https://api.typesafe.ai`、`jev-1.13.0` 和 `env:TYPESAFE_API_KEY`。配置仍通过共享管理 API 保存；`.env` 不会创建模型资源。连接测试和路由检查可能调用付费服务。
+按[配套 SKILL](../skills/jev-router/SKILL.md)创建禁用模型、测试并启用。多候选 `auto` 还需配置 `decision.put`。先发现 schema，再创建私有 `decision.json`，包含 `base_url`、`model` 和只写的 `api_key`；第三方 Jev 兼容服务按文档填写 `path`。官网使用 `https://api.typesafe.ai` 和 `jev-1.13.0`。重新读取版本后，用 `docker compose exec -T router jev-router call decision.put --json - --expected-version VERSION --idempotency-key setup-decision-1 < decision.json` 提交。确认成功后删除本地凭证文件。配置仍通过共享管理 API 保存；`.env` 不会创建模型资源。连接测试和路由检查可能调用付费服务。
 
 容器中的 `localhost` 指容器自身，上游应使用可达的主机名，不能直接照搬宿主机 loopback 地址。修改环境密钥后执行 `docker compose up -d` 重建服务。
 
