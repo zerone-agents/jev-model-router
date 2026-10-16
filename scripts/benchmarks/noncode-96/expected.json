@@ -1,0 +1,68 @@
+{
+  "max": {
+    "passed": 88,
+    "n": 96,
+    "by_kind": {
+      "math": 31,
+      "knowledge": 27,
+      "reading": 30
+    },
+    "models": {
+      "qwen3.8-max": 96
+    },
+    "generation_cny": "0.9873840",
+    "successful_decision_usd": "0.000000000",
+    "invalid_final_format": 0,
+    "output_limit_stops": 0
+  },
+  "flash": {
+    "passed": 84,
+    "n": 96,
+    "by_kind": {
+      "math": 30,
+      "knowledge": 24,
+      "reading": 30
+    },
+    "models": {
+      "qwen3.8-flash": 96
+    },
+    "generation_cny": "0.1811183",
+    "successful_decision_usd": "0.000000000",
+    "invalid_final_format": 6,
+    "output_limit_stops": 6
+  },
+  "auto": {
+    "passed": 86,
+    "n": 96,
+    "by_kind": {
+      "math": 31,
+      "knowledge": 25,
+      "reading": 30
+    },
+    "models": {
+      "qwen3.8-flash": 83,
+      "qwen3.8-max": 13
+    },
+    "generation_cny": "0.5558036",
+    "successful_decision_usd": "0.004963224",
+    "invalid_final_format": 0,
+    "output_limit_stops": 0
+  },
+  "semantic": {
+    "passed": 86,
+    "n": 96,
+    "by_kind": {
+      "math": 31,
+      "knowledge": 25,
+      "reading": 30
+    },
+    "models": {
+      "qwen3.8-flash": 77,
+      "qwen3.8-max": 19
+    },
+    "generation_cny": "0.3079090",
+    "successful_decision_usd": "0.000000000",
+    "invalid_final_format": 4,
+    "output_limit_stops": 4
+  }
+}
