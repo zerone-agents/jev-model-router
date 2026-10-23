@@ -6,6 +6,19 @@ A lightweight model routing gateway for agents. Connect OpenAI Chat Completions 
 
 The current release is [v0.1.19](https://github.com/zerone-agents/jev-model-router/releases/tag/v0.1.19). It runs as a single Go service with SQLite, streams text and tool calls, and supports OpenAI-compatible and native Anthropic generation upstreams within the matrix below. Local Laya, sensitive-session locking, ArbiterOS and PostgreSQL remain planned.
 
+## Benchmark results
+
+Same Qwen3.8-Max / Flash model pool, frozen routing configurations. Each cell shows **tasks passed · generation cost (CNY)**.
+
+| Strategy | [LiveCodeBench · 128 tasks](docs/benchmarks/livecodebench-128.md) | [Math, knowledge & reading · 96 tasks](docs/benchmarks/noncode-96.md) |
+| --- | ---: | ---: |
+| Fixed Max | 88 · 8.7390 | 88 · 0.9874 |
+| Fixed Flash | 85 · 0.9988 | 84 · 0.1811 |
+| **Jev Model Router** | **91 · 7.5988** | **86 · 0.5558** |
+| Semantic Router | 85 · 6.5021 | 86 · 0.3079 |
+
+Jev Model Router used **13.05% less generation cost** than fixed Max on the code snapshot with three more passes, and **43.71% less** on non-code with two fewer passes. Code results are a selected shared-answer-bank replay; non-code results are independent online generations with failed-request recovery. These limited snapshots do not establish a stable ranking. Costs use frozen API-equivalent token prices and exclude routing fees, local compute and failed attempts; see the linked reports for accounting details and reproduction scripts.
+
 ## Client and upstream support
 
 | Client entry point | OpenAI-compatible upstream | Native Anthropic upstream |

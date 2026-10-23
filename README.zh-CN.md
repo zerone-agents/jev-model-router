@@ -6,6 +6,19 @@
 
 当前正式版为 [v0.1.19](https://github.com/zerone-agents/jev-model-router/releases/tag/v0.1.19)。单个 Go 服务配合 SQLite，支持文本与工具调用流式输出，并按下表接入 OpenAI 兼容和原生 Anthropic 生成上游。本地 Laya、敏感会话锁定、ArbiterOS 与 PostgreSQL 仍属规划。
 
+## 测评结果
+
+使用相同的 Qwen3.8-Max / Flash 模型池与冻结的路由配置。每格为 **通过题数 · 生成费用（人民币元）**。
+
+| 策略 | [LiveCodeBench · 128 题](docs/benchmarks/livecodebench-128.md) | [数学、知识与阅读 · 96 题](docs/benchmarks/noncode-96.md) |
+| --- | ---: | ---: |
+| 固定 Max | 88 · 8.7390 | 88 · 0.9874 |
+| 固定 Flash | 85 · 0.9988 | 84 · 0.1811 |
+| **Jev Model Router** | **91 · 7.5988** | **86 · 0.5558** |
+| Semantic Router | 85 · 6.5021 | 86 · 0.3079 |
+
+相比固定 Max，Jev Model Router 在代码快照中多通过 3 题，**生成费用降低 13.05%**；非代码测评中少通过 2 题，**生成费用降低 43.71%**。代码结果为选定的共享答案库回放，非代码结果为独立在线生成并补跑失败请求。这些有限样本快照不代表稳定排名。费用按冻结的 API Token 单价估算，不含路由费、本地计算及失败请求费用；统计细节与复现脚本见上方报告。
+
 ## 客户端与上游支持
 
 | 客户端入口 | OpenAI 兼容上游 | 原生 Anthropic 上游 |
