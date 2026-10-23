@@ -147,18 +147,30 @@ func TestMessagesStreamFailure(t *testing.T) {
 func TestMessagesTimeoutAndCancel(t *testing.T) {
 	for _, phase := range []string{"json", "first", "idle", "cancel"} {
 		t.Run(phase, func(t *testing.T) {
+			release := make(chan struct{})
 			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if phase == "idle" {
 					w.Header().Set("Content-Type", "text/event-stream")
 					fmt.Fprint(w, "data: {\"id\":\"x\",\"choices\":[{\"index\":0,\"delta\":{\"reasoning_content\":\"partial thought\"}}]}\n\n")
 					w.(http.Flusher).Flush()
 				}
-				time.Sleep(80 * time.Millisecond)
+				select {
+				case <-r.Context().Done():
+				case <-release:
+				}
 			}))
 			defer s.Close()
-			limits := Limits{FirstEventTimeout: 20 * time.Millisecond, IdleTimeout: 20 * time.Millisecond}
+			defer close(release)
+			limits := Limits{FirstEventTimeout: 100 * time.Millisecond, IdleTimeout: 100 * time.Millisecond}
+			if phase == "idle" {
+				// Allow connection setup under race instrumentation; this case tests idle expiry.
+				limits.FirstEventTimeout = 2 * time.Second
+			}
 			h := messagesHandler(t, s.URL, limits)
 			r := httptest.NewRequest("POST", "/v1/messages", strings.NewReader(fmt.Sprintf(`{"model":"auto","max_tokens":1024,"stream":%t,"messages":[{"role":"user","content":"query"}]}`, phase != "json")))
+			ctx, stop := context.WithTimeout(r.Context(), 5*time.Second)
+			defer stop()
+			r = r.WithContext(ctx)
 			r.Header.Set("x-api-key", "router-key")
 			r.Header.Set("anthropic-version", "2023-06-01")
 			r.Header.Set("Content-Type", "application/json")
@@ -171,7 +183,7 @@ func TestMessagesTimeoutAndCancel(t *testing.T) {
 			w := httptest.NewRecorder()
 			start := time.Now()
 			h.ServeHTTP(w, r)
-			if time.Since(start) > 70*time.Millisecond {
+			if time.Since(start) > 3*time.Second {
 				t.Error("request did not stop promptly")
 			}
 			if phase == "idle" {
