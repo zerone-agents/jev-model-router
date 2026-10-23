@@ -1,6 +1,6 @@
 ---
 name: jev-router
-description: Configure and inspect Jev Model Router through its CLI. Use when managing providers, model cards, routing preferences, connection tests, or automatic and explicit model selection.
+description: Deploy, configure and inspect Jev Model Router. Use for Docker Compose setup, providers, model cards, routing preferences, connection tests, or automatic and explicit model selection.
 license: Apache-2.0
 metadata:
   protocols:
@@ -8,6 +8,16 @@ metadata:
 ---
 
 # Jev Model Router
+
+## Deploy
+
+For an existing instance, skip deployment and use [remote CLI setup](../../docs/cli-installation.md#manage-a-remote-instance), then continue with Discover. For a new instance:
+
+1. Obtain a checkout of `https://github.com/zerone-agents/jev-model-router` and verify `docker compose version` works. If this skill was installed separately, resolve repository-relative links against that checkout; use its matching revision for the documentation and Compose files.
+2. Read [Docker Compose Quickstart](../../quickstart/README.md) before deployment. In the checkout's `quickstart/` directory, copy `.env.example` to `.env` only for a fresh setup. Provision distinct settings and inference tokens plus an encryption master key as described there; protect `.env` with mode 600 and back up the master key separately. Preserve existing configuration and volumes when reusing a deployment.
+3. From `quickstart/`, run `docker compose up -d`, then `docker compose ps`. Confirm the `router` service is healthy. Keep the default loopback binding for local use; follow the quickstart's HTTPS and dashboard-origin instructions for remote access.
+4. Run `docker compose exec -T router jev-router schema` and `docker compose exec -T router jev-router call status.get --json -` with `{}` on stdin. Both must succeed before configuration. Container health alone does not verify upstream models.
+5. Continue with Configure and verify below. Inside Compose, prefix CLI commands with `docker compose exec -T router`; pass local JSON files through stdin with `--json -`. Configure providers and disabled model cards, test and enable models, then configure `decision.put` for multi-candidate automatic routing. Follow Managed credentials below when supplying API keys.
 
 ## Discover
 

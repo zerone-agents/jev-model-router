@@ -30,6 +30,14 @@ Support is limited to the fields and combinations in the [compatibility matrix](
 
 ## Getting started
 
+### For Agent
+
+Install the `jev-router` skill from this repository's [`skills/jev-router`](skills/jev-router/SKILL.md) directory using your agent's skill installer (repository: `https://github.com/zerone-agents/jev-model-router`, path: `skills/jev-router`). Alternatively, clone the repository and register that directory with your agent's local skill loader. Keep the checkout available: the skill references its deployment and configuration docs.
+
+Load `jev-router` to deploy Jev Model Router with Docker Compose, configure providers, models and automatic routing, and verify connectivity. The skill includes the deployment steps and CLI configuration workflow.
+
+### Docker Compose
+
 Recommended: deploy the prebuilt Docker Hub image with [Docker Compose Quickstart](quickstart/README.md). It includes persistent SQLite and the management UI; no local Go or Node installation is needed.
 
 ### Local CLI

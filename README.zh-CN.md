@@ -30,6 +30,14 @@
 
 ## 快速开始
 
+### For Agent
+
+通过你的 Agent 的 Skill 安装器安装本仓库的 [`skills/jev-router`](skills/jev-router/SKILL.md)：仓库地址为 `https://github.com/zerone-agents/jev-model-router`，目录为 `skills/jev-router`，技能名为 `jev-router`。也可以克隆仓库，再通过 Agent 的本地 Skill 加载机制注册该目录。请保留仓库副本，SKILL 会引用其中的部署和配置文档。
+
+加载 `jev-router` 后，按 SKILL 中的步骤通过 Docker Compose 部署 Jev Model Router，配置供应商、模型与自动路由，并验证连通性。SKILL 包含部署步骤和 CLI 配置流程。
+
+### Docker Compose
+
 推荐通过 [Docker Compose 快速开始](quickstart/README.zh-CN.md)部署 Docker Hub 预构建镜像，包含 SQLite 持久化和管理 UI，无需本地安装 Go 或 Node。
 
 ### 本地 CLI
