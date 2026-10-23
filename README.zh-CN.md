@@ -6,6 +6,19 @@
 
 当前正式版为 [v0.1.19](https://github.com/zerone-agents/jev-model-router/releases/tag/v0.1.19)。单个 Go 服务配合 SQLite，支持文本与工具调用流式输出，并按下表接入 OpenAI 兼容和原生 Anthropic 生成上游。本地 Laya、敏感会话锁定、ArbiterOS 与 PostgreSQL 仍属规划。
 
+## 测评结果
+
+使用相同的 Qwen3.8-Max / Flash 模型池与冻结的路由配置。每格为 **通过题数 · 生成费用（人民币元）**。
+
+| 策略 | [LiveCodeBench · 128 题](docs/benchmarks/livecodebench-128.md) | [数学、知识与阅读 · 96 题](docs/benchmarks/noncode-96.md) |
+| --- | ---: | ---: |
+| 固定 Max | 88 · 8.7390 | 88 · 0.9874 |
+| 固定 Flash | 85 · 0.9988 | 84 · 0.1811 |
+| **Jev Model Router** | **91 · 7.5988** | **86 · 0.5558** |
+| Semantic Router | 85 · 6.5021 | 86 · 0.3079 |
+
+相比固定 Max，Jev Model Router 在代码快照中多通过 3 题，**生成费用降低 13.05%**；非代码测评中少通过 2 题，**生成费用降低 43.71%**。代码结果为选定的共享答案库回放，非代码结果为独立在线生成并补跑失败请求。这些有限样本快照不代表稳定排名。费用按冻结的 API Token 单价估算，不含路由费、本地计算及失败请求费用；统计细节与复现脚本见上方报告。
+
 ## 客户端与上游支持
 
 | 客户端入口 | OpenAI 兼容上游 | 原生 Anthropic 上游 |
@@ -16,6 +29,14 @@
 支持范围以[兼容矩阵](docs/compatibility.md)公布的字段组合为准，无法保留语义的转换明确失败。BigModel `glm-5.3` 和 `glm-5.3-flash` 通过本地 Router 完成了 12 个原始 Agent SDK 示例，见[兼容范围与验证方法](docs/compatibility.md)。该结果不代表所有 Anthropic 部署或原生签名历史均兼容。
 
 ## 快速开始
+
+### For Agent
+
+通过你的 Skill 安装器安装本仓库的 [`skills/jev-router`](skills/jev-router/SKILL.md)：仓库地址为 `https://github.com/zerone-agents/jev-model-router`，目录为 `skills/jev-router`，技能名为 `jev-router`。也可以克隆仓库，再通过 Agent 的本地 Skill 加载机制注册该目录。请保留仓库副本，SKILL 会引用其中的部署和配置文档。
+
+加载 `jev-router` 后，按 SKILL 中的步骤通过 Docker Compose 部署 Jev Model Router，配置供应商、模型与自动路由，并验证连通性。SKILL 包含部署步骤和 CLI 配置流程。
+
+### Docker Compose
 
 推荐通过 [Docker Compose 快速开始](quickstart/README.zh-CN.md)部署 Docker Hub 预构建镜像，包含 SQLite 持久化和管理 UI，无需本地安装 Go 或 Node。
 
