@@ -138,11 +138,39 @@ Use the returned Router request ID to find its `records.list` entry and inspect 
 decisions and Auto reselection. `complete=false` means one or more invoked
 decisions lack valid usage; the counts are only a lower bound, not a final cost.
 `invocations` counts decision adapter calls, including local failures before
-transmission, and is not a billable request count. Explicit and sole-candidate
-paths report zero invocations and complete zero usage. Historical records omit
+transmission, and is not a billable request count. Explicit and sole-candidate paths that do not require automatic effort
+selection report zero invocations and complete zero usage. Historical records omit
 this object: treat their decision cost as unknown, never zero.
 
 These counts exclude generation usage. Use the actual inference request ID to
 join records with generation results; a separate `route.inspect` call incurs
 its own decision and cannot stand in for execution usage. Records remain best
 effort; missing records or `records_degraded` prevent complete reconciliation.
+
+## Configure automatic effort
+
+Discover `models.get`, `models.put` and `route.inspect` on the target instance.
+Read the current model and version, preserve all replacement fields, and add
+`"auto_effort":{"allowed":["low","high"]}` only after confirming the upstream
+model supports those values. Use the discovered write envelope and idempotency
+rules. Omit auto_effort to disable it; do not send an empty array. There is no
+Dashboard effort editor or display.
+
+Auto uses independent model and task-effort judgments in one Jev request.
+Levels ascend minimal/low/medium/high/xhigh/max. The router uses the nearest
+allowed level at or below the answer, or the lowest allowed level if no lower
+one exists. Anthropic automatic configuration supports low/medium/high/max.
+Unconfigured models receive no injected effort. These labels do not measure
+cross-model ability, token budget or price.
+
+Verify `effective_effort` with Chat-format `route.inspect`, then use actual
+inference to validate provider acceptance. Inspection is another decision call,
+not a prediction guaranteed identical to a later decision. Native Messages
+budgets, output_config and signed history cannot be inspected through this Chat
+contract; verify them through full `/v1/messages` requests instead.
+
+Explicit model IDs never add automatic effort or a Jev call. Explicit effort,
+disabled thinking or fixed thinking budgets override automatic selection; never
+silently lower caller effort after an upstream error. A sole model with multiple
+allowed levels still incurs an effort decision. A sole singleton applies its
+only level directly. Auto fallback adapts each attempt independently.

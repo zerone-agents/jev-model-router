@@ -141,3 +141,18 @@ func TestProviderProtocolEndpoint(t *testing.T) {
 		}
 	}
 }
+func TestChatInspectionEffectiveEffort(t *testing.T) {
+	c, s, g := checksFixture()
+	s.s.Models[0].Enabled = true
+	s.s.Models[0].AutoEffort = &routing.AutoEffortConfig{Allowed: []string{"high"}}
+	service := management.New(s, nil)
+	c.Register(service)
+	result, err := service.Execute(context.Background(), "settings", management.Call{CapabilityID: "route.inspect", Input: json.RawMessage(`{"model":"auto","messages":[{"role":"user","content":"hi"}]}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := json.Marshal(result.Data)
+	if !strings.Contains(string(b), `"effective_effort":"high"`) || g.calls != 0 {
+		t.Fatalf("%s calls=%d", b, g.calls)
+	}
+}

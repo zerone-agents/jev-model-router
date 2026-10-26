@@ -14,6 +14,7 @@ type Planner struct {
 	Estimate     func(Model, Request) (int64, bool, error)
 }
 type Plan struct {
+	EffectiveEffort           string            `json:"effective_effort,omitempty"`
 	DecisionInvoked           bool              `json:"-"`
 	HealthExclusionsTruncated bool              `json:"health_exclusions_truncated,omitempty"`
 	HealthExclusions          []HealthExclusion `json:"health_exclusions,omitempty"`
@@ -52,7 +53,7 @@ func (p *Planner) PlanPreparedWithEstimate(ctx context.Context, s Snapshot, r Re
 }
 
 func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Target) error, prepared bool, preparedEstimate PreparedEstimate, options PlanOptions) (result Plan, retErr error) {
-	result = Plan{ConfigVersion: s.Version, CandidateIDs: []string{}}
+	result = Plan{ConfigVersion: s.Version, CandidateIDs: []string{}, EffectiveEffort: ExplicitEffort(r)}
 	if !prepared {
 		if e := ValidateRequest(r); e != nil {
 			return result, e
@@ -65,6 +66,11 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 	}
 	// Freeze all slices before any external decision call.
 	s.Models = append([]Model{}, s.Models...)
+	for i, m := range s.Models {
+		if m.AutoEffort != nil {
+			s.Models[i].AutoEffort = &AutoEffortConfig{Allowed: append([]string(nil), m.AutoEffort.Allowed...)}
+		}
+	}
 	s.Providers = append([]Provider{}, s.Providers...)
 	if r.Model == "auto" {
 		enabled := false
@@ -180,6 +186,7 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 			result.ModelID = m.ID
 			result.CandidateIDs = []string{m.ID}
 			result.Path = "explicit"
+			result.EffectiveEffort = outgoingEffort(target, result.EffectiveEffort)
 			return result, nil
 		}
 		var units int64
@@ -238,7 +245,17 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 	} else {
 		result.Path = "jev_choice"
 	}
-	if r.Model == "auto" && len(targets) > 1 {
+	selectEffort := false
+	if AutomaticEffortAllowed(r) {
+		for _, t := range targets {
+			if t.Model.AutoEffort != nil {
+				selectEffort = true
+			}
+		}
+	}
+	needsEffortDecision := selectEffort && (len(targets) > 1 || len(selected.Model.AutoEffort.Allowed) > 1)
+	requestedEffort := ""
+	if r.Model == "auto" && (len(targets) > 1 || needsEffortDecision) {
 		if p.Decider == nil || s.Decision.Model == "" {
 			return result, Fail("config_missing", "decision configuration required")
 		}
@@ -247,10 +264,19 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 			models[i] = v.Model
 		}
 		result.DecisionInvoked = true
-		d, e := p.Decider.Choose(ctx, s.Decision, DecisionInput{Retry: options.Retry, Prompt: s.Prompt, Candidates: models, Request: r})
+		d, e := p.Decider.Choose(ctx, s.Decision, DecisionInput{SelectEffort: needsEffortDecision, Retry: options.Retry, Prompt: s.Prompt, Candidates: models, Request: r})
 		result.DecisionUsage = d.Usage
 		if e != nil {
 			return result, e
+		}
+		if needsEffortDecision {
+			if effortRank(d.Effort) < 0 {
+				return result, Fail("invalid_decision", "invalid automatic effort")
+			}
+			requestedEffort = d.Effort
+		}
+		if len(targets) == 1 {
+			d.ModelID = selected.Model.ID
 		}
 		found := false
 		for _, v := range targets {
@@ -264,6 +290,31 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 			return result, Fail("invalid_decision", "unknown selected model")
 		}
 	}
+	if selectEffort && selected.Model.AutoEffort != nil {
+		if !needsEffortDecision {
+			requestedEffort = selected.Model.AutoEffort.Allowed[0]
+		}
+		var err error
+		result.EffectiveEffort, err = ResolveAutoEffort(selected.Model.AutoEffort, requestedEffort)
+		if err != nil {
+			return result, err
+		}
+		if !prepared {
+			effective := WithEffectiveEffort(r, result.EffectiveEffort)
+			if err = ValidateRequest(effective); err != nil {
+				return result, err
+			}
+			if p.PrepareCheck != nil {
+				err = p.PrepareCheck(effective)(selected)
+			} else if p.Check != nil {
+				err = p.Check(selected, effective)
+			}
+			if err != nil {
+				return result, err
+			}
+		}
+	}
+	result.EffectiveEffort = outgoingEffort(selected, result.EffectiveEffort)
 	result.Target = selected
 	result.ModelID = selected.Model.ID
 	result.ContextExact = exact[selected.Model.ID]

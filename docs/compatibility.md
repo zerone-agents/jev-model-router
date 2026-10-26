@@ -31,7 +31,7 @@ Jev defaults to 255 candidates and 32,000 serialized UTF-8 bytes including quest
 
 Generation capacity estimation uses `semantic_bytes_v1`: full history text, including tool results and reasoning/refusal, plus tool names/descriptions is estimated as ceil(total UTF-8 bytes / 4). Tool arguments use decoded string bytes; tool schemas, response_format and tool_choice use compact JSON bytes, accounted separately. Framing reserves 4 per message, 8 per tool call/definition and 8192 per image. Image URL/base64 and non-prompt fields such as model/stream/temperature do not count as text. Input and output are separate; output is reserved once. Unspecified OpenAI output reserves 4096 without injecting that limit upstream; native Anthropic sends and reserves 65536. `route.inspect.context_estimate` reports the method, text/structured bytes, image/framing, input, output reserve and total. `context_exact=false` indicates a heuristic, not a multilingual or visual-model upper bound.
 
-When every otherwise eligible Auto candidate exceeds a non-exact capacity estimate, all models tied for the largest ContextLimit become overflow candidates, with path `context_estimate_fallback`. A sole candidate executes directly; Jev selects among ties, preserving candidates and decision usage. Normal capacity matches take precedence; exact overflow never uses this path. Capability, enablement and provider checks remain mandatory. Explicit selection skips local capacity estimation and delegates limits to the upstream without switching models. Jev failures remain failures, with no arbitrary substitute. Generation inputs and output limits remain unchanged. This capacity policy is distinct from Auto fallback after an eligible generation failure: Auto can now reselect once before semantic output, excluding the failed model. SDK retries remain disabled; explicit requests never switch models.
+When every otherwise eligible Auto candidate exceeds a non-exact capacity estimate, all models tied for the largest ContextLimit become overflow candidates, with path `context_estimate_fallback`. A sole candidate skips model selection but may still need an automatic effort decision; Jev selects among ties, preserving candidates and decision usage. Normal capacity matches take precedence; exact overflow never uses this path. Capability, enablement and provider checks remain mandatory. Explicit selection skips local capacity estimation and delegates limits to the upstream without switching models. Jev failures remain failures, with no arbitrary substitute. Generation inputs and output limits remain unchanged. This capacity policy is distinct from Auto fallback after an eligible generation failure: Auto can now reselect once before semantic output, excluding the failed model. SDK retries remain disabled; explicit requests never switch models.
 
 Plain `response_format.type=text` does not require structured-output capability; JSON modes do. Jev's required input also includes output format/JSON Schema, tool_choice, parallel_tool_calls and max_completion_tokens, all counted in its decision budget.
 
@@ -189,3 +189,20 @@ JEV_TEST_ANTHROPIC_SDK=/absolute/path/to/node-project go test ./internal/transpo
 SDK 0.52.0 passes auto/explicit × JSON/SSE signed thinking, redacted history, images, cache and is_error tool replay with maxRetries=0. Low-level streaming preserves max_tokens and incomplete partial_json. Its high-level finalMessage aggregates the tested incomplete input to `{}`; missing usage causes its high-level helper to throw, while JSON/low-level events preserve absence. These SDK behaviors do not alter Router output. Mock signatures establish preservation only; real Claude signature authenticity remains unverified.
 
 Real native Messages acceptance used a temporary local Router and official Anthropic SDK 0.52.0 against glm-5.3/glm-5.3-flash: two 14-call runs completed JSON/SSE text and tools/continuation, plus Flash image analysis. The replay run reused complete original assistant blocks and verified returned tool-result text. Flash identified the synthetic red square, blue circle and green triangle in both modes. GLM-5.3 text emitted signed thinking; these low-effort tool turns and Flash responses did not emit thinking. Cache counters were zero; cache hits and real Claude signature authenticity are not established. No production configuration was changed.
+
+## Automatic effort (#58)
+
+Optional model `auto_effort.allowed` enables automatic parameter adaptation for
+Auto requests only. One Jev call can contain independent model and effort
+questions; task effort is not conditioned on the model answer. Select the highest
+allowed level at or below the target, falling to the lowest allowed level when
+necessary. Unconfigured models omit injection. Explicit caller controls remain
+unchanged. See the [management contract](../contracts/README.md#automatic-task-effort)
+for configuration, singleton behavior and caller precedence.
+
+Chat and native Messages JSON/SSE paths apply effort to full request copies.
+Chat-only `route.inspect` cannot represent native Messages thinking budgets or
+signed history; native acceptance uses full HTTP requests and upstream captures.
+Local mocked end-to-end tests cover both input protocols against OpenAI and
+Anthropic upstreams. They do not establish real Jev selection quality or upstream
+model support; live multi-question validation requires usable decision credentials.
