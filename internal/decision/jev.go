@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 )
@@ -21,6 +22,13 @@ type jev struct {
 func New(client *http.Client, resolve func(string) ([]byte, error), budget BudgetPolicy) routing.Decider {
 	if client == nil {
 		client = &http.Client{}
+		// All production callers bound the complete decision with a context.
+		// Do not impose DefaultTransport's separate ten-second TLS deadline.
+		if transport, ok := http.DefaultTransport.(*http.Transport); ok {
+			cloned := transport.Clone()
+			cloned.TLSHandshakeTimeout = 0
+			client.Transport = cloned
+		}
 	}
 	copy := *client
 	copy.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
@@ -118,6 +126,10 @@ func decisionIOError(ctx context.Context, err error) error {
 	}
 	if ctx.Err() != nil || errors.Is(err, context.Canceled) {
 		return routing.Fail("cancelled", "decision cancelled")
+	}
+	var timeout net.Error
+	if errors.As(err, &timeout) && timeout.Timeout() {
+		return routing.Fail("timeout", "decision transport timed out")
 	}
 	return routing.Fail("upstream_error", "decision transport failed")
 }
