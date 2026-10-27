@@ -196,6 +196,9 @@ Anthropic, explicit none becomes thinking.disabled and therefore omits
 effective_effort; the original caller control is still forwarded through conversion. Native Messages
 fields are rejected, not converted into equivalent inspection inputs. Native
 Messages is verified through full request execution and upstream captures.
-No effort fields are added to routing records, public inference response metadata
-or Playground events. Dashboard adds no effort editor or display; existing edits
-preserve the hidden model configuration. Configuration belongs to CLI/Agents.
+No effort fields are added to routing records or public inference response metadata.
+Dashboard edits preserve the model effort configuration. Configuration belongs to CLI/Agents.
+
+Playground route events expose optional `effective_effort` for the current attempt. The dashboard shows configured automatic effort levels and the actual outgoing effort read-only. Missing effort is shown as not set, without inferring provider defaults. Configuration remains CLI/Agent-managed; routing records and public inference response metadata are unchanged.
+
+Effort Choice criteria retain ascending strength order in serialized requests and order-preserving JSON formatting: minimal, low, medium, high, xhigh, max. The wire format remains a JSON object; meanings are defined by descriptions rather than object ordering.

@@ -20,16 +20,17 @@ type Service struct {
 	DecisionTimeout time.Duration
 }
 type Request struct {
-	OnRetry      func() error
-	snapshot     *routing.Snapshot
-	options      routing.PlanOptions
-	current      int
-	diagnostics  []routing.AttemptDiagnostic
-	service      *Service
-	ctx          context.Context
-	parent       context.Context
-	cancelBudget context.CancelFunc
-	record       routing.Record
+	OnRetry         func() error
+	snapshot        *routing.Snapshot
+	options         routing.PlanOptions
+	current         int
+	diagnostics     []routing.AttemptDiagnostic
+	service         *Service
+	ctx             context.Context
+	parent          context.Context
+	cancelBudget    context.CancelFunc
+	effectiveEffort string
+	record          routing.Record
 }
 
 func (s *Service) Begin(ctx context.Context, id string) *Request {
@@ -69,6 +70,7 @@ func (r *Request) PlanPrepared(req routing.Request, check func(routing.Target) e
 	r.record.DecisionUsage.OutputTokens += u.OutputTokens
 	r.record.DecisionUsage.Invocations += u.Invocations
 	r.record.DecisionUsage.Complete = r.record.DecisionUsage.Complete && u.Complete
+	r.effectiveEffort = plan.EffectiveEffort
 	r.record.Path = plan.Path
 	r.record.CandidateIDs = plan.CandidateIDs
 	if plan.ModelID != "" {
@@ -98,15 +100,16 @@ func (r *Request) Finish(err error) {
 func (r *Request) Context() context.Context { return r.ctx }
 
 type RouteMetadata struct {
-	Attempt        int                         `json:"attempt,omitempty"`
-	Attempts       []routing.AttemptDiagnostic `json:"attempts,omitempty"`
-	RequestID      string                      `json:"request_id"`
-	ModelID        string                      `json:"model_id"`
-	Path           string                      `json:"path"`
-	ConfigVersion  int64                       `json:"config_version"`
-	DecisionMillis int64                       `json:"decision_ms"`
+	EffectiveEffort string                      `json:"effective_effort,omitempty"`
+	Attempt         int                         `json:"attempt,omitempty"`
+	Attempts        []routing.AttemptDiagnostic `json:"attempts,omitempty"`
+	RequestID       string                      `json:"request_id"`
+	ModelID         string                      `json:"model_id"`
+	Path            string                      `json:"path"`
+	ConfigVersion   int64                       `json:"config_version"`
+	DecisionMillis  int64                       `json:"decision_ms"`
 }
 
 func (r *Request) Metadata() RouteMetadata {
-	return RouteMetadata{Attempt: r.current, Attempts: r.DiagnosticAttempts(), RequestID: r.record.RequestID, ModelID: r.record.ModelID, Path: r.record.Path, ConfigVersion: r.record.ConfigVersion, DecisionMillis: r.record.DecisionMillis}
+	return RouteMetadata{EffectiveEffort: r.effectiveEffort, Attempt: r.current, Attempts: r.DiagnosticAttempts(), RequestID: r.record.RequestID, ModelID: r.record.ModelID, Path: r.record.Path, ConfigVersion: r.record.ConfigVersion, DecisionMillis: r.record.DecisionMillis}
 }

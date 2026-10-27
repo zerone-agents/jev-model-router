@@ -47,6 +47,9 @@ func TestFallbackEffortIsAttemptLocal(t *testing.T) {
 		if p.EffectiveEffort != want {
 			t.Fatalf("attempt %d got %s", n, p.EffectiveEffort)
 		}
+		if got := r.Metadata().EffectiveEffort; got != want {
+			t.Fatalf("attempt %d metadata effort = %q, want %q", n, got, want)
+		}
 		copy := routing.WithEffectiveEffort(req, p.EffectiveEffort)
 		copy.Options["reasoning_effort"] = json.RawMessage(`"max"`)
 		if n == 1 {

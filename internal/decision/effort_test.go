@@ -25,6 +25,19 @@ func TestIndependentEffortQuestions(t *testing.T) {
 				Questions map[string]json.RawMessage
 			}
 			json.NewDecoder(r.Body).Decode(&b)
+			var effort struct{ Criteria json.RawMessage }
+			if err := json.Unmarshal(b.Questions["effort"], &effort); err != nil {
+				t.Error(err)
+				return
+			}
+			previous := -1
+			for _, level := range []string{"minimal", "low", "medium", "high", "xhigh", "max"} {
+				pos := bytes.Index(effort.Criteria, []byte(`"`+level+`":`))
+				if pos <= previous {
+					t.Errorf("criteria not in strength order: %s", effort.Criteria)
+				}
+				previous = pos
+			}
 			want := 2
 			if sole {
 				want = 1

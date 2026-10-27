@@ -221,7 +221,33 @@ function Editor(props: Props & { initial: Snapshot }) {
               }))
             }
           />
-          <div className="capabilities">
+          {props.canReadProvider && (
+            <ProviderDetails
+              {...props}
+              key={snapshot.model.provider_id}
+              providerId={snapshot.model.provider_id}
+            />
+          )}
+          <div className="capabilities effort-tags">
+            <span className="read-only">
+              {text(lang, "Reasoning effort", "推理强度")}:
+            </span>
+            {snapshot.model.auto_effort?.allowed.length ? (
+              snapshot.model.auto_effort.allowed.map((effort) => (
+                <span className="badge" key={effort}>
+                  {effort}
+                </span>
+              ))
+            ) : (
+              <span className="read-only">
+                {text(lang, "Not configured", "未配置")}
+              </span>
+            )}
+          </div>
+          <div className="capabilities effort-tags">
+            <span className="read-only">
+              {text(lang, "Other tags:", "其他标签：")}
+            </span>
             {Object.entries(snapshot.model.capabilities).map(([k, v]) => (
               <span className="badge" key={k}>
                 {k}:{" "}
@@ -231,13 +257,6 @@ function Editor(props: Props & { initial: Snapshot }) {
               </span>
             ))}
           </div>
-          {props.canReadProvider && (
-            <ProviderDetails
-              {...props}
-              key={snapshot.model.provider_id}
-              providerId={snapshot.model.provider_id}
-            />
-          )}
           <p className="read-only">
             {text(
               lang,

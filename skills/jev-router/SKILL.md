@@ -174,3 +174,5 @@ disabled thinking or fixed thinking budgets override automatic selection; never
 silently lower caller effort after an upstream error. A sole model with multiple
 allowed levels still incurs an effort decision. A sole singleton applies its
 only level directly. Auto fallback adapts each attempt independently.
+
+Playground route events expose optional `effective_effort` for the current attempt. The dashboard shows configured automatic effort levels and the actual outgoing effort read-only. Missing effort is shown as not set, without inferring provider defaults. Configuration remains CLI/Agent-managed; routing records and public inference response metadata are unchanged.

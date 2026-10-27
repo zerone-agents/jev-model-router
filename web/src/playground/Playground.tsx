@@ -575,6 +575,10 @@ export function Playground({ client, lang, onError }: PageProps) {
               <dl>
                 <dt>{text(lang, "Selected model", "选定模型")}</dt>
                 <dd>{route.model_id}</dd>
+                <dt>{text(lang, "Effort", "推理强度")}</dt>
+                <dd>
+                  {route.effective_effort || text(lang, "Not set", "未设置")}
+                </dd>
                 <dt>{text(lang, "Selection path", "选择路径")}</dt>
                 <dd>
                   {{

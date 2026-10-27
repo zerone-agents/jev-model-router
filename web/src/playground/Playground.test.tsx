@@ -12,7 +12,7 @@ it("recovers from initial limits timeout and completes a routed response", async
   const fetcher = vi.fn(async (path: RequestInfo | URL, init?: RequestInit) =>
     String(path).endsWith("completions")
       ? new Response(
-          'event: route\ndata: {"request_id":"r","model_id":"flash","path":"single_candidate","config_version":1,"decision_ms":3}\n\nevent: delta\ndata: {"reasoning_content":"hidden-secret"}\n\nevent: delta\ndata: {"content":"Hello there"}\n\nevent: done\ndata: {"finish_reason":"stop"}\n\n',
+          'event: route\ndata: {"request_id":"r","model_id":"flash","path":"single_candidate","config_version":1,"decision_ms":3,"effective_effort":"high"}\n\nevent: delta\ndata: {"reasoning_content":"hidden-secret"}\n\nevent: delta\ndata: {"content":"Hello there"}\n\nevent: done\ndata: {"finish_reason":"stop"}\n\n',
           { headers: { "Content-Type": "text/event-stream" } },
         )
       : String(path).endsWith("models.list")
@@ -95,6 +95,7 @@ it("recovers from initial limits timeout and completes a routed response", async
   expect(screen.getByText("11 / 32,768 bytes")).toBeInTheDocument();
   await user.keyboard("{Enter}");
   expect(await screen.findByText("Hello there")).toBeInTheDocument();
+  expect(screen.getByText("high")).toBeInTheDocument();
   expect(screen.queryByText("hidden-secret")).not.toBeInTheDocument();
   expect(screen.queryByText("Completed")).not.toBeInTheDocument();
   expect(screen.getByText("11 / 32,768 bytes")).toBeInTheDocument();

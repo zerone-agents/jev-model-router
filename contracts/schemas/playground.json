@@ -295,6 +295,10 @@
                 "outcome"
               ]
             }
+          },
+          "effective_effort": {
+            "type": "string",
+            "description": "Final outgoing effort parameter; omitted when no effort parameter is sent."
           }
         },
         "required": [
