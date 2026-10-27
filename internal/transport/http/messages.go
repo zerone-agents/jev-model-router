@@ -91,10 +91,18 @@ func (s *server) messages(w http.ResponseWriter, r *http.Request) {
 	}
 	started := false
 	finalErr = execution.Execute(prepared.Projection(), prepared.Check, prepared.Estimate, prepared.Summary(), func(attemptCtx context.Context, plan routing.Plan, _ int) inference.AttemptResult {
+		effective, err := prepared.WithEffectiveEffort(plan.EffectiveEffort)
+		if err == nil {
+			err = effective.Check(plan.Target)
+		}
+		if err != nil {
+			return inference.AttemptResult{Err: err}
+		}
+
 		if !prepared.Projection().Stream {
 			ctx, cancel := routing.WithStageTimeout(attemptCtx, s.limits.FirstEventTimeout)
 			defer cancel()
-			result, e := gen.CompleteMessages(ctx, plan.Target, prepared)
+			result, e := gen.CompleteMessages(ctx, plan.Target, effective)
 			e = contextError(ctx, e)
 			if e != nil {
 				return inference.AttemptResult{Err: e, RetryableGenerationFailure: routing.HealthOutcome(e).Kind != ""}
@@ -113,7 +121,7 @@ func (s *server) messages(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 		stopOpening := context.AfterFunc(firstCtx, func() { stop(context.Cause(firstCtx)) })
 		defer stopOpening()
-		stream, e := gen.StreamMessages(ctx, plan.Target, prepared)
+		stream, e := gen.StreamMessages(ctx, plan.Target, effective)
 		if e != nil {
 			e = contextError(firstCtx, e)
 			return inference.AttemptResult{Err: e, RetryableGenerationFailure: routing.HealthOutcome(e).Kind != ""}

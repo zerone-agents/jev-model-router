@@ -79,10 +79,19 @@ func (p *PreparedMessages) Projection() routing.Request {
 	_ = json.Unmarshal(p.body, &fields)
 	var output struct {
 		Format json.RawMessage `json:"format"`
+		Effort json.RawMessage `json:"effort"`
 	}
 	_ = json.Unmarshal(fields["output_config"], &output)
 	if len(output.Format) > 0 {
 		r.Options["response_format"] = json.RawMessage(`{"type":"json_object"}`)
+	}
+	if output.Effort != nil {
+		r.Options["reasoning_effort"] = append(json.RawMessage(nil), output.Effort...)
+	}
+	if doc.Thinking != nil {
+		if doc.Thinking.Type == "disabled" || doc.Thinking.Budget != "" {
+			r.AutoEffortBlocked = true
+		}
 	}
 	return r
 }

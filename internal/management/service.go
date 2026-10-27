@@ -113,13 +113,17 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 	switch c.CapabilityID {
 	case "status.get":
 		n := 0
+		needsDecision := false
 		for _, m := range cfg.Models {
 			if m.Enabled {
 				n++
+				if m.AutoEffort != nil && len(m.AutoEffort.Allowed) > 1 {
+					needsDecision = true
+				}
 			}
 		}
 		degraded := s.RecordsDegraded != nil && s.RecordsDegraded()
-		result := Success(map[string]any{"version": cfg.Version, "ready": n > 0 && (n == 1 || cfg.Decision.Model != ""), "enabled_models": n, "records_degraded": degraded, "auto_fallback": s.Fallback}, time.Now())
+		result := Success(map[string]any{"version": cfg.Version, "ready": n > 0 && ((n == 1 && !needsDecision) || cfg.Decision.Model != ""), "enabled_models": n, "records_degraded": degraded, "auto_fallback": s.Fallback}, time.Now())
 		if s.Health != nil && s.Health.Service.Warning() {
 			result.Warnings = append(result.Warnings, "health_degraded")
 		}

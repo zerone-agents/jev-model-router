@@ -49,14 +49,15 @@ type Capabilities struct {
 	StructuredOutput bool                   `json:"structured_output"`
 }
 type Model struct {
-	Revision     string       `json:"-"`
-	ID           string       `json:"id"`
-	ProviderID   string       `json:"provider_id"`
-	UpstreamName string       `json:"upstream_name"`
-	Description  string       `json:"description"`
-	Location     string       `json:"location"`
-	Enabled      bool         `json:"enabled"`
-	Capabilities Capabilities `json:"capabilities"`
+	AutoEffort   *AutoEffortConfig `json:"auto_effort,omitempty"`
+	Revision     string            `json:"-"`
+	ID           string            `json:"id"`
+	ProviderID   string            `json:"provider_id"`
+	UpstreamName string            `json:"upstream_name"`
+	Description  string            `json:"description"`
+	Location     string            `json:"location"`
+	Enabled      bool              `json:"enabled"`
+	Capabilities Capabilities      `json:"capabilities"`
 }
 type DecisionConfig struct {
 	Path      string `json:"path,omitempty"`
@@ -101,12 +102,13 @@ type CallFunction struct {
 	Arguments string `json:"arguments"`
 }
 type Request struct {
-	Model    string
-	Messages []Message
-	Tools    []Tool
-	Options  map[string]json.RawMessage
-	Stream   bool
-	raw      json.RawMessage
+	AutoEffortBlocked bool `json:"-"`
+	Model             string
+	Messages          []Message
+	Tools             []Tool
+	Options           map[string]json.RawMessage
+	Stream            bool
+	raw               json.RawMessage
 }
 
 func (r *Request) UnmarshalJSON(b []byte) error {
@@ -217,12 +219,14 @@ type Generator interface {
 }
 
 type DecisionInput struct {
-	Retry      *RetryContext
-	Prompt     string
-	Candidates []Model
-	Request    Request
+	SelectEffort bool
+	Retry        *RetryContext
+	Prompt       string
+	Candidates   []Model
+	Request      Request
 }
 type Decision struct {
+	Effort  string
 	ModelID string
 	Usage   *Usage
 }

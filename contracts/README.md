@@ -86,7 +86,7 @@ Optional `capabilities.reasoning` remains readable/writable for compatibility bu
 
 `decision_ms` covers selection only: validation, filtering and any decision call. It excludes generation time; generation_ms is no longer emitted. `request_summary` extracts text from the last user message locally, collapses whitespace and limits it to 120 Unicode characters without another model call. Missing text and older records omit it. Tool messages, image addresses and earlier messages are excluded. Default retention is seven days and 100000 records, evicting the oldest by insertion order. Startup configuration controls both; see configuration.md.
 
-Optional `route.inspect.context_estimate` returns semantic_bytes_v1 components and total input/output reserve. The context_estimate_fallback path means all eligible auto candidates exceeded estimated capacity and the largest-context fallback was used; it does not establish exact capacity. One largest candidate executes directly; ties send only those candidates to Jev once. The path remains context_estimate_fallback, retaining complete candidate_ids and decision usage.
+Optional `route.inspect.context_estimate` returns semantic_bytes_v1 components and total input/output reserve. The context_estimate_fallback path means all eligible auto candidates exceeded estimated capacity and the largest-context fallback was used; it does not establish exact capacity. One largest candidate skips model selection but may still require an effort decision; ties send only those candidates to Jev once. The path remains context_estimate_fallback, retaining complete candidate_ids and decision usage.
 
 Explicit-model route.inspect skips context estimation, omits context_estimate and sets context_exact=false to mean uncounted. It still validates request format, enabled state and capabilities.
 
@@ -141,7 +141,7 @@ with its health identity and error redaction, across all supported entrypoints.
 
 ## Auto fallback
 
-Enabled by default, Auto can make one additional selection and generation attempt after an eligible upstream failure, before any answer, reasoning, refusal or tool delta is forwarded. Failed model IDs are excluded from this request regardless of global isolation thresholds. A single remaining candidate executes directly; multiple remaining candidates return to Jev with a typed failure summary. Original input, configuration version and request ID are preserved. Explicit selection, decision failures, content/request errors, cancellation and downstream writes never trigger fallback.
+Enabled by default, Auto can make one additional selection and generation attempt after an eligible upstream failure, before any answer, reasoning, refusal or tool delta is forwarded. Failed model IDs are excluded from this request regardless of global isolation thresholds. A single remaining candidate skips model selection but may still require an effort decision; multiple remaining candidates return to Jev with a typed failure summary. Original input, configuration version and request ID are preserved. Explicit selection, decision failures, content/request errors, cancellation and downstream writes never trigger fallback.
 
 Both attempts share a 180-second default total budget. Its internal cancellation cause is health-neutral; genuine independent generation-stage timeouts still count toward health. Cancellation is best effort and both attempts may incur charges. status.get exposes auto_fallback {enabled,max_retries,timeout_seconds}. records.list exposes optional attempts containing only safe execution metadata; old records remain readable.
 
@@ -156,11 +156,46 @@ Response writes use the earlier of the request deadline and the stream idle dead
 decisions and Auto reselection. `complete=false` means one or more invoked
 decisions lack valid usage; the counts are only a lower bound, not a final cost.
 `invocations` counts decision adapter calls, including local failures before
-transmission, and is not a billable request count. Explicit and sole-candidate
-paths report zero invocations and complete zero usage. Historical records omit
+transmission, and is not a billable request count. Explicit and sole-candidate paths that do not require automatic effort
+selection report zero invocations and complete zero usage. Historical records omit
 this object: treat their decision cost as unknown, never zero.
 
 These counts exclude generation usage. Use the actual inference request ID to
 join records with generation results; a separate `route.inspect` call incurs
 its own decision and cannot stand in for execution usage. Records remain best
 effort; missing records or `records_degraded` prevent complete reconciliation.
+
+## Automatic task effort
+
+Models may declare `auto_effort: {"allowed": ["low", "high"]}` through
+`models.put` and configuration snapshots. Arrays must be nonempty and unique.
+Omission disables automatic injection; retain this field on replacement writes.
+The automatic order is minimal, low, medium, high, xhigh, max. Anthropic providers
+use the common adapter subset low/medium/high/max. Actual upstream model support
+is declared by the operator, not inferred from a model name or connection test.
+Informational `capabilities.reasoning` does not enable this feature.
+
+Auto asks independent model and task-effort Choice questions in one Jev call.
+The effort question judges the task, not the selected model or its allowed
+levels. Resolve to the highest allowed level no greater than the answer; when
+none exists, use the lowest allowed level. An unconfigured selected model gets
+no injected parameter. Requested answers must be valid even if an unconfigured
+model is chosen. A sole model with multiple levels asks effort only; a sole
+model with one level applies it directly, and an unconfigured sole model bypasses
+Jev. Both questions share existing request budgets and one invocation count.
+
+Explicit model selection, caller effort, disabled thinking and fixed thinking
+budgets suppress automatic injection. Explicit effort is never downgraded.
+Enabled/adaptive thinking may coexist when the adapter preserves the combination;
+automatic effort does not add a thinking switch. Each fallback attempt starts
+from the original request and applies its own decision to a separate copy.
+
+`route.inspect` remains Chat-format-only and returns optional `effective_effort`,
+the final outgoing parameter, not measured computational effort. For Chat targeting
+Anthropic, explicit none becomes thinking.disabled and therefore omits
+effective_effort; the original caller control is still forwarded through conversion. Native Messages
+fields are rejected, not converted into equivalent inspection inputs. Native
+Messages is verified through full request execution and upstream captures.
+No effort fields are added to routing records, public inference response metadata
+or Playground events. Dashboard adds no effort editor or display; existing edits
+preserve the hidden model configuration. Configuration belongs to CLI/Agents.

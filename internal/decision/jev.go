@@ -109,15 +109,34 @@ func (j *jev) Choose(ctx context.Context, c routing.DecisionConfig, in routing.D
 	if json.Unmarshal(out.Answers, &answers) != nil {
 		return routing.Decision{Usage: usage}, routing.Fail("invalid_decision", "invalid decision response")
 	}
+	result := routing.Decision{Usage: usage}
+	if in.SelectEffort {
+		a := answers["effort"]
+		valid := false
+		for _, level := range []string{"minimal", "low", "medium", "high", "xhigh", "max"} {
+			if a.Choice == level {
+				valid = true
+			}
+		}
+		if a.Type != "choice" || !valid {
+			return result, routing.Fail("invalid_decision", "invalid effort response")
+		}
+		result.Effort = a.Choice
+		if len(in.Candidates) == 1 {
+			result.ModelID = in.Candidates[0].ID
+			return result, nil
+		}
+	}
 	a := answers["model"]
 	if a.Type == "choice" {
 		for n, m := range in.Candidates {
 			if a.Choice == fmt.Sprintf("m%d", n) {
-				return routing.Decision{ModelID: m.ID, Usage: usage}, nil
+				result.ModelID = m.ID
+				return result, nil
 			}
 		}
 	}
-	return routing.Decision{Usage: usage}, routing.Fail("invalid_decision", "decision selected an unknown candidate")
+	return result, routing.Fail("invalid_decision", "decision selected an unknown candidate")
 }
 
 func decisionIOError(ctx context.Context, err error) error {

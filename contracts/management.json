@@ -564,6 +564,31 @@
                   "structured_output"
                 ],
                 "additionalProperties": false
+              },
+              "auto_effort": {
+                "type": "object",
+                "properties": {
+                  "allowed": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 6,
+                    "uniqueItems": true,
+                    "items": {
+                      "enum": [
+                        "minimal",
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "allowed"
+                ],
+                "additionalProperties": false
               }
             },
             "required": [
@@ -707,6 +732,31 @@
                 "structured_output"
               ],
               "additionalProperties": false
+            },
+            "auto_effort": {
+              "type": "object",
+              "properties": {
+                "allowed": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 6,
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": [
+                      "minimal",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "allowed"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [
@@ -826,6 +876,31 @@
             "structured_output"
           ],
           "additionalProperties": false
+        },
+        "auto_effort": {
+          "type": "object",
+          "properties": {
+            "allowed": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 6,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            }
+          },
+          "required": [
+            "allowed"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
@@ -929,6 +1004,31 @@
                 "tools",
                 "images",
                 "structured_output"
+              ],
+              "additionalProperties": false
+            },
+            "auto_effort": {
+              "type": "object",
+              "properties": {
+                "allowed": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 6,
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": [
+                      "minimal",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "allowed"
               ],
               "additionalProperties": false
             }
@@ -1833,6 +1933,19 @@
         },
         "context_exact": {
           "type": "boolean"
+        },
+        "effective_effort": {
+          "type": "string",
+          "enum": [
+            "none",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "description": "Final outgoing effort for this Chat-format inspection; omitted when no parameter is sent."
         }
       },
       "required": [
