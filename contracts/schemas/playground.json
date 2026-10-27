@@ -285,6 +285,10 @@
                     "invocations",
                     "complete"
                   ]
+                },
+                "effective_effort": {
+                  "type": "string",
+                  "description": "Outgoing effort for this generation attempt; omitted for historical records or when unset."
                 }
               },
               "required": [
@@ -484,6 +488,10 @@
                     "invocations",
                     "complete"
                   ]
+                },
+                "effective_effort": {
+                  "type": "string",
+                  "description": "Outgoing effort for this generation attempt; omitted for historical records or when unset."
                 }
               },
               "required": [
@@ -668,6 +676,10 @@
                     "invocations",
                     "complete"
                   ]
+                },
+                "effective_effort": {
+                  "type": "string",
+                  "description": "Outgoing effort for this generation attempt; omitted for historical records or when unset."
                 }
               },
               "required": [
@@ -808,6 +820,10 @@
                     "invocations",
                     "complete"
                   ]
+                },
+                "effective_effort": {
+                  "type": "string",
+                  "description": "Outgoing effort for this generation attempt; omitted for historical records or when unset."
                 }
               },
               "required": [
@@ -1012,6 +1028,10 @@
                 "invocations",
                 "complete"
               ]
+            },
+            "effective_effort": {
+              "type": "string",
+              "description": "Outgoing effort for this generation attempt; omitted for historical records or when unset."
             }
           },
           "required": [

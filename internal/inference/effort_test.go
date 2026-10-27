@@ -57,7 +57,22 @@ func TestFallbackEffortIsAttemptLocal(t *testing.T) {
 		}
 		return AttemptResult{}
 	})
+	if r.record.EffectiveEffort != "low" || len(r.record.Attempts) != 2 ||
+		r.record.Attempts[0].EffectiveEffort != "high" || r.record.Attempts[1].EffectiveEffort != "low" {
+		t.Fatalf("incorrect recorded efforts: %+v", r.record)
+	}
 	if err != nil || d.calls != 2 || len(req.Options) != 0 {
 		t.Fatalf("%v %d %+v", err, d.calls, req)
+	}
+}
+
+func TestGenerationWithoutEffortClearsRecordedValue(t *testing.T) {
+	svc := Service{Store: &snapshotCounter{}, Planner: &routing.Planner{Decider: firstDecider{}}, DecisionTimeout: time.Second}
+	r := svc.Begin(context.Background(), "unset")
+	r.record.EffectiveEffort = "high"
+	req := routing.Request{Model: "auto", Messages: []routing.Message{{Role: "user", Content: json.RawMessage(`"hello"`)}}}
+	err := r.Execute(req, nil, nil, "hello", func(context.Context, routing.Plan, int) AttemptResult { return AttemptResult{} })
+	if err != nil || r.record.EffectiveEffort != "" || r.record.Attempts[0].EffectiveEffort != "" {
+		t.Fatalf("stale effort: %+v, %v", r.record, err)
 	}
 }

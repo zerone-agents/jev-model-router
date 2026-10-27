@@ -349,6 +349,7 @@ it("shows selection time and summaries with numbered record pagination", async (
       "Request / time",
       "Request summary",
       "Selected model",
+      "Reasoning effort",
       "Path",
       "Model selection time",
       "Result",
@@ -380,4 +381,33 @@ it("shows selection time and summaries with numbered record pagination", async (
     offset: 0,
     limit: 10,
   });
+});
+
+it("shows recorded effort without inferring legacy values", async () => {
+  render(
+    <Records
+      client={client({
+        records: [
+          {
+            request_id: "new-effort",
+            model_id: "model-a",
+            effective_effort: "low",
+            outcome: "success",
+          },
+          { request_id: "old-effort", model_id: "model-b", outcome: "success" },
+        ],
+        total: 2,
+        next_cursor: "",
+      })}
+      lang="en"
+      onError={() => {}}
+    />,
+  );
+  expect(
+    await screen.findByRole("columnheader", { name: "Reasoning effort" }),
+  ).toBeInTheDocument();
+  const current = screen.getByText("new-effort").closest("tr")!;
+  const legacy = screen.getByText("old-effort").closest("tr")!;
+  expect(current.children[3]).toHaveTextContent("low");
+  expect(legacy.children[3]).toHaveTextContent("—");
 });

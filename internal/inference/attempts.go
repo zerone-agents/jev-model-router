@@ -44,6 +44,8 @@ func (r *Request) Execute(req routing.Request, check func(routing.Target) error,
 		result := AttemptResult{Err: err}
 		if err == nil {
 			a.Stage = "generation"
+			a.EffectiveEffort = plan.EffectiveEffort
+			r.record.EffectiveEffort = plan.EffectiveEffort
 			result = run(r.ctx, plan, index)
 		}
 		plan.Close()

@@ -197,3 +197,43 @@ func TestRecordCountMigrationAndRollback(t *testing.T) {
 		t.Fatalf("rollback %+v %v", p, e)
 	}
 }
+
+func TestRecordEffortPersistsAcrossReopen(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "db")
+	s, err := Open(path, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range []routing.Record{
+		{RequestID: "legacy", CreatedAt: time.Now()},
+		{RequestID: "effort", CreatedAt: time.Now(), EffectiveEffort: "low", Attempts: []routing.AttemptSummary{{Index: 1, EffectiveEffort: "high"}, {Index: 2, EffectiveEffort: "low"}}},
+	} {
+		if err := s.Append(ctx, r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s.Close()
+	s, err = Open(path, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	page, err := s.ListRecords(ctx, "", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Records) != 2 {
+		t.Fatal(page)
+	}
+	for _, r := range page.Records {
+		if r.RequestID == "legacy" {
+			b, _ := json.Marshal(r)
+			if strings.Contains(string(b), "effective_effort") {
+				t.Fatal(string(b))
+			}
+		} else if r.EffectiveEffort != "low" || len(r.Attempts) != 2 || r.Attempts[0].EffectiveEffort != "high" || r.Attempts[1].EffectiveEffort != "low" {
+			t.Fatal(r)
+		}
+	}
+}
