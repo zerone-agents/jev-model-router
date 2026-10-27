@@ -933,3 +933,10 @@ tr:has(details[open]) .request-summary-text {
 .health-reason {
   overflow-wrap: anywhere;
 }
+
+.effort-tags {
+  align-items: center;
+}
+.effort-tags .read-only {
+  margin: 0;
+}

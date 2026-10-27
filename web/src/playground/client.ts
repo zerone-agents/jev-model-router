@@ -10,6 +10,7 @@ export type PlaygroundInput = {
   stream: true;
 };
 export type Route = {
+  effective_effort?: string;
   attempt?: number;
   attempts?: Attempt[];
   request_id: string;
@@ -157,7 +158,8 @@ function decodeEvent(type: string, data: string): PlaygroundEvent {
   if (
     type === "route" &&
     strings(["request_id", "model_id", "path"]) &&
-    numbers(["config_version", "decision_ms"])
+    numbers(["config_version", "decision_ms"]) &&
+    optional(["effective_effort"])
   )
     return {
       ...v,
