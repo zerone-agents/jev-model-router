@@ -474,6 +474,7 @@ export function Records(props: PageProps) {
                       text(lang, "Request / time", "请求 / 时间"),
                       text(lang, "Request summary", "请求摘要"),
                       text(lang, "Selected model", "选定模型"),
+                      text(lang, "Reasoning effort", "推理强度"),
                       text(lang, "Path", "选择路径"),
                       text(lang, "Model selection time", "选模型耗时"),
                       text(lang, "Result", "结果"),
@@ -502,6 +503,14 @@ export function Records(props: PageProps) {
                         </span>
                       </td>
                       <td>{String(r.model_id || "—")}</td>
+                      <td>
+                        {typeof r.effective_effort === "string" &&
+                        r.effective_effort ? (
+                          <span className="badge">{r.effective_effort}</span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                       <td>
                         <span className="badge">{String(r.path || "—")}</span>
                       </td>

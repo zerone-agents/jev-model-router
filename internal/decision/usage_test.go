@@ -2,6 +2,7 @@ package decision
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"net/http"
@@ -59,6 +60,38 @@ func TestUsageSurvivesMalformedResponseFields(t *testing.T) {
 					}
 				})
 			}
+		}
+	}
+}
+
+func TestAliyunInputOnlyUsage(t *testing.T) {
+	c := routing.DecisionConfig{BaseURL: "https://llm-test.cn-beijing.maas.aliyuncs.com", Path: "/compatible-mode/v1/systemone", Model: "decision-model-preview"}
+	for _, raw := range []string{`{"input_tokens":496}`, `{"input_tokens":0}`} {
+		u := parseDecisionUsage(json.RawMessage(raw), c)
+		if u == nil || u.OutputTokens != 0 || (raw == `{"input_tokens":496}` && u.InputTokens != 496) {
+			t.Fatalf("missing input-only usage: %s", raw)
+		}
+	}
+	for _, raw := range []string{`{}`, `{"input_tokens":null}`, `{"input_tokens":-1}`, `{"input_tokens":1,"output_tokens":null}`, `{"input_tokens":1,"output_tokens":-1}`, `{"input_tokens":1,"output_tokens":"x"}`} {
+		if parseDecisionUsage(json.RawMessage(raw), c) != nil {
+			t.Fatalf("accepted invalid usage: %s", raw)
+		}
+	}
+	c.BaseURL = "https://example.com"
+	if parseDecisionUsage(json.RawMessage(`{"input_tokens":496}`), c) != nil {
+		t.Fatal("exception leaked to other providers")
+	}
+}
+
+func TestAliyunDefaultPathInputOnlyUsage(t *testing.T) {
+	for _, base := range []string{
+		"https://llm-test.cn-beijing.maas.aliyuncs.com/compatible-mode",
+		"https://llm-test.cn-beijing.maas.aliyuncs.com/compatible-mode/",
+	} {
+		c := routing.DecisionConfig{BaseURL: base, Model: "decision-model-preview"}
+		u := parseDecisionUsage(json.RawMessage(`{"input_tokens":496}`), c)
+		if u == nil || u.InputTokens != 496 || u.OutputTokens != 0 {
+			t.Fatalf("default path usage lost for %s: %+v", base, u)
 		}
 	}
 }

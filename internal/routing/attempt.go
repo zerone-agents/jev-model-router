@@ -4,15 +4,16 @@ import "encoding/json"
 
 // AttemptSummary is safe to persist; detailed upstream bodies are response-only.
 type AttemptSummary struct {
-	DecisionUsage  *DecisionUsage `json:"decision_usage,omitempty"`
-	Index          int            `json:"index"`
-	Stage          string         `json:"stage"`
-	ModelID        string         `json:"model_id,omitempty"`
-	Path           string         `json:"path,omitempty"`
-	DecisionMillis int64          `json:"decision_ms"`
-	DurationMillis int64          `json:"duration_ms"`
-	Outcome        string         `json:"outcome"`
-	ErrorCode      string         `json:"error_code,omitempty"`
+	EffectiveEffort string         `json:"effective_effort,omitempty"`
+	DecisionUsage   *DecisionUsage `json:"decision_usage,omitempty"`
+	Index           int            `json:"index"`
+	Stage           string         `json:"stage"`
+	ModelID         string         `json:"model_id,omitempty"`
+	Path            string         `json:"path,omitempty"`
+	DecisionMillis  int64          `json:"decision_ms"`
+	DurationMillis  int64          `json:"duration_ms"`
+	Outcome         string         `json:"outcome"`
+	ErrorCode       string         `json:"error_code,omitempty"`
 }
 type AttemptDiagnostic struct {
 	AttemptSummary

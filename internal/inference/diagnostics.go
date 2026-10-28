@@ -6,7 +6,7 @@ import (
 
 func (r *Request) StreamError(e error) error {
 	d := routing.Diagnose(e)
-	a := routing.AttemptDiagnostic{AttemptSummary: routing.AttemptSummary{Index: r.current, Stage: "generation", ModelID: r.record.ModelID, Path: r.record.Path, Outcome: "error", ErrorCode: d.Code}, Diagnostic: &d}
+	a := routing.AttemptDiagnostic{AttemptSummary: routing.AttemptSummary{EffectiveEffort: r.record.EffectiveEffort, Index: r.current, Stage: "generation", ModelID: r.record.ModelID, Path: r.record.Path, Outcome: "error", ErrorCode: d.Code}, Diagnostic: &d}
 	return &routing.AttemptError{Cause: e, Attempts: routing.BoundAttempts(append(r.DiagnosticAttempts(), a))}
 }
 func (r *Request) ErrorStage() string {

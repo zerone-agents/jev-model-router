@@ -246,7 +246,11 @@ export function Playground({ client, lang, onError }: PageProps) {
       <div className="pg-layout">
         <div className="pg-conversation">
           <div className="pg-toolbar">
-            <span>{text(lang, "Model", "模型")}</span>
+            <span role={modelsLoading ? "status" : undefined}>
+              {modelsLoading
+                ? text(lang, "Loading models…", "正在读取模型…")
+                : text(lang, "Model", "模型")}
+            </span>
             <ChoicePicker
               className="pg-model-picker"
               label={text(lang, "Model", "模型")}
@@ -266,11 +270,6 @@ export function Playground({ client, lang, onError }: PageProps) {
               ]}
             />
           </div>
-          {modelsLoading && (
-            <p role="status">
-              {text(lang, "Loading models…", "正在读取模型…")}
-            </p>
-          )}
           {modelsError != null && (
             <div>
               <ErrorBox error={modelsError} lang={lang} />

@@ -196,9 +196,18 @@ Anthropic, explicit none becomes thinking.disabled and therefore omits
 effective_effort; the original caller control is still forwarded through conversion. Native Messages
 fields are rejected, not converted into equivalent inspection inputs. Native
 Messages is verified through full request execution and upstream captures.
-No effort fields are added to routing records or public inference response metadata.
+Public successful inference response metadata is unchanged.
 Dashboard edits preserve the model effort configuration. Configuration belongs to CLI/Agents.
 
-Playground route events expose optional `effective_effort` for the current attempt. The dashboard shows configured automatic effort levels and the actual outgoing effort read-only. Missing effort is shown as not set, without inferring provider defaults. Configuration remains CLI/Agent-managed; routing records and public inference response metadata are unchanged.
+Playground route events expose optional `effective_effort` for the current attempt. The dashboard shows configured automatic effort levels and the actual outgoing effort read-only. Missing effort is shown as not set, without inferring provider defaults. Configuration remains CLI/Agent-managed; successful public inference response metadata is unchanged.
 
 Effort Choice criteria retain ascending strength order in serialized requests and order-preserving JSON formatting: minimal, low, medium, high, xhigh, max. The wire format remains a JSON object; meanings are defined by descriptions rather than object ordering.
+
+Routing records expose optional `effective_effort` on the record and each generation attempt. The record retains the latest generation attempt value, including when a subsequent routing attempt fails. A later generation with no effort clears the previous value. Historical and unset values display as an em dash; no provider default is inferred. Attempt diagnostics carry the same optional field. Existing JSON record storage requires no table migration.
+
+For the official Aliyun HTTPS maas.aliyuncs.com System One endpoint
+(/compatible-mode/v1/systemone) using decision-model-preview, a valid
+input_tokens count with omitted output_tokens is complete usage. Output is
+normalized to zero because this interface does not separately report output
+usage. Explicit null, negative or malformed counts remain invalid; other
+decision endpoints still require both counts.

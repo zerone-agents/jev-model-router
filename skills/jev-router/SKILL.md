@@ -175,4 +175,6 @@ silently lower caller effort after an upstream error. A sole model with multiple
 allowed levels still incurs an effort decision. A sole singleton applies its
 only level directly. Auto fallback adapts each attempt independently.
 
-Playground route events expose optional `effective_effort` for the current attempt. The dashboard shows configured automatic effort levels and the actual outgoing effort read-only. Missing effort is shown as not set, without inferring provider defaults. Configuration remains CLI/Agent-managed; routing records and public inference response metadata are unchanged.
+Playground route events expose optional `effective_effort` for the current attempt. The dashboard shows configured automatic effort levels and the actual outgoing effort read-only. Missing effort is shown as not set, without inferring provider defaults. Configuration remains CLI/Agent-managed; successful public inference response metadata is unchanged.
+
+Routing records expose optional `effective_effort` on the record and each generation attempt. The record retains the latest generation attempt value, including when a subsequent routing attempt fails. A later generation with no effort clears the previous value. Historical and unset values display as an em dash; no provider default is inferred. Attempt diagnostics carry the same optional field. Existing JSON record storage requires no table migration.
