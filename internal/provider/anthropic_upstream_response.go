@@ -44,6 +44,8 @@ func (u nativeUsage) normalized() (*routing.Usage, error) {
 }
 
 type nativeBlock struct {
+	ToolUseID string          `json:"tool_use_id"`
+	Content   json.RawMessage `json:"content"`
 	Type      string          `json:"type"`
 	Text      *string         `json:"text"`
 	Thinking  *string         `json:"thinking"`
