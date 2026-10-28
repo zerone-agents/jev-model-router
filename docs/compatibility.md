@@ -192,13 +192,14 @@ Real native Messages acceptance used a temporary local Router and official Anthr
 
 ## Automatic effort (#58)
 
-Optional model `auto_effort.allowed` enables automatic parameter adaptation for
-Auto requests only. One Jev call can contain independent model and effort
+Model `capabilities.reasoning` supplies effort levels for Auto parameter adaptation.
+There is no additional opt-in configuration. One Jev call can contain independent model and effort
 questions; task effort is not conditioned on the model answer. Select the highest
 allowed level at or below the target, falling to the lowest allowed level when
-necessary. Unconfigured models omit injection. Explicit caller controls remain
-unchanged. See the [management contract](../contracts/README.md#automatic-task-effort)
-for configuration, singleton behavior and caller precedence.
+necessary. Models without usable effort declarations omit injection. Auto rejects manual
+effort, disabled thinking and fixed budgets with HTTP 400; use an explicit model
+to retain caller controls. See the [management contract](../contracts/README.md#automatic-task-effort)
+for configuration, singleton behavior and upgrade rules.
 
 Chat and native Messages JSON/SSE paths apply effort to full request copies.
 Chat-only `route.inspect` cannot represent native Messages thinking budgets or

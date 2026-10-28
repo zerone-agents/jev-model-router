@@ -20,6 +20,7 @@ for (const model of ["auto", "external"]) {
         ]
       : [{}];
   for (const controls of settings) {
+    if (model === "auto" && controls.effort) continue;
     const params = {
       ...controls,
       model,

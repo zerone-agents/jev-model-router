@@ -34,8 +34,8 @@ type Provider struct {
 	SecretRef string           `json:"secret_ref"`
 }
 
-// ReasoningCombination is optional informational metadata retained for existing
-// configurations. It does not restrict reasoning requests or model eligibility.
+// ReasoningCombination declares supported controls. Effort entries drive Auto
+// selection; explicit requests retain upstream validation and forwarding.
 type ReasoningCombination struct {
 	EnableThinking *bool  `json:"enable_thinking,omitempty"`
 	Effort         string `json:"reasoning_effort,omitempty"`
@@ -49,15 +49,14 @@ type Capabilities struct {
 	StructuredOutput bool                   `json:"structured_output"`
 }
 type Model struct {
-	AutoEffort   *AutoEffortConfig `json:"auto_effort,omitempty"`
-	Revision     string            `json:"-"`
-	ID           string            `json:"id"`
-	ProviderID   string            `json:"provider_id"`
-	UpstreamName string            `json:"upstream_name"`
-	Description  string            `json:"description"`
-	Location     string            `json:"location"`
-	Enabled      bool              `json:"enabled"`
-	Capabilities Capabilities      `json:"capabilities"`
+	Revision     string       `json:"-"`
+	ID           string       `json:"id"`
+	ProviderID   string       `json:"provider_id"`
+	UpstreamName string       `json:"upstream_name"`
+	Description  string       `json:"description"`
+	Location     string       `json:"location"`
+	Enabled      bool         `json:"enabled"`
+	Capabilities Capabilities `json:"capabilities"`
 }
 type DecisionConfig struct {
 	Path      string `json:"path,omitempty"`

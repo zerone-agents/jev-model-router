@@ -85,6 +85,7 @@ test("real API read, edit, conflict, retry, language, disconnect and refresh", a
   await page.getByRole("button", { name: "Models", exact: true }).click();
   await page.getByRole("button", { name: /flash Enabled/ }).click();
   await expect(page.getByText(/reasoning:.*enable_thinking/)).toBeVisible();
+  await expect(page.locator(".effort-tags .badge").filter({ hasText: /^high$/ })).toBeVisible();
   const editor = page.getByLabel("Model description");
   await editor.fill("Updated description");
   await page.getByRole("button", { name: "Save changes" }).click();

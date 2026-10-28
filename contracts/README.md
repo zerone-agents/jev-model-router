@@ -167,13 +167,21 @@ effort; missing records or `records_degraded` prevent complete reconciliation.
 
 ## Automatic task effort
 
-Models may declare `auto_effort: {"allowed": ["low", "high"]}` through
-`models.put` and configuration snapshots. Arrays must be nonempty and unique.
-Omission disables automatic injection; retain this field on replacement writes.
-The automatic order is minimal, low, medium, high, xhigh, max. Anthropic providers
-use the common adapter subset low/medium/high/max. Actual upstream model support
-is declared by the operator, not inferred from a model name or connection test.
-Informational `capabilities.reasoning` does not enable this feature.
+Models declare supported effort once in `capabilities.reasoning`, for example
+`[{"reasoning_effort":"low"},{"reasoning_effort":"high"}]`. Auto derives unique
+levels in minimal, low, medium, high, xhigh, max order; entries without effort,
+`none`, and entries with `enable_thinking:false` do not enable automatic effort.
+Anthropic adapters derive only low/medium/high/max, retaining all stored metadata.
+Model names and connection tests do not establish supported levels.
+`models.get` and `models.list` expose read-only `automatic_effort_levels` using the
+same derivation as planning and readiness; strip it and `health` from replacement
+writes. No separate enablement field exists.
+
+Upgrade: existing persisted `auto_effort` is ignored and no longer returned.
+New writes containing it are rejected; declare support in capabilities.reasoning.
+Existing reasoning declarations now enable Auto effort without an extra opt-in.
+Models lacking declarations receive no injected effort; historical records and
+unrelated configuration are unchanged.
 
 Auto asks independent model and task-effort Choice questions in one Jev call.
 The effort question judges the task, not the selected model or its allowed
@@ -184,11 +192,14 @@ model is chosen. A sole model with multiple levels asks effort only; a sole
 model with one level applies it directly, and an unconfigured sole model bypasses
 Jev. Both questions share existing request budgets and one invocation count.
 
-Explicit model selection, caller effort, disabled thinking and fixed thinking
-budgets suppress automatic injection. Explicit effort is never downgraded.
-Enabled/adaptive thinking may coexist when the adapter preserves the combination;
-automatic effort does not add a thinking switch. Each fallback attempt starts
-from the original request and applies its own decision to a separate copy.
+Auto owns effort: caller `reasoning_effort` (including none), native Messages
+`output_config.effort`, disabled thinking and fixed thinking budgets fail with
+HTTP 400 `invalid_request` before external calls. Use an explicit model for these
+controls; explicit requests retain their existing validation and forwarding.
+Enabled/adaptive thinking without a fixed budget may coexist when the adapter
+supports it. Historical thinking is not a new control. Automatic effort adds no
+thinking switch. Each fallback attempt starts from the original request and
+applies its own decision to a separate copy.
 
 `route.inspect` remains Chat-format-only and returns optional `effective_effort`,
 the final outgoing parameter, not measured computational effort. For Chat targeting

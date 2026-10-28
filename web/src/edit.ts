@@ -5,6 +5,7 @@ export function descriptionInput<T extends { description: string }>(
 ): T {
   const result = { ...resource, description };
   delete (result as Record<string, unknown>).health;
+  delete (result as Record<string, unknown>).automatic_effort_levels;
   return result;
 }
 export function prepareWrite(

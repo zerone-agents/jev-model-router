@@ -278,6 +278,7 @@ it("shows reasoning combinations in model details without losing false", async (
           provider_id: "p",
           upstream_name: "upstream",
           description: "model",
+          automatic_effort_levels: ["high"],
           enabled: true,
           capabilities: {
             reasoning: [
@@ -299,6 +300,7 @@ it("shows reasoning combinations in model details without losing false", async (
     ),
   ).toBeInTheDocument();
   expect(screen.queryByText(/\[object Object\]/)).not.toBeInTheDocument();
+  expect(screen.getByText("high", { selector: ".effort-tags .badge" })).toBeInTheDocument();
 });
 
 it("shows selection time and summaries with numbered record pagination", async () => {

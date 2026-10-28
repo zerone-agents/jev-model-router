@@ -18,7 +18,9 @@ func TestIndependentEffortQuestions(t *testing.T) {
 		if sole {
 			in.Candidates = in.Candidates[:1]
 		}
-		in.Candidates[0].AutoEffort = &routing.AutoEffortConfig{Allowed: []string{"low", "high"}}
+		for _, level := range []string{"low", "high"} {
+			in.Candidates[0].Capabilities.Reasoning = append(in.Candidates[0].Capabilities.Reasoning, routing.ReasoningCombination{Effort: level})
+		}
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var b struct {
 				State     json.RawMessage
@@ -63,7 +65,7 @@ func TestEffortFortyModelShapeAndBudget(t *testing.T) {
 	in.SelectEffort = true
 	in.Candidates = nil
 	for i := 0; i < 40; i++ {
-		in.Candidates = append(in.Candidates, routing.Model{ID: fmt.Sprintf("m%d", i), Description: "Useful model", AutoEffort: &routing.AutoEffortConfig{Allowed: []string{"low", "medium", "high", "xhigh", "max"}}})
+		in.Candidates = append(in.Candidates, routing.Model{ID: fmt.Sprintf("m%d", i), Description: "Useful model", Capabilities: routing.Capabilities{Reasoning: []routing.ReasoningCombination{{Effort: "low"}, {Effort: "medium"}, {Effort: "high"}, {Effort: "xhigh"}, {Effort: "max"}}}})
 	}
 	q, _ := json.Marshal(question(in))
 	var questions map[string]struct{ Criteria map[string]any }

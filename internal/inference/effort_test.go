@@ -14,8 +14,12 @@ type effortStore struct{}
 
 func (effortStore) Snapshot(ctx context.Context) (routing.Snapshot, error) {
 	s, _ := (&snapshotCounter{}).Snapshot(ctx)
-	s.Models[0].AutoEffort = &routing.AutoEffortConfig{Allowed: []string{"low", "high"}}
-	s.Models[1].AutoEffort = &routing.AutoEffortConfig{Allowed: []string{"low", "medium"}}
+	for _, level := range []string{"low", "high"} {
+		s.Models[0].Capabilities.Reasoning = append(s.Models[0].Capabilities.Reasoning, routing.ReasoningCombination{Effort: level})
+	}
+	for _, level := range []string{"low", "medium"} {
+		s.Models[1].Capabilities.Reasoning = append(s.Models[1].Capabilities.Reasoning, routing.ReasoningCombination{Effort: level})
+	}
 	return s, nil
 }
 

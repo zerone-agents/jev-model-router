@@ -87,7 +87,7 @@
             "type": "array",
             "maxItems": 64,
             "uniqueItems": true,
-            "description": "Optional informational reasoning metadata. Not used for request validation or model eligibility. Valid reasoning controls are forwarded unchanged; support is determined by the upstream.",
+            "description": "Declared reasoning controls. Effort levels drive automatic selection for Auto requests; explicit requests are forwarded without restricting them to these declarations.",
             "items": {
               "type": "object",
               "properties": {
@@ -116,31 +116,6 @@
           "tools",
           "images",
           "structured_output"
-        ],
-        "additionalProperties": false
-      },
-      "auto_effort": {
-        "type": "object",
-        "properties": {
-          "allowed": {
-            "type": "array",
-            "minItems": 1,
-            "maxItems": 6,
-            "uniqueItems": true,
-            "items": {
-              "enum": [
-                "minimal",
-                "low",
-                "medium",
-                "high",
-                "xhigh",
-                "max"
-              ]
-            }
-          }
-        },
-        "required": [
-          "allowed"
         ],
         "additionalProperties": false
       }

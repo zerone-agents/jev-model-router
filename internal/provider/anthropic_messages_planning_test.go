@@ -55,7 +55,7 @@ func TestMessagesPlanningIsolation(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			model := "auto"
-			extra := `,"thinking":{"type":"enabled","budget_tokens":1024}`
+			extra := `,"system":[{"type":"text","text":"native","cache_control":{"type":"ephemeral"}}]`
 			want := "n"
 			if i%2 == 0 {
 				model = "o"

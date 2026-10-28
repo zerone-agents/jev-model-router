@@ -11,7 +11,7 @@ func TestAutoEffortConfiguration(t *testing.T) {
 	for _, tc := range []struct {
 		levels string
 		valid  bool
-	}{{`["low","high"]`, true}, {`[]`, false}, {`["high","high"]`, false}, {`["none"]`, false}, {`["other"]`, false}} {
+	}{{`["low","high"]`, false}, {`[]`, false}, {`["high","high"]`, false}, {`["none"]`, false}, {`["other"]`, false}} {
 		raw := strings.Replace(base, "%s", tc.levels, 1)
 		err := Validate("models.put", json.RawMessage(raw))
 		if (err == nil) != tc.valid {

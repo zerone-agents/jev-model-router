@@ -150,13 +150,15 @@ SQLite stores health and an independent fingerprint key. Health updates do not c
 
 ### Automatic effort selection
 
-Optional model auto_effort configuration is managed through the shared CLI/API
-contract and persisted in existing configuration snapshots. The UI displays effort read-only and has no effort
+Model capabilities.reasoning is the sole configuration source for automatic
+effort. The shared CLI/API persists declarations and derives provider-representable
+levels for planning, readiness and read-only model responses. Legacy auto_effort
+is ignored on load and rejected in new writes. The UI displays effort read-only and has no effort
 configuration controls. Jev independently chooses model and task effort
 in one call; the planner adapts the effort to the selected model's allowed levels,
 falling down or to the lowest configured level. This is not pairwise optimization.
-Caller effort, disabled thinking and fixed budgets take precedence. Explicit
-models retain their existing behavior. Generation applies the final parameter to
+Auto rejects caller effort, disabled thinking and fixed budgets before external
+calls. Explicit models retain their existing parameter forwarding behavior. Generation applies the final parameter to
 an attempt-local full request copy, including native Messages bodies; fallback
 never reuses injected parameters as caller constraints. Chat-only inspection
 reports the effective parameter; native Messages is validated by execution.

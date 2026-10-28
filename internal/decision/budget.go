@@ -228,7 +228,7 @@ func middleTruncate(text string, chars []rune, limit int) string {
 func decisionModels(models []routing.Model) []routing.Model {
 	out := append([]routing.Model(nil), models...)
 	for i := range out {
-		out[i].AutoEffort = nil
+		out[i].Capabilities.Reasoning = nil
 	}
 	return out
 }

@@ -11,7 +11,7 @@ import {
 import { HealthBadge, type ModelHealth } from "./health";
 import { text } from "./i18n";
 export type Model = {
-  auto_effort?: { allowed: string[] };
+  automatic_effort_levels?: string[];
   health?: ModelHealth;
   id: string;
   description: string;

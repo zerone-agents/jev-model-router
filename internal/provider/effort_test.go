@@ -14,7 +14,7 @@ func TestNativeEffortCopyAndPrecedence(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if routing.AutomaticEffortAllowed(p.Projection()) != (extra == "") {
+		if (routing.ValidateAutoEffortControls(p.Projection()) == nil) != (extra == "") {
 			t.Fatalf("precedence %s", extra)
 		}
 	}

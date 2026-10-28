@@ -61,14 +61,21 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 	} else if r.Model == "" || len(r.Messages) == 0 {
 		return result, Fail("internal_error", "invalid prepared planning projection")
 	}
+	if e := ValidateAutoEffortControls(r); e != nil {
+		return result, e
+	}
 	if !prepared && p.PrepareCheck != nil {
 		check = p.PrepareCheck(r)
 	}
 	// Freeze all slices before any external decision call.
 	s.Models = append([]Model{}, s.Models...)
 	for i, m := range s.Models {
-		if m.AutoEffort != nil {
-			s.Models[i].AutoEffort = &AutoEffortConfig{Allowed: append([]string(nil), m.AutoEffort.Allowed...)}
+		s.Models[i].Capabilities.Reasoning = append([]ReasoningCombination(nil), m.Capabilities.Reasoning...)
+		for j, entry := range s.Models[i].Capabilities.Reasoning {
+			if entry.EnableThinking != nil {
+				enabled := *entry.EnableThinking
+				s.Models[i].Capabilities.Reasoning[j].EnableThinking = &enabled
+			}
 		}
 	}
 	s.Providers = append([]Provider{}, s.Providers...)
@@ -246,14 +253,14 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 		result.Path = "jev_choice"
 	}
 	selectEffort := false
-	if AutomaticEffortAllowed(r) {
+	if r.Model == "auto" {
 		for _, t := range targets {
-			if t.Model.AutoEffort != nil {
+			if len(AutomaticEffortLevels(t.Model, t.Provider.EffectiveProtocol())) > 0 {
 				selectEffort = true
 			}
 		}
 	}
-	needsEffortDecision := selectEffort && (len(targets) > 1 || len(selected.Model.AutoEffort.Allowed) > 1)
+	needsEffortDecision := selectEffort && (len(targets) > 1 || len(AutomaticEffortLevels(selected.Model, selected.Provider.EffectiveProtocol())) > 1)
 	requestedEffort := ""
 	if r.Model == "auto" && (len(targets) > 1 || needsEffortDecision) {
 		if p.Decider == nil || s.Decision.Model == "" {
@@ -290,12 +297,13 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 			return result, Fail("invalid_decision", "unknown selected model")
 		}
 	}
-	if selectEffort && selected.Model.AutoEffort != nil {
+	levels := AutomaticEffortLevels(selected.Model, selected.Provider.EffectiveProtocol())
+	if selectEffort && len(levels) > 0 {
 		if !needsEffortDecision {
-			requestedEffort = selected.Model.AutoEffort.Allowed[0]
+			requestedEffort = levels[0]
 		}
 		var err error
-		result.EffectiveEffort, err = ResolveAutoEffort(selected.Model.AutoEffort, requestedEffort)
+		result.EffectiveEffort, err = ResolveAutoEffort(levels, requestedEffort)
 		if err != nil {
 			return result, err
 		}

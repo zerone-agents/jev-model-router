@@ -22,17 +22,6 @@ func ValidateSnapshot(s Snapshot) error {
 		if contracts.Validate("models.put", b) != nil || models[m.ID] || !providers[m.ProviderID] {
 			return Fail("invalid_request", "invalid model, reserved ID, or missing provider")
 		}
-		if m.AutoEffort != nil {
-			for _, p := range s.Providers {
-				if p.ID == m.ProviderID && p.Protocol == "anthropic" {
-					for _, level := range m.AutoEffort.Allowed {
-						if level == "minimal" || level == "xhigh" {
-							return Fail("invalid_request", "automatic effort cannot be preserved by Anthropic adapters")
-						}
-					}
-				}
-			}
-		}
 		models[m.ID] = true
 	}
 	if s.Decision != (DecisionConfig{}) {

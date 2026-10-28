@@ -20,6 +20,12 @@ func TestReasoningNeedsNoCapabilityDeclaration(t *testing.T) {
 				}
 				p := Planner{}
 				plan, err := p.Plan(context.Background(), s, r)
+				if model == "auto" && fields != `"chat_template_kwargs":{"enable_thinking":true}` {
+					if err == nil {
+						t.Fatal("Auto accepted manual controls")
+					}
+					continue
+				}
 				if err != nil || plan.ModelID != "a" {
 					t.Fatalf("%s %s: %+v %v", model, fields, plan, err)
 				}
