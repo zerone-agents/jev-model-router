@@ -90,6 +90,7 @@ test("real API read, edit, conflict, retry, language, disconnect and refresh", a
   await editor.fill("Updated description");
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByRole("status")).toContainText("Saved");
+  await expect(page.locator(".effort-tags .badge").filter({ hasText: /^high$/ })).toBeVisible();
   expect(
     (await call(request, "models.get", { id: "flash" })).resource.description,
   ).toBe("Updated description");

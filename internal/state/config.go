@@ -81,13 +81,6 @@ func (s *Store) Apply(ctx context.Context, principal string, c management.Call, 
 	if e != nil {
 		return management.Result{}, routing.Fail("invalid_request", "invalid JSON input")
 	}
-	if c.CapabilityID == "models.put" {
-		if obj, ok := v.(map[string]any); ok {
-			if _, legacy := obj["auto_effort"]; legacy {
-				return management.Result{}, routing.Fail("invalid_request", "auto_effort was removed; declare supported levels in capabilities.reasoning")
-			}
-		}
-	}
 	canonical, _ := json.Marshal([]any{c.CapabilityID, *c.ExpectedVersion, v})
 	hash := sha256.Sum256(canonical)
 	digest := hex.EncodeToString(hash[:])
@@ -123,6 +116,13 @@ func (s *Store) Apply(ctx context.Context, principal string, c management.Call, 
 	}
 	if e != nil && !errors.Is(e, sql.ErrNoRows) {
 		return management.Result{}, storageError()
+	}
+	if c.CapabilityID == "models.put" {
+		if obj, ok := v.(map[string]any); ok {
+			if _, legacy := obj["auto_effort"]; legacy {
+				return management.Result{}, routing.Fail("invalid_request", "auto_effort was removed; declare supported levels in capabilities.reasoning")
+			}
+		}
 	}
 	current, e := snapshot(ctx, tx)
 	if e != nil {

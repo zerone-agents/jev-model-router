@@ -141,7 +141,11 @@ function Editor(props: Props & { initial: Snapshot }) {
         version: result.data.version,
         text: snapshot.model ? submitted.description : submitted.text,
         model: snapshot.model
-          ? { ...submitted, health: snapshot.model.health }
+          ? {
+              ...submitted,
+              health: snapshot.model.health,
+              automatic_effort_levels: snapshot.model.automatic_effort_levels,
+            }
           : undefined,
       });
       setNotice("saved");
