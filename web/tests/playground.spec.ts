@@ -211,6 +211,14 @@ test("mobile explicit model and Chinese UI remain usable", async ({ page }) => {
 
 test("sending keeps the page and composer stable", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
+  let releaseModels!: () => void;
+  const modelsReady = new Promise<void>((resolve) => {
+    releaseModels = resolve;
+  });
+  await page.route("**/admin/v1/call/models.list", async (route) => {
+    await modelsReady;
+    await route.continue();
+  });
   await login(page);
   const snapshot = () =>
     page.evaluate(() => ({
@@ -230,6 +238,10 @@ test("sending keeps the page and composer stable", async ({ page }) => {
       ),
     }));
   const before = await snapshot();
+  releaseModels();
+  await expect(page.getByText("Loading models…", { exact: true })).toHaveCount(
+    0,
+  );
   await send(page, "layout stability");
   await expect(
     page.getByRole("button", { name: "Stop", exact: true }),
