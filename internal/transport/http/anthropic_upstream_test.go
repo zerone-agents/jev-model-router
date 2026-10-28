@@ -51,6 +51,12 @@ func nativeChatFixture(t *testing.T) (http.Handler, *inference.Service, *routing
 			}
 			blocks = append([]map[string]any{{"type": "thinking", "thinking": "thought"}}, blocks...)
 		}
+		// Include server-executed tools in both native response forms. These
+		// must never reach the downstream SDK as client tool calls.
+		blocks = append([]map[string]any{
+			{"type": "server_tool_use", "id": "server-reader", "name": "webReader", "input": map[string]any{"url": "https://example.com"}},
+			{"type": "tool_result", "tool_use_id": "server-reader", "content": "server page"},
+		}, blocks...)
 		if b["stream"] != true {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]any{"id": "m", "type": "message", "role": "assistant", "model": "upstream", "content": blocks, "stop_reason": stop, "usage": map[string]int{"input_tokens": 10, "cache_read_input_tokens": 20, "cache_creation_input_tokens": 30, "output_tokens": 7}})
@@ -75,6 +81,8 @@ func nativeChatFixture(t *testing.T) (http.Handler, *inference.Service, *routing
 				start["thinking"] = ""
 				delta["type"] = "thinking_delta"
 				delta["thinking"] = b["thinking"]
+			case "server_tool_use", "tool_result":
+				start = b
 			case "tool_use":
 				start["id"] = b["id"]
 				start["name"] = b["name"]
@@ -84,7 +92,9 @@ func nativeChatFixture(t *testing.T) (http.Handler, *inference.Service, *routing
 				delta["partial_json"] = string(args)
 			}
 			send("content_block_start", map[string]any{"index": i, "content_block": start})
-			send("content_block_delta", map[string]any{"index": i, "delta": delta})
+			if len(delta) > 0 {
+				send("content_block_delta", map[string]any{"index": i, "delta": delta})
+			}
 			send("content_block_stop", map[string]any{"index": i})
 		}
 		send("message_delta", map[string]any{"delta": map[string]any{"stop_reason": stop}, "usage": map[string]int{"output_tokens": 7}})

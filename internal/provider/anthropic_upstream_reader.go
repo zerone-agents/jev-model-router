@@ -28,6 +28,7 @@ type anthropicUpstreamValidation struct {
 	tools             bool
 	signatureOptional bool
 	ids               map[string]bool
+	serverCalls       map[string]bool
 	argument          strings.Builder
 }
 type nativeBoundedReader struct {
@@ -196,6 +197,7 @@ func (s *anthropicUpstreamValidation) accept(typ string, raw []byte) error {
 		s.started = true
 		s.open = -1
 		s.ids = map[string]bool{}
+		s.serverCalls = map[string]bool{}
 		return nil
 	}
 	if !s.started {
@@ -216,6 +218,26 @@ func (s *anthropicUpstreamValidation) accept(typ string, raw []byte) error {
 			if b.Thinking == nil || (!s.signatureOptional && s.tools && b.Signature != nil && *b.Signature != "") {
 				return nativeError(502)
 			}
+		case "server_tool_use":
+			if b.ID == "" || b.Name == "" || s.ids[b.ID] {
+				return nativeError(502)
+			}
+			var obj map[string]any
+			if json.Unmarshal(b.Input, &obj) != nil || obj == nil {
+				return nativeError(502)
+			}
+			s.ids[b.ID] = true
+			s.serverCalls[b.ID] = false
+			s.argument.Reset()
+			if len(obj) > 0 {
+				s.argument.Write(b.Input)
+			}
+		case "tool_result":
+			done, exists := s.serverCalls[b.ToolUseID]
+			if !exists || done || len(b.Content) == 0 || string(b.Content) == "null" {
+				return nativeError(502)
+			}
+			s.serverCalls[b.ToolUseID] = true
 		case "tool_use":
 			if b.ID == "" || b.Name == "" || s.ids[b.ID] {
 				return nativeError(502)
@@ -268,7 +290,7 @@ func (s *anthropicUpstreamValidation) accept(typ string, raw []byte) error {
 			}
 			*b.Signature += *event.Delta.Signature
 		case "input_json_delta":
-			if b.Type != "tool_use" || event.Delta.JSON == nil {
+			if (b.Type != "tool_use" && b.Type != "server_tool_use") || event.Delta.JSON == nil {
 				return nativeError(502)
 			}
 			s.argument.WriteString(*event.Delta.JSON)
@@ -280,7 +302,7 @@ func (s *anthropicUpstreamValidation) accept(typ string, raw []byte) error {
 			return nativeError(502)
 		}
 		b := &s.body.Content[s.open]
-		if b.Type == "tool_use" {
+		if b.Type == "tool_use" || b.Type == "server_tool_use" {
 			if s.argument.Len() > 0 {
 				b.Input = []byte(s.argument.String())
 			}
@@ -323,6 +345,11 @@ func (s *anthropicUpstreamValidation) accept(typ string, raw []byte) error {
 			}
 		}
 	case "message_stop":
+		for _, done := range s.serverCalls {
+			if !done {
+				return nativeError(502)
+			}
+		}
 		if !s.stopped || s.open != -1 || len(s.body.Content) == 0 {
 			return nativeError(502)
 		}

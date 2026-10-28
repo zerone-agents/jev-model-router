@@ -32,11 +32,15 @@ func completeNativePassthrough(ctx *schemas.BifrostContext, client *bifrost.Bifr
 		err.RetryAfter = retryAfterHeaders(out.Headers)
 		return routing.Completion{}, err
 	}
+	projected, err := projectServerTools(out.Body)
+	if err != nil {
+		return routing.Completion{}, err
+	}
 	var native anthropic.AnthropicMessageResponse
-	if json.Unmarshal(out.Body, &native) != nil {
+	if json.Unmarshal(projected, &native) != nil {
 		return routing.Completion{}, nativeError(502)
 	}
-	return anthropicUpstreamCompletion(native.ToBifrostChatResponse(ctx), out.Body, tools, signatureOptional)
+	return anthropicUpstreamCompletion(native.ToBifrostChatResponse(ctx), projected, tools, signatureOptional)
 }
 
 // Present the raw SDK transport chunks as one reader. Framing, bounds and
@@ -142,6 +146,24 @@ func streamNativePassthrough(ctx *schemas.BifrostContext, client *bifrost.Bifros
 			if err != nil {
 				failure(err)
 				return
+			}
+			// Server tools have already executed upstream. Do not expose them
+			// to the client or feed their arguments into SDK tool-call state.
+			var envelope struct {
+				Type  string `json:"type"`
+				Index *int   `json:"index"`
+			}
+			if json.Unmarshal(body, &envelope) != nil {
+				failure(nativeError(502))
+				return
+			}
+			if envelope.Index != nil && (envelope.Type == "content_block_start" || envelope.Type == "content_block_delta" || envelope.Type == "content_block_stop") {
+				state.mu.Lock()
+				blockType := state.body.Content[*envelope.Index].Type
+				state.mu.Unlock()
+				if blockType == "server_tool_use" || blockType == "tool_result" {
+					continue
+				}
 			}
 			var event anthropic.AnthropicStreamEvent
 			if json.Unmarshal(body, &event) != nil {
