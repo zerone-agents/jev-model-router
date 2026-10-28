@@ -117,7 +117,7 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 		for _, m := range cfg.Models {
 			if m.Enabled {
 				n++
-				if m.AutoEffort != nil && len(m.AutoEffort.Allowed) > 1 {
+				if len(modelEffortLevels(cfg, m)) > 1 {
 					needsDecision = true
 				}
 			}

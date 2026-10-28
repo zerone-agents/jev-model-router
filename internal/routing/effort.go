@@ -2,12 +2,6 @@ package routing
 
 import "encoding/json"
 
-// AutoEffortConfig declares operator-approved upstream effort levels.
-// It does not assert comparable capability across models.
-type AutoEffortConfig struct {
-	Allowed []string `json:"allowed"`
-}
-
 var effortLevels = []string{"minimal", "low", "medium", "high", "xhigh", "max"}
 
 func effortRank(s string) int {
@@ -19,8 +13,8 @@ func effortRank(s string) int {
 	return -1
 }
 
-func ResolveAutoEffort(config *AutoEffortConfig, requested string) (string, error) {
-	if config == nil {
+func ResolveAutoEffort(allowed []string, requested string) (string, error) {
+	if len(allowed) == 0 {
 		return "", nil
 	}
 	rank := effortRank(requested)
@@ -28,7 +22,7 @@ func ResolveAutoEffort(config *AutoEffortConfig, requested string) (string, erro
 		return "", Fail("invalid_decision", "invalid automatic effort")
 	}
 	lowest, best := len(effortLevels), -1
-	for _, v := range config.Allowed {
+	for _, v := range allowed {
 		n := effortRank(v)
 		if n < 0 {
 			return "", Fail("invalid_request", "invalid automatic effort configuration")
@@ -49,15 +43,37 @@ func ResolveAutoEffort(config *AutoEffortConfig, requested string) (string, erro
 	return effortLevels[best], nil
 }
 
-func AutomaticEffortAllowed(r Request) bool {
-	if r.Model != "auto" || r.AutoEffortBlocked || r.Options["reasoning_effort"] != nil {
-		return false
+// AutomaticEffortLevels is the single source for planning and read-only metadata.
+// Provider adaptation filters unsupported levels without rewriting stored declarations.
+func AutomaticEffortLevels(m Model, protocol ProviderProtocol) []string {
+	levels := []string{}
+	for _, level := range effortLevels {
+		if protocol == ProtocolAnthropic && (level == "minimal" || level == "xhigh") {
+			continue
+		}
+		for _, entry := range m.Capabilities.Reasoning {
+			if entry.Effort == level && (entry.EnableThinking == nil || *entry.EnableThinking) {
+				levels = append(levels, level)
+				break
+			}
+		}
+	}
+	return levels
+}
+
+// ValidateAutoEffortControls runs on original requests, never injected copies.
+func ValidateAutoEffortControls(r Request) error {
+	if r.Model != "auto" {
+		return nil
 	}
 	var knobs struct {
 		Enable *bool `json:"enable_thinking"`
 	}
 	_ = json.Unmarshal(r.Options["chat_template_kwargs"], &knobs)
-	return knobs.Enable == nil || *knobs.Enable
+	if r.AutoEffortBlocked || r.Options["reasoning_effort"] != nil || (knobs.Enable != nil && !*knobs.Enable) {
+		return Fail("invalid_request", "Auto selects reasoning effort; use an explicit model for manual effort, disabled thinking or a fixed thinking budget")
+	}
+	return nil
 }
 func ExplicitEffort(r Request) string {
 	var effort string

@@ -89,10 +89,12 @@ func TestNativeMessagesHTTPMixedRouting(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			extra := ""
+			model := "auto"
 			if i%2 == 0 {
+				model = "external"
 				extra = `,"thinking":{"type":"enabled","budget_tokens":1024}`
 			}
-			w := messagesCall(h, `{"model":"auto","max_tokens":2048,"messages":[{"role":"user","content":"hi"}]`+extra+`}`, "router-key")
+			w := messagesCall(h, `{"model":"`+model+`","max_tokens":2048,"messages":[{"role":"user","content":"hi"}]`+extra+`}`, "router-key")
 			if w.Code != 200 || !strings.Contains(w.Body.String(), `"model":"external"`) || w.Header().Get("request-id") != w.Header().Get("X-Request-ID") {
 				t.Errorf("%d %s", w.Code, w.Body.String())
 			}

@@ -28,7 +28,9 @@ func TestStatusAutomaticEffortReadiness(t *testing.T) {
 			checks, store, _ := checksFixture()
 			store.s.Models[0].Enabled = tc.enabled
 			if tc.levels != nil {
-				store.s.Models[0].AutoEffort = &routing.AutoEffortConfig{Allowed: tc.levels}
+				for _, level := range tc.levels {
+					store.s.Models[0].Capabilities.Reasoning = append(store.s.Models[0].Capabilities.Reasoning, routing.ReasoningCombination{Effort: level})
+				}
 			}
 			if tc.decision {
 				store.s.Decision.Model = "jev"

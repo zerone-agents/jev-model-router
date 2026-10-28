@@ -8,10 +8,11 @@ it("description replacement preserves every other field", () => {
     enabled: false,
     capabilities: { tools: true },
     future: "keep",
-    auto_effort: { allowed: ["low", "high"] },
+    automatic_effort_levels: ["low", "high"],
   };
   expect(descriptionInput(model, "new")).toEqual({
     ...model,
+    automatic_effort_levels: undefined,
     description: "new",
   });
   expect(model.description).toBe("old");

@@ -69,9 +69,9 @@ Chat Completions and route.inspect accept:
 - reasoning_effort: none, minimal, low, medium, high, xhigh, max. This is entrypoint vocabulary, not a claim that every model supports every value.
 - SDK thinking: {type: "enabled"} maps to chat_template_kwargs; the SDK-internal top-level thinking object is not accepted.
 
-Valid OpenAI-compatible thinking/effort controls require no model capability declaration and are forwarded unchanged, individually or together, for the upstream to validate. Auto, explicit selection and route.inspect do not filter on reasoning metadata. Shape, allowed-value and unknown-field checks remain. Unsupported upstream requests fail without silently stripping parameters or degrading them; only eligible operational generation failures can use Auto fallback.
+With an explicit model, valid OpenAI-compatible thinking/effort controls require no matching capability declaration and are forwarded unchanged, individually or together, for upstream validation. Shape, allowed-value and unknown-field checks remain. Explicit requests fail without silently stripping parameters, degrading effort or switching models.
 
-The existing capabilities.reasoning array retains read/write compatibility as optional descriptive metadata; no configuration migration is needed. Jev state requirements still include actual reasoning controls and count them in mandatory bytes.
+Auto derives effort levels from capabilities.reasoning. Manual effort, disabled thinking and fixed budgets are rejected before decision or generation; enabled/adaptive thinking without a fixed budget remains subject to adapter support. Chat route.inspect follows the same rules. See [Automatic effort](#automatic-effort-58) for upgrade behavior; reasoning declarations are no longer descriptive-only metadata.
 
 The OpenAI path forwards only these two validated extensions through Bifrost ExtraParams, bypassing model-name effort normalization without exposing arbitrary overrides. Validation uses the same conversion, serialization and extension merge as actual sending. Output limits keep max_completion_tokens semantics rather than becoming a thinking budget. No SDK retries or silent downgrade are introduced; bounded Auto reselection is an independent router policy.
 
@@ -194,13 +194,14 @@ Real native Messages acceptance used a temporary local Router and official Anthr
 
 ## Automatic effort (#58)
 
-Optional model `auto_effort.allowed` enables automatic parameter adaptation for
-Auto requests only. One Jev call can contain independent model and effort
+Model `capabilities.reasoning` supplies effort levels for Auto parameter adaptation.
+There is no additional opt-in configuration. One Jev call can contain independent model and effort
 questions; task effort is not conditioned on the model answer. Select the highest
 allowed level at or below the target, falling to the lowest allowed level when
-necessary. Unconfigured models omit injection. Explicit caller controls remain
-unchanged. See the [management contract](../contracts/README.md#automatic-task-effort)
-for configuration, singleton behavior and caller precedence.
+necessary. Models without usable effort declarations omit injection. Auto rejects manual
+effort, disabled thinking and fixed budgets with HTTP 400; use an explicit model
+to retain caller controls. See the [management contract](../contracts/README.md#automatic-task-effort)
+for configuration, singleton behavior and upgrade rules.
 
 Chat and native Messages JSON/SSE paths apply effort to full request copies.
 Chat-only `route.inspect` cannot represent native Messages thinking budgets or

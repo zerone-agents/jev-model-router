@@ -71,6 +71,12 @@ func TestMessagesThroughRouter(t *testing.T) {
 				}))
 				defer s.Close()
 				w := messagesCall(messagesHandler(t, s.URL, Limits{}), fmt.Sprintf(`{"model":%q,"max_tokens":1024,"stream":%t,"messages":[{"role":"user","content":"query"}],"thinking":{"type":"adaptive"},"output_config":{"effort":"max"}}`, model, stream), "router-key")
+				if model == "auto" {
+					if w.Code != 400 || calls.Load() != 0 {
+						t.Fatalf("Auto controls: %d %s calls=%d", w.Code, w.Body.String(), calls.Load())
+					}
+					return
+				}
 				if w.Code != 200 || !strings.Contains(w.Body.String(), `"model":"external"`) || !strings.Contains(w.Body.String(), "thought") || strings.Contains(w.Body.String(), "extra_fields") || calls.Load() != 1 {
 					t.Fatalf("%d %s calls=%d", w.Code, w.Body.String(), calls.Load())
 				}

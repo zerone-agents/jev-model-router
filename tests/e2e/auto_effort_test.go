@@ -64,7 +64,7 @@ func TestAutoEffortAgentWire(t *testing.T) {
 					i.put("decision.put", map[string]any{"base_url": i.upstream.URL, "model": "jev", "secret_ref": "env:TEST_PROVIDER_KEY"})
 					for _, id := range []string{"a", "b"} {
 						m := model(id, true)
-						m["auto_effort"] = map[string]any{"allowed": []string{"low", "high"}}
+						m["capabilities"].(map[string]any)["reasoning"] = []map[string]string{{"reasoning_effort": "low"}, {"reasoning_effort": "high"}}
 						if protocol == "anthropic" {
 							m["upstream_name"] = "claude-test"
 						}
@@ -83,6 +83,7 @@ func TestAutoEffortAgentWire(t *testing.T) {
 					req, _ := http.NewRequest("POST", i.server.URL+path, strings.NewReader(body))
 					req.Header.Set("Authorization", "Bearer inference-secret")
 					req.Header.Set("Content-Type", "application/json")
+					req.Header.Set("Content-Type", "application/json")
 					if native {
 						req.Header.Set("anthropic-version", "2023-06-01")
 					}
@@ -99,6 +100,46 @@ func TestAutoEffortAgentWire(t *testing.T) {
 					if decisions.Load() != 2 || generations.Load() != 1 {
 						t.Fatalf("decisions=%d generation=%d", decisions.Load(), generations.Load())
 					}
+					for _, controls := range []string{`,"reasoning_effort":"high"`, `,"reasoning_effort":"none"`, `,"chat_template_kwargs":{"enable_thinking":false}`} {
+						conflict := strings.TrimSuffix(body, "}") + controls + "}"
+						if native {
+							continue
+						}
+						req, _ := http.NewRequest("POST", i.server.URL+path, strings.NewReader(conflict))
+						req.Header.Set("Authorization", "Bearer inference-secret")
+						req.Header.Set("Content-Type", "application/json")
+						resp, err := i.server.Client().Do(req)
+						if err != nil {
+							t.Fatal(err)
+						}
+						out, _ := io.ReadAll(resp.Body)
+						resp.Body.Close()
+						if resp.StatusCode != 400 || !strings.Contains(string(out), "explicit model") {
+							t.Fatalf("conflict: %d %s", resp.StatusCode, out)
+						}
+					}
+					if native {
+						for _, controls := range []string{`,"output_config":{"effort":"high"}`, `,"thinking":{"type":"disabled"}`, `,"thinking":{"type":"enabled","budget_tokens":1024}`} {
+							conflict := strings.TrimSuffix(body, "}") + controls + "}"
+							req, _ := http.NewRequest("POST", i.server.URL+path, strings.NewReader(conflict))
+							req.Header.Set("Authorization", "Bearer inference-secret")
+							req.Header.Set("Content-Type", "application/json")
+							req.Header.Set("anthropic-version", "2023-06-01")
+							resp, err := i.server.Client().Do(req)
+							if err != nil {
+								t.Fatal(err)
+							}
+							out, _ := io.ReadAll(resp.Body)
+							resp.Body.Close()
+							if resp.StatusCode != 400 || !strings.Contains(string(out), "explicit model") {
+								t.Fatalf("native conflict: %d %s", resp.StatusCode, out)
+							}
+						}
+					}
+					if decisions.Load() != 2 || generations.Load() != 1 {
+						t.Fatal("rejected controls caused external calls")
+					}
+
 				})
 			}
 		}

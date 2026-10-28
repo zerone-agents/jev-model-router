@@ -1,6 +1,9 @@
 package routing
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestResolveAutoEffort(t *testing.T) {
 	for _, tc := range []struct {
@@ -12,16 +15,26 @@ func TestResolveAutoEffort(t *testing.T) {
 		{[]string{"high"}, "max", "high"},
 		{nil, "xhigh", ""},
 	} {
-		var c *AutoEffortConfig
-		if tc.allowed != nil {
-			c = &AutoEffortConfig{Allowed: tc.allowed}
-		}
-		got, err := ResolveAutoEffort(c, tc.target)
+		got, err := ResolveAutoEffort(tc.allowed, tc.target)
 		if err != nil || got != tc.want {
 			t.Fatalf("%+v: %q %v", tc, got, err)
 		}
 	}
-	if _, err := ResolveAutoEffort(&AutoEffortConfig{Allowed: []string{"high"}}, "bogus"); err == nil {
+	if _, err := ResolveAutoEffort([]string{"high"}, "bogus"); err == nil {
 		t.Fatal("invalid decision accepted")
+	}
+}
+
+func TestAutomaticEffortLevels(t *testing.T) {
+	m := Model{Capabilities: Capabilities{Reasoning: []ReasoningCombination{
+		{Effort: "high"}, {Effort: "low"}, {Effort: "low"}, {Effort: "none"}, {Effort: "minimal"}, {Effort: "xhigh"}, {Effort: "max", EnableThinking: new(false)}, {EnableThinking: new(true)},
+	}}}
+	for _, tc := range []struct {
+		protocol ProviderProtocol
+		want     string
+	}{{ProtocolOpenAI, "minimal,low,high,xhigh"}, {ProtocolAnthropic, "low,high"}} {
+		if got := strings.Join(AutomaticEffortLevels(m, tc.protocol), ","); got != tc.want {
+			t.Fatalf("%s got %s", tc.protocol, got)
+		}
 	}
 }

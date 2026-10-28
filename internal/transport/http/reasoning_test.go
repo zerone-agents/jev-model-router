@@ -98,6 +98,17 @@ func TestReasoningThroughRouterAndInspection(t *testing.T) {
 				q := httptest.NewRequest("POST", "/admin/v1/call/route.inspect", strings.NewReader(`{"input":`+body+`}`))
 				q.Header.Set("Authorization", "Bearer settings")
 				h.ServeHTTP(inspect, q)
+				if model == "auto" && fields != `"chat_template_kwargs":{"enable_thinking":true}` {
+					if inspect.Code != 400 {
+						t.Fatalf("inspect accepted manual Auto: %d", inspect.Code)
+					}
+					w := httptest.NewRecorder()
+					h.ServeHTTP(w, httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(body)))
+					if w.Code != 400 || calls.Load() != before {
+						t.Fatalf("Auto conflict: %d %s", w.Code, w.Body.String())
+					}
+					continue
+				}
 				if inspect.Code != 200 || !strings.Contains(inspect.Body.String(), `"model_id":"external"`) || calls.Load() != before {
 					t.Fatalf("inspect: %d %s", inspect.Code, inspect.Body.String())
 				}
@@ -176,16 +187,19 @@ func TestUnmodifiedAgentSDKReasoning(t *testing.T) {
 		t.Fatalf("SDK verification: %v\n%s", err, out)
 	}
 	t.Log(string(out))
-	if calls.Load() != 12 {
+	if calls.Load() != 8 {
 		t.Fatalf("SDK calls=%d", calls.Load())
 	}
-	for i := 0; i < 12; i++ {
+	for i := 0; i < 8; i++ {
 		wire := <-captured
 		if string(wire["max_completion_tokens"]) != "1024" || wire["max_tokens"] != nil {
 			t.Fatal("SDK output limit changed")
 		}
-		// Script order: thinking, effort, both; each has JSON and SSE, for both models.
-		mode := (i % 6) / 2
+		// Auto allows enabled thinking; explicit model also exercises effort and both.
+		mode := 0
+		if i >= 2 {
+			mode = (i - 2) / 2
+		}
 		if (wire["chat_template_kwargs"] != nil) != (mode != 1) || (wire["reasoning_effort"] != nil) != (mode != 0) {
 			t.Fatalf("SDK controls lost at call %d: %s", i, wire)
 		}

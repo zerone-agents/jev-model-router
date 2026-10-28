@@ -141,7 +141,11 @@ function Editor(props: Props & { initial: Snapshot }) {
         version: result.data.version,
         text: snapshot.model ? submitted.description : submitted.text,
         model: snapshot.model
-          ? { ...submitted, health: snapshot.model.health }
+          ? {
+              ...submitted,
+              health: snapshot.model.health,
+              automatic_effort_levels: snapshot.model.automatic_effort_levels,
+            }
           : undefined,
       });
       setNotice("saved");
@@ -232,8 +236,8 @@ function Editor(props: Props & { initial: Snapshot }) {
             <span className="read-only">
               {text(lang, "Reasoning effort", "推理强度")}:
             </span>
-            {snapshot.model.auto_effort?.allowed.length ? (
-              snapshot.model.auto_effort.allowed.map((effort) => (
+            {snapshot.model.automatic_effort_levels?.length ? (
+              snapshot.model.automatic_effort_levels.map((effort) => (
                 <span className="badge" key={effort}>
                   {effort}
                 </span>

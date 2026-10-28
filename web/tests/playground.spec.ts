@@ -51,7 +51,7 @@ test.beforeAll(async ({ request }) => {
         "models.put",
         Object.fromEntries(
           Object.entries({ ...m, enabled: false }).filter(
-            ([k]) => k !== "health",
+            ([k]) => k !== "health" && k !== "automatic_effort_levels",
           ),
         ),
         true,

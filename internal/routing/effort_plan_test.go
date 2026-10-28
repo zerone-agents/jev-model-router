@@ -24,7 +24,9 @@ func TestEffortPlanning(t *testing.T) {
 			s, r := planFixture()
 			s.Models = s.Models[:tc.count]
 			if tc.allowed != nil {
-				s.Models[0].AutoEffort = &AutoEffortConfig{Allowed: tc.allowed}
+				for _, level := range tc.allowed {
+					s.Models[0].Capabilities.Reasoning = append(s.Models[0].Capabilities.Reasoning, ReasoningCombination{Effort: level})
+				}
 			}
 			calls := 0
 			p := Planner{Decider: chooseFunc(func(_ context.Context, _ DecisionConfig, in DecisionInput) (Decision, error) {
@@ -44,15 +46,17 @@ func TestEffortPlanning(t *testing.T) {
 		})
 	}
 }
-func TestEffortCallerPrecedence(t *testing.T) {
+func TestAutoRejectsCallerControls(t *testing.T) {
 	for _, options := range []map[string]json.RawMessage{{"reasoning_effort": json.RawMessage(`"max"`)}, {"chat_template_kwargs": json.RawMessage(`{"enable_thinking":false}`)}} {
 		s, r := planFixture()
 		s.Models = s.Models[:1]
-		s.Models[0].AutoEffort = &AutoEffortConfig{Allowed: []string{"low", "high"}}
+		for _, level := range []string{"low", "high"} {
+			s.Models[0].Capabilities.Reasoning = append(s.Models[0].Capabilities.Reasoning, ReasoningCombination{Effort: level})
+		}
 		r.Options = options
 		calls := 0
 		plan, err := counterPlanner(&calls).Plan(context.Background(), s, r)
-		if err != nil || calls != 0 {
+		if err == nil || calls != 0 {
 			t.Fatalf("%+v %v calls=%d", plan, err, calls)
 		}
 	}

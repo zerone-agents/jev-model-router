@@ -54,9 +54,9 @@ Jev mode offers no sensitive-data routing guarantee. Conversation text may go to
 
 Discover the current `models.put` and `route.inspect` schemas first. Chat requests support `chat_template_kwargs: {"enable_thinking": true|false}` and `reasoning_effort`; template kwargs cannot contain arbitrary provider overrides. SDK `thinking: {type: "enabled"}` becomes `chat_template_kwargs.enable_thinking=true` on the wire.
 
-No `capabilities.reasoning` declaration is required. For OpenAI-compatible upstreams, valid thinking and effort controls are forwarded unchanged, alone or together; the upstream decides whether they are supported. Existing reasoning metadata remains readable/writable for compatibility but does not gate requests or filter candidates.
+For explicit models, valid thinking and effort controls are forwarded to OpenAI-compatible upstreams without requiring matching `capabilities.reasoning` declarations; the upstream determines support. Auto uses these declarations for automatic effort and rejects manual effort, disabled thinking and fixed budgets. Use an explicit model when you need these controls. See [Configure automatic effort](#configure-automatic-effort).
 
-Validate upstream behavior against the actual endpoint/model in JSON and SSE. Neither `auto` nor explicit selection requires reasoning metadata. Inspect uses the same checks as generation, and Jev receives the reasoning requirements within its input budget. No field dropping, reasoning downgrade, retry or fallback is used. Output limits are preserved independently of these controls. Responses preserve text `reasoning_content`, including thinking-only SSE events; OpenAI-compatible upstream history can replay this text. Native signed-tool responses have only the narrow BigModel exception described below; encrypted reasoning remains unsupported.
+Validate the actual endpoint/model in JSON and SSE. Chat inspection shares generation checks; native Messages requires full execution checks. Output limits remain independent. Explicit controls are never silently dropped or downgraded, and explicit requests never switch models. Responses preserve text `reasoning_content`, including thinking-only SSE events; OpenAI-compatible history can replay this text. Native signed-tool responses have only the narrow BigModel exception below; encrypted reasoning remains unsupported.
 
 ## Anthropic Messages
 
@@ -150,17 +150,20 @@ effort; missing records or `records_degraded` prevent complete reconciliation.
 ## Configure automatic effort
 
 Discover `models.get`, `models.put` and `route.inspect` on the target instance.
-Read the current model and version, preserve all replacement fields, and add
-`"auto_effort":{"allowed":["low","high"]}` only after confirming the upstream
-model supports those values. Use the discovered write envelope and idempotency
-rules. Omit auto_effort to disable it; do not send an empty array. There is no
-Dashboard effort editor or display.
+Read the current model and version. Preserve all writable replacement fields,
+remove read-only `health` and `automatic_effort_levels`, and declare supported
+levels in `capabilities.reasoning`, e.g.
+`[{"reasoning_effort":"low"},{"reasoning_effort":"high"}]` after confirming upstream
+support. Apply version/idempotency safeguards and read back the derived
+`automatic_effort_levels`. These declarations automatically enable Auto effort;
+there is no second enablement flag. Legacy `auto_effort` is ignored on load and
+rejected on writes. The dashboard displays levels read-only.
 
 Auto uses independent model and task-effort judgments in one Jev request.
 Levels ascend minimal/low/medium/high/xhigh/max. The router uses the nearest
 allowed level at or below the answer, or the lowest allowed level if no lower
 one exists. Anthropic automatic configuration supports low/medium/high/max.
-Unconfigured models receive no injected effort. These labels do not measure
+Models without usable effort declarations receive no injected effort. These labels do not measure
 cross-model ability, token budget or price.
 
 Verify `effective_effort` with Chat-format `route.inspect`, then use actual
@@ -169,9 +172,10 @@ not a prediction guaranteed identical to a later decision. Native Messages
 budgets, output_config and signed history cannot be inspected through this Chat
 contract; verify them through full `/v1/messages` requests instead.
 
-Explicit model IDs never add automatic effort or a Jev call. Explicit effort,
-disabled thinking or fixed thinking budgets override automatic selection; never
-silently lower caller effort after an upstream error. A sole model with multiple
+Explicit model IDs never add automatic effort or a Jev call. Auto rejects manual
+effort (Chat reasoning_effort or Messages output_config.effort), disabled thinking
+and fixed thinking budgets with HTTP 400. Use an explicit model for these controls.
+Enabled/adaptive thinking without a fixed budget remains subject to adapter support. A sole model with multiple
 allowed levels still incurs an effort decision. A sole singleton applies its
 only level directly. Auto fallback adapts each attempt independently.
 

@@ -76,9 +76,9 @@ Login exchanges Settings Bearer plus an empty JSON object for an HttpOnly cookie
 
 ## Reasoning controls and model capabilities
 
-`chat.json` and `route.inspect` validate formats and values of `chat_template_kwargs.enable_thinking` and `reasoning_effort`, rejecting unknown template fields. Valid controls pass unchanged to OpenAI-compatible upstreams without requiring declared capabilities. Native Anthropic maps thinking/effort through normalization rules and rejects combinations that cannot be preserved before candidate selection; see the [compatibility matrix](../docs/compatibility.md#openai-clients-with-native-anthropic-upstream-50). The upstream decides model support. Failures trigger neither parameter removal, downgrades nor model switching.
+`chat.json` and `route.inspect` validate formats and values of `chat_template_kwargs.enable_thinking` and `reasoning_effort`, rejecting unknown template fields. With an explicit model, valid controls pass unchanged to OpenAI-compatible upstreams without requiring matching capability declarations. Native Anthropic maps thinking/effort through normalization rules and rejects combinations that cannot be preserved; see the [compatibility matrix](../docs/compatibility.md#openai-clients-with-native-anthropic-upstream-50). The upstream decides model support. Explicit failures do not remove parameters, downgrade effort or switch models.
 
-Optional `capabilities.reasoning` remains readable/writable for compatibility but is descriptive metadata only. It does not affect request validation or auto/explicit selection. Missing configuration, empty arrays or metadata differing from the request do not block control forwarding. Jev still receives reasoning requirements and counts them in its input budget. Chat JSON/SSE preserves textual reasoning_content and permits assistant-history replay; signed/encrypted reasoning extensions are outside this contract.
+For Auto, `capabilities.reasoning` supplies the supported levels used for automatic effort adaptation. Auto rejects manual effort, disabled thinking and fixed budgets before external calls; enabled/adaptive thinking remains subject to adapter support. See [Automatic task effort](#automatic-task-effort) for derivation, singleton behavior and upgrade rules. Chat JSON/SSE preserves textual reasoning_content and permits assistant-history replay; signed/encrypted reasoning extensions are outside this contract.
 
 ## Routing-record pagination and retention
 
@@ -167,13 +167,23 @@ effort; missing records or `records_degraded` prevent complete reconciliation.
 
 ## Automatic task effort
 
-Models may declare `auto_effort: {"allowed": ["low", "high"]}` through
-`models.put` and configuration snapshots. Arrays must be nonempty and unique.
-Omission disables automatic injection; retain this field on replacement writes.
-The automatic order is minimal, low, medium, high, xhigh, max. Anthropic providers
-use the common adapter subset low/medium/high/max. Actual upstream model support
-is declared by the operator, not inferred from a model name or connection test.
-Informational `capabilities.reasoning` does not enable this feature.
+Models declare supported effort once in `capabilities.reasoning`, for example
+`[{"reasoning_effort":"low"},{"reasoning_effort":"high"}]`. Auto derives unique
+levels in minimal, low, medium, high, xhigh, max order; entries without effort,
+`none`, and entries with `enable_thinking:false` do not enable automatic effort.
+Anthropic adapters derive only low/medium/high/max, retaining all stored metadata.
+Model names and connection tests do not establish supported levels.
+`models.get` and `models.list` expose read-only `automatic_effort_levels` using the
+same derivation as planning and readiness; strip it and `health` from replacement
+writes. No separate enablement field exists.
+
+Upgrade: existing persisted `auto_effort` is ignored and no longer returned.
+New writes containing it are rejected; declare support in capabilities.reasoning.
+Previously successful writes still replay their matching unexpired idempotency
+receipts, including legacy payloads; replay does not apply the configuration again.
+Existing reasoning declarations now enable Auto effort without an extra opt-in.
+Models lacking declarations receive no injected effort; historical records and
+unrelated configuration are unchanged.
 
 Auto asks independent model and task-effort Choice questions in one Jev call.
 The effort question judges the task, not the selected model or its allowed
@@ -184,11 +194,14 @@ model is chosen. A sole model with multiple levels asks effort only; a sole
 model with one level applies it directly, and an unconfigured sole model bypasses
 Jev. Both questions share existing request budgets and one invocation count.
 
-Explicit model selection, caller effort, disabled thinking and fixed thinking
-budgets suppress automatic injection. Explicit effort is never downgraded.
-Enabled/adaptive thinking may coexist when the adapter preserves the combination;
-automatic effort does not add a thinking switch. Each fallback attempt starts
-from the original request and applies its own decision to a separate copy.
+Auto owns effort: caller `reasoning_effort` (including none), native Messages
+`output_config.effort`, disabled thinking and fixed thinking budgets fail with
+HTTP 400 `invalid_request` before external calls. Use an explicit model for these
+controls; explicit requests retain their existing validation and forwarding.
+Enabled/adaptive thinking without a fixed budget may coexist when the adapter
+supports it. Historical thinking is not a new control. Automatic effort adds no
+thinking switch. Each fallback attempt starts from the original request and
+applies its own decision to a separate copy.
 
 `route.inspect` remains Chat-format-only and returns optional `effective_effort`,
 the final outgoing parameter, not measured computational effort. For Chat targeting
