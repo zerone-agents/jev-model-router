@@ -52,10 +52,7 @@ func (j *jev) Choose(ctx context.Context, c routing.DecisionConfig, in routing.D
 	if e != nil {
 		return zero, routing.Fail("config_missing", "decision credential unavailable")
 	}
-	path := c.Path
-	if path == "" {
-		path = "/v1/systemone"
-	}
+	path := decisionPath(c)
 	req, e := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(c.BaseURL, "/")+path, bytes.NewReader(body))
 	if e != nil {
 		return zero, routing.Fail("config_missing", "invalid decision endpoint")
@@ -177,7 +174,7 @@ func parseDecisionUsage(raw json.RawMessage, c routing.DecisionConfig) *routing.
 	u, err := url.Parse(c.BaseURL)
 	if err != nil || u.Scheme != "https" ||
 		!strings.HasSuffix(strings.ToLower(u.Hostname()), ".maas.aliyuncs.com") ||
-		strings.TrimRight(u.Path, "/")+c.Path != "/compatible-mode/v1/systemone" ||
+		strings.TrimRight(u.Path, "/")+decisionPath(c) != "/compatible-mode/v1/systemone" ||
 		c.Model != "decision-model-preview" {
 		return parseUsage(raw)
 	}
@@ -194,4 +191,12 @@ func parseDecisionUsage(raw json.RawMessage, c routing.DecisionConfig) *routing.
 		return parseUsage(normalized)
 	}
 	return parseUsage(raw)
+}
+
+// decisionPath is shared by request construction and endpoint-specific parsing.
+func decisionPath(c routing.DecisionConfig) string {
+	if c.Path == "" {
+		return "/v1/systemone"
+	}
+	return c.Path
 }

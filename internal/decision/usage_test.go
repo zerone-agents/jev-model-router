@@ -82,3 +82,16 @@ func TestAliyunInputOnlyUsage(t *testing.T) {
 		t.Fatal("exception leaked to other providers")
 	}
 }
+
+func TestAliyunDefaultPathInputOnlyUsage(t *testing.T) {
+	for _, base := range []string{
+		"https://llm-test.cn-beijing.maas.aliyuncs.com/compatible-mode",
+		"https://llm-test.cn-beijing.maas.aliyuncs.com/compatible-mode/",
+	} {
+		c := routing.DecisionConfig{BaseURL: base, Model: "decision-model-preview"}
+		u := parseDecisionUsage(json.RawMessage(`{"input_tokens":496}`), c)
+		if u == nil || u.InputTokens != 496 || u.OutputTokens != 0 {
+			t.Fatalf("default path usage lost for %s: %+v", base, u)
+		}
+	}
+}
