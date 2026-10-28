@@ -3,6 +3,8 @@ package inference
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"testing"
 	"time"
@@ -74,5 +76,35 @@ func TestGenerationWithoutEffortClearsRecordedValue(t *testing.T) {
 	err := r.Execute(req, nil, nil, "hello", func(context.Context, routing.Plan, int) AttemptResult { return AttemptResult{} })
 	if err != nil || r.record.EffectiveEffort != "" || r.record.Attempts[0].EffectiveEffort != "" {
 		t.Fatalf("stale effort: %+v, %v", r.record, err)
+	}
+}
+
+func TestStreamErrorEffortMatchesRecordedAttempt(t *testing.T) {
+	for _, fallback := range []bool{false, true} {
+		t.Run(fmt.Sprint("fallback=", fallback), func(t *testing.T) {
+			svc := Service{Store: effortStore{}, Planner: &routing.Planner{Decider: &effortDecider{t: t}}, DecisionTimeout: time.Second, Fallback: DefaultFallbackConfig()}
+			r := svc.Begin(context.Background(), "stream-effort")
+			defer r.Finish(nil)
+			var streamed *routing.AttemptError
+			req := routing.Request{Model: "auto", Messages: []routing.Message{{Role: "user", Content: json.RawMessage(`"hello"`)}}}
+			err := r.Execute(req, nil, nil, "hello", func(_ context.Context, _ routing.Plan, n int) AttemptResult {
+				if fallback && n == 1 {
+					return AttemptResult{Err: routing.Fail("timeout", "slow"), RetryableGenerationFailure: true}
+				}
+				failure := r.StreamError(routing.Fail("upstream_error", "stream failed after content"))
+				if !errors.As(failure, &streamed) {
+					t.Fatal("missing stream diagnostics")
+				}
+				return AttemptResult{Err: failure, Committed: true}
+			})
+			if err == nil || streamed == nil {
+				t.Fatal("expected stream failure")
+			}
+			for i, a := range r.record.Attempts {
+				if streamed.Attempts[i].EffectiveEffort != a.EffectiveEffort {
+					t.Fatalf("attempt %d: stream effort %q differs from record %q", i+1, streamed.Attempts[i].EffectiveEffort, a.EffectiveEffort)
+				}
+			}
+		})
 	}
 }
