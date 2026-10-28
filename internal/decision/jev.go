@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -77,7 +78,7 @@ func (j *jev) Choose(ctx context.Context, c routing.DecisionConfig, in routing.D
 		}
 		reported := ""
 		if len(b) <= 65536 && json.Unmarshal(b, &envelope) == nil {
-			zero.Usage = parseUsage(envelope.Usage)
+			zero.Usage = parseDecisionUsage(envelope.Usage, c)
 			var upstreamError map[string]any
 			if json.Unmarshal(envelope.Error, &upstreamError) == nil {
 				reported = routing.ReportedErrorCode(upstreamError)
@@ -104,7 +105,7 @@ func (j *jev) Choose(ctx context.Context, c routing.DecisionConfig, in routing.D
 	if json.Unmarshal(b, &out) != nil {
 		return zero, routing.Fail("invalid_decision", "invalid decision response")
 	}
-	usage := parseUsage(out.Usage)
+	usage := parseDecisionUsage(out.Usage, c)
 	var answers map[string]struct{ Type, Choice string }
 	if json.Unmarshal(out.Answers, &answers) != nil {
 		return routing.Decision{Usage: usage}, routing.Fail("invalid_decision", "invalid decision response")
@@ -167,4 +168,30 @@ func parseUsage(raw json.RawMessage) *routing.Usage {
 		return nil
 	}
 	return &u
+}
+
+// Aliyun System One reports input-only usage for decision-model-preview.
+// Missing output usage is zero by this interface's accounting contract;
+// explicit malformed output fields and other endpoints remain strict.
+func parseDecisionUsage(raw json.RawMessage, c routing.DecisionConfig) *routing.Usage {
+	u, err := url.Parse(c.BaseURL)
+	if err != nil || u.Scheme != "https" ||
+		!strings.HasSuffix(strings.ToLower(u.Hostname()), ".maas.aliyuncs.com") ||
+		strings.TrimRight(u.Path, "/")+c.Path != "/compatible-mode/v1/systemone" ||
+		c.Model != "decision-model-preview" {
+		return parseUsage(raw)
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(raw, &fields) != nil || fields == nil {
+		return nil
+	}
+	if _, exists := fields["output_tokens"]; !exists {
+		fields["output_tokens"] = json.RawMessage("0")
+		normalized, err := json.Marshal(fields)
+		if err != nil {
+			return nil
+		}
+		return parseUsage(normalized)
+	}
+	return parseUsage(raw)
 }
