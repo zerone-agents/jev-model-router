@@ -382,3 +382,27 @@ func TestCompleteToolRoundThroughRouter(t *testing.T) {
 		t.Fatalf("second: %d %s calls=%d", code, second, calls.Load())
 	}
 }
+
+func TestRootRedirectsToDashboard(t *testing.T) {
+	i := newInstance(t)
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	for _, method := range []string{http.MethodGet, http.MethodHead} {
+		req, _ := http.NewRequest(method, i.server.URL+"/", nil)
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusPermanentRedirect || resp.Header.Get("Location") != "/dashboard/" {
+			t.Fatalf("unexpected root redirect: %d %s", resp.StatusCode, resp.Header.Get("Location"))
+		}
+	}
+	resp, err := i.server.Client().Get(i.server.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || resp.Request.URL.Path != "/dashboard/" {
+		t.Fatalf("dashboard unreachable: %d", resp.StatusCode)
+	}
+}

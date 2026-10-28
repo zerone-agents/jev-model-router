@@ -168,7 +168,7 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 	pg := httptransport.NewPlaygroundHandler(sessionHTTP, playground.NewService(store, cfg.Playground, time.Now), &inference.Service{Store: store, Planner: planner, Recorder: recorder, DecisionTimeout: cfg.DecisionTimeout, Fallback: cfg.Fallback}, &routing.Executor{Generator: gen}, cfg.Playground)
 	dashboard := web.Handler()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/dashboard" || strings.HasPrefix(r.URL.Path, "/dashboard/") {
+		if r.URL.Path == "/" || r.URL.Path == "/dashboard" || strings.HasPrefix(r.URL.Path, "/dashboard/") {
 			dashboard.ServeHTTP(w, r)
 			return
 		}

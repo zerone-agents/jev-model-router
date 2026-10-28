@@ -25,7 +25,7 @@ func Handler() http.Handler {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		if r.URL.Path == "/dashboard" {
+		if r.URL.Path == "/" || r.URL.Path == "/dashboard" {
 			http.Redirect(w, r, "/dashboard/", http.StatusPermanentRedirect)
 			return
 		}
