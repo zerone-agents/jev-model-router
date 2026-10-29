@@ -12,7 +12,7 @@
 
 阅读英文说明：[Agent 模型路由如何工作](docs/agent-model-routing.md)，以及何时应按请求选模、何时固定模型更合适。
 
-当前正式版为 [v0.1.27](https://github.com/zerone-agents/jev-model-router/releases/tag/v0.1.27)。单个 Go 服务配合 SQLite，支持文本与工具调用流式输出，并提供管理 CLI 和中英文控制台。本地 Laya、敏感会话锁定、ArbiterOS 与 PostgreSQL 仍属规划。
+[最新正式版](https://github.com/zerone-agents/jev-model-router/releases/latest)以单个 Go 服务配合 SQLite 运行，支持文本与工具调用流式输出，并提供管理 CLI 和中英文控制台。本地 Laya、敏感会话锁定、ArbiterOS 与 PostgreSQL 仍属规划。
 
 ## 客户端与上游支持
 

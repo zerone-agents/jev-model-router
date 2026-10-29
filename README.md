@@ -12,7 +12,7 @@ A lightweight, open-source model router for AI agents. Keep your OpenAI Chat Com
 
 [Learn how Agent model routing works](docs/agent-model-routing.md), when per-request selection helps, and when a fixed model is the better choice.
 
-The current release is [v0.1.27](https://github.com/zerone-agents/jev-model-router/releases/tag/v0.1.27). It runs as a single Go service with SQLite, streams text and tool calls, and includes a management CLI and bilingual dashboard. Local Laya, sensitive-session locking, ArbiterOS and PostgreSQL remain planned.
+The [latest release](https://github.com/zerone-agents/jev-model-router/releases/latest) runs as a single Go service with SQLite, streams text and tool calls, and includes a management CLI and bilingual dashboard. Local Laya, sensitive-session locking, ArbiterOS and PostgreSQL remain planned.
 
 ## Client and upstream support
 
