@@ -66,7 +66,7 @@ const response = await client.chat.completions.create({
 console.log(response.choices[0]?.message);
 ```
 
-OpenAI Chat Completions supports the documented OpenAI-compatible and native Anthropic generation upstream paths. Anthropic Messages clients can use the router root URL, but `/v1/messages` currently selects only OpenAI-compatible upstreams; native Anthropic upstream support for that client entry point remains planned. Unsupported conversions fail explicitly rather than silently changing request semantics.
+OpenAI Chat Completions and Anthropic Messages both support the documented OpenAI-compatible and native Anthropic generation upstream paths. Native Messages requests preserve their native JSON and stream event structure within the documented field, signature, and model-profile boundaries. Unsupported candidates or conversions fail explicitly rather than silently changing request semantics.
 
 Agents can also install the repository's [companion `jev-router` Skill](../skills/jev-router/SKILL.md) to deploy the service, discover management schemas, configure models, inspect routes, and verify connectivity through the Agent-facing CLI workflow.
 

@@ -112,4 +112,4 @@ For a remote dashboard, set `JEV_ROUTER_DASHBOARD_ORIGIN=https://router.example.
 
 ## Inference protocols
 
-OpenAI clients use the Router `/v1` base URL; Anthropic SDK clients use the Router root. `/v1/chat/completions` supports OpenAI-compatible and native Anthropic upstreams; `/v1/messages` currently supports only OpenAI-compatible upstreams. See [request examples](../README.md#call-the-inference-api) and [native Anthropic/BigModel configuration](../docs/configuration.md#native-anthropic-generation-upstream).
+OpenAI clients use the Router `/v1` base URL; Anthropic SDK clients use the Router root. Both `/v1/chat/completions` and `/v1/messages` support OpenAI-compatible and native Anthropic upstreams within their documented compatibility boundaries. See [request examples](../README.md#call-the-inference-api), [native Messages compatibility](../docs/compatibility.md#native-messages-clients-with-native-anthropic-upstream-51), and [native Anthropic/BigModel configuration](../docs/configuration.md#native-anthropic-generation-upstream).

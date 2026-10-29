@@ -19,7 +19,7 @@ The current release is [v0.1.27](https://github.com/zerone-agents/jev-model-rout
 | Client entry point | OpenAI-compatible upstream | Native Anthropic upstream |
 | --- | --- | --- |
 | `/v1/chat/completions` | JSON / SSE | JSON / SSE, including supported thinking and tool continuations |
-| `/v1/messages` | JSON / SSE through conversion | Planned in [#51](https://github.com/zerone-agents/jev-model-router/issues/51) |
+| `/v1/messages` | JSON / SSE through conversion | JSON / SSE with native preservation |
 
 Support is limited to the fields and combinations in the [compatibility matrix](docs/compatibility.md). Unsupported conversions fail explicitly. BigModel `glm-5.3` and `glm-5.3-flash` passed 12 original Agent SDK examples through the local Router; see the [compatibility and validation scope](docs/compatibility.md). This does not establish compatibility with every Anthropic deployment or native signed thinking history.
 
@@ -115,13 +115,13 @@ curl http://127.0.0.1:8080/v1/messages \
   -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}],"max_tokens":1024}'
 ```
 
-Add `"stream":true` for SSE. Messages currently selects only OpenAI-compatible upstreams; use Chat Completions if you have configured only native Anthropic upstreams. See the [Anthropic SDK example](examples/anthropic-messages.mjs) and [native upstream configuration](docs/configuration.md#native-anthropic-generation-upstream).
+Add `"stream":true` for SSE. Messages supports configured OpenAI-compatible and native Anthropic upstreams within the documented field and model-profile boundaries. See the [Anthropic SDK example](examples/anthropic-messages.mjs), [native Messages compatibility](docs/compatibility.md#native-messages-clients-with-native-anthropic-upstream-51), and [native upstream configuration](docs/configuration.md#native-anthropic-generation-upstream).
 
 ## Routing behavior
 
 - No candidates means failure; a single candidate is selected directly; multiple candidates invoke Jev on every request. Explicit model selection skips Jev.
 - Preferences live primarily in prompts and natural-language model cards. Code enforces authorization, capability, capacity, and protocol boundaries.
-- `auto` is a reserved ID. Generation requests are not truncated, parameters are not silently dropped, and requests are not retried or switched to another model.
+- `auto` is a reserved ID. Generation requests are not truncated and parameters are not silently dropped. SDK retries remain disabled; explicit requests never switch models, while Auto may reselect once before semantic output after an eligible generation failure.
 - Jev mode provides no sensitive-data routing guarantee. Conversation text may go to Jev. Image data, tool definitions, tool arguments and tool outputs are excluded; paired tool IDs and names remain.
 - Configuration writes affect new requests immediately. Disabling a model does not revoke snapshots already in use.
 - Records retain routing metadata and up to 120 characters from the latest user message. Default retention is seven days or 100,000 records, whichever limit is reached first. Writes are best effort and degraded status is exposed; these records are not audit logs.

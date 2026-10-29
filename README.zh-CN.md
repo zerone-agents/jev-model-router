@@ -19,7 +19,7 @@
 | 客户端入口 | OpenAI 兼容上游 | 原生 Anthropic 上游 |
 | --- | --- | --- |
 | `/v1/chat/completions` | JSON / SSE | JSON / SSE，包含受支持的思考与工具续写 |
-| `/v1/messages` | 经转换支持 JSON / SSE | 由 [#51](https://github.com/zerone-agents/jev-model-router/issues/51) 追踪，尚未支持 |
+| `/v1/messages` | 经转换支持 JSON / SSE | JSON / SSE，原生保真 |
 
 支持范围以[兼容矩阵](docs/compatibility.md)公布的字段组合为准，无法保留语义的转换明确失败。BigModel `glm-5.3` 和 `glm-5.3-flash` 通过本地 Router 完成了 12 个原始 Agent SDK 示例，见[兼容范围与验证方法](docs/compatibility.md)。该结果不代表所有 Anthropic 部署或原生签名历史均兼容。
 
@@ -115,13 +115,13 @@ curl http://127.0.0.1:8080/v1/messages \
   -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}],"max_tokens":1024}'
 ```
 
-增加 `"stream":true` 可使用 SSE。Messages 当前只选择 OpenAI 兼容上游；若只配置原生 Anthropic 上游，请使用 Chat Completions 入口。见 [Anthropic SDK 示例](examples/anthropic-messages.mjs)及[原生上游配置](docs/configuration.md#native-anthropic-generation-upstream)。
+增加 `"stream":true` 可使用 SSE。Messages 可在已记录的字段与模型配置边界内选择 OpenAI 兼容或原生 Anthropic 上游。见 [Anthropic SDK 示例](examples/anthropic-messages.mjs)、[原生 Messages 兼容范围](docs/compatibility.md#native-messages-clients-with-native-anthropic-upstream-51)及[原生上游配置](docs/configuration.md#native-anthropic-generation-upstream)。
 
 ## 路由约定
 
 - 零候选失败、单候选直达、多候选每次调用 Jev；显式选择跳过 Jev。
 - 偏好尽量交给提示词和自然语言模型卡；代码仅锁定权限、能力、容量及协议边界。
-- `auto` 为保留 ID。完整生成请求不裁剪，参数不静默丢失，不重试或换模。
+- `auto` 为保留 ID。完整生成请求不裁剪，参数不静默丢失。SDK 重试保持禁用，显式请求绝不换模；Auto 在符合条件的生成失败且尚未产生语义输出时，最多重新选模一次。
 - Jev 模式没有敏感路由保证；对话文本可能送往 Jev；图片数据、工具定义、参数和输出不发送，工具历史仅保留配对的 ID 与名称等关联记录。
 - 配置写入立即影响新请求；禁用模型不撤销在途快照。
 - 记录保存路由元数据和最后一条用户消息最多 120 字的文本摘要，默认保留 7 天且最多 10 万条，超限丢弃最旧记录，尽力写入并公开降级状态，不是审计日志。
