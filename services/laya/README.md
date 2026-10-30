@@ -129,7 +129,11 @@ controlled fixtures; these checks do not establish generation-model quality.
 ## Image publication configuration
 
 The Laya workflow validates pull requests without registry writes. Version tags
-publish only after validation. Configure repository variable `DOCKERHUB_LAYA_IMAGE`
+publish only after validation. The Laya workflow also supports manual dispatch
+with a stable `version` such as `0.1.0` (without a `v` prefix). This publishes
+only Laya under that version and `latest`, after the same validation; it does
+not create a project release or trigger Router/CLI workflows. Select the reviewed
+commit branch when dispatching and do not reuse a published version. Configure repository variable `DOCKERHUB_LAYA_IMAGE`
 with the separate Docker Hub image name; it reuses `DOCKERHUB_USERNAME` and
 `DOCKERHUB_TOKEN`. An optional Huawei mirror uses `REGISTRY_LAYA_IMAGE`, the existing
 `REGISTRY_HOST`, `DOCKER_REGISTRY_USER` and `DOCKER_REGISTRY_PASSWORD`. Docker media
