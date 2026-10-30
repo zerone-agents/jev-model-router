@@ -224,3 +224,25 @@ input_tokens count with omitted output_tokens is complete usage. Output is
 normalized to zero because this interface does not separately report output
 usage. Explicit null, negative or malformed counts remain invalid; other
 decision endpoints still require both counts.
+
+
+## Local Laya decision backend
+
+Use the existing `decision.put` fields with `base_url: http://laya:8090`,
+`path: /v1/systemone`, `model: laya-multilingual` and
+`secret_ref: env:DECISION_API_KEY`. Version checks, idempotent replay and credential
+handling are unchanged. No Laya-specific management resource is introduced.
+
+Configuration readiness from `status.get` is not model liveness. Verify
+`decision.get` readback and perform a Chat-format Auto `route.inspect` to exercise
+the configured backend. Native Messages must be verified through `/v1/messages`;
+inspection remains Chat-only. The legacy `jev_choice` reason means typed-decider
+selection and does not identify which backend was called.
+
+Laya returns choice answers for one or two independent questions. Input usage is
+the sum of unpadded positions processed for evaluated questions; deterministic
+singleton answers consume zero model positions. Non-generative output usage is
+zero. The service refuses inputs that would lose instructions, descriptions or
+state under its pinned encoder. Errors retain routing-stage diagnostics, HTTP
+status and upstream code, including `input_too_large`, `overloaded` and
+`model_unavailable`. These are errors, never successful default selections.

@@ -113,3 +113,23 @@ ROUTER_IMAGE=swr.cn-east-3.myhuaweicloud.com/zerone/jev-model-router:latest
 ## 推理协议
 
 OpenAI 客户端使用 Router `/v1` base URL；Anthropic SDK 使用 Router 根地址。`/v1/chat/completions` 与 `/v1/messages` 均可在各自兼容边界内接入 OpenAI 兼容与原生 Anthropic 上游。见[调用示例](../README.zh-CN.md#调用推理接口)、[原生 Messages 兼容范围](../docs/compatibility.md#native-messages-clients-with-native-anthropic-upstream-51)和[原生 Anthropic/BigModel 配置](../docs/configuration.md#native-anthropic-generation-upstream)。
+
+## 可选：本地 Laya 决策
+
+独立 Laya 服务可在本地选择模型与推理强度。这不代表生成也在本地，且本期不提供敏感会话锁定。Laya 加载或不可用时，Router 的管理接口和显式模型请求仍可使用。
+
+在私有 `.env` 中增加独立随机值 `DECISION_API_KEY`，不要复用 Settings 或 inference 凭证。可选 Compose 配置会把它传给两个服务，不向宿主机开放 Laya 端口。
+
+预构建镜像计划使用 `zeroneai/jev-model-router-laya`，首次发布尚未完成。当前请从仓库构建：
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.laya.yml -f docker-compose.laya.build.yml build laya
+docker compose -f docker-compose.yml -f docker-compose.laya.yml -f docker-compose.laya.build.yml run --rm laya-provision
+docker compose -f docker-compose.yml -f docker-compose.laya.yml -f docker-compose.laya.build.yml up -d router laya
+```
+
+镜像发布后，将 `LAYA_IMAGE` 设置为发布标签并省略构建覆盖文件。预置命令显式下载并校验固定版本权重；服务启动只读加载已验证卷，不自动下载。
+
+通过 CLI 发现 `decision.put`，使用当前配置版本和幂等键，将 `base_url` 设置为 `http://laya:8090`、`path` 设置为 `/v1/systemone`、`model` 设置为 `laya-multilingual`、`secret_ref` 设置为 `env:DECISION_API_KEY`。保存后回读 `decision.get`，再以 Chat 格式执行 Auto `route.inspect`；仅保存配置不能证明服务可用。
+
+离线预置、超时、head 预算限制和已验证平台范围见 [服务说明](../services/laya/README.md)。

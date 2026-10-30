@@ -88,8 +88,8 @@ export function Overview(props: PageProps) {
                   <strong>v{data.version}</strong>
                 </div>
                 <div>
-                  <small>{text(lang, "Decision backend", "决策后端")}</small>
-                  <strong>Jev</strong>
+                  <small>{text(lang, "Decision protocol", "决策协议")}</small>
+                  <strong>System One</strong>
                 </div>
               </div>
             </section>

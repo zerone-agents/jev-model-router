@@ -1,0 +1,36 @@
+# Optional local decision service. Provision weights explicitly before first use.
+services:
+  router:
+    environment:
+      DECISION_API_KEY: ${DECISION_API_KEY:?Set a dedicated local decision service token}
+  laya:
+    image: ${LAYA_IMAGE:-zeroneai/jev-model-router-laya:latest}
+    restart: unless-stopped
+    environment:
+      LAYA_API_KEY: ${DECISION_API_KEY:?Set a dedicated local decision service token}
+      LAYA_MODEL_DIR: /models/current
+      LAYA_HEAD_TOKENS: ${LAYA_HEAD_TOKENS:-512}
+      LAYA_CPU_THREADS: ${LAYA_CPU_THREADS:-4}
+      LAYA_WORKER_TIMEOUT_SECONDS: ${LAYA_WORKER_TIMEOUT_SECONDS:-60}
+    volumes:
+      - laya_models:/models:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+  laya-provision:
+    image: ${LAYA_IMAGE:-zeroneai/jev-model-router-laya:latest}
+    profiles: [provision]
+    command: [python, -m, jev_laya.provision, --destination, /models]
+    volumes:
+      - laya_models:/models
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+volumes:
+  laya_models:

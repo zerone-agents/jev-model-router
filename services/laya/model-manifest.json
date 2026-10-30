@@ -1,0 +1,42 @@
+{
+  "model": "convaiinnovations/laya-multilingual",
+  "model_revision": "1720e3e3357cfe1e281542e223f8273b0890ca34",
+  "source_repository": "https://github.com/NandhaKishorM/laya",
+  "source_revision": "fe9a6c35023a7d94102e7feaaeaae8857d9d1b07",
+  "artifacts": [
+    {
+      "path": "config.json",
+      "size": 160,
+      "sha256": "7add7c041b53f7091e65908553af79ab3f077946e5f2312d510ae13b17c7c134"
+    },
+    {
+      "path": "rl_agent_config.json",
+      "size": 472,
+      "sha256": "25061739243b617ad88d1219ba6f8a9c86c5881ca28df024fa2d9b3b2fcc30c6"
+    },
+    {
+      "path": "encoder/config.json",
+      "size": 1938,
+      "sha256": "83f6916d13ef0f556ac461f28308dc2bffa7ebeadee8ec9e2db5812020ea5bb4"
+    },
+    {
+      "path": "model.safetensors",
+      "size": 643835514,
+      "sha256": "9d628fd971b700382ac6f65920a86f149777b2e748e0c955fb3b19695aa8f204"
+    },
+    {
+      "path": "tokenizer/tokenizer.json",
+      "size": 34363188,
+      "sha256": "609d8f4c067cd3950f88594c5a802616cea245823836ef5848ee4fc40aab5b6f"
+    },
+    {
+      "path": "tokenizer/tokenizer_config.json",
+      "size": 502,
+      "sha256": "424b69444bf7b5809dc2cd2e36d0bd71b8055124dd24274d6db3c655d38205e7"
+    }
+  ],
+  "head_budget": 256,
+  "encoder_context_ceiling": 8192,
+  "context_note": "8192 is verified in encoder configuration; no full-length inference acceptance yet.",
+  "tokenizer_note": "Artifact hashes are upstream originals. SDK normalizes extra_special_tokens before loading; retain original artifacts for verification."
+}
