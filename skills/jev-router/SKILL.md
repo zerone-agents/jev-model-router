@@ -216,3 +216,9 @@ shorten descriptions, change the configured budget or switch to a cloud decider.
 than opening parallel retries. On `model_unavailable`, check service readiness and
 provisioned artifacts; Settings and explicit model requests remain independent.
 Local Laya selection does not establish sensitive-data protection or local generation.
+
+
+For native macOS Laya deployment, operators may set `LAYA_DEVICE=mps` and restart;
+CPU remains the default. Confirm authenticated metadata and readiness, then run
+inspection. If MPS is unavailable, initialization fails without CPU fallback.
+Linux Compose remains CPU-only and does not expose the Mac GPU.

@@ -201,3 +201,29 @@ The capacity fixture has no selection-quality oracle. The bilingual/order and
 effort observations above remain limitations, not successful quality acceptance.
 Representative quality evaluation is still required before recommending this
 backend for production routing; SDK equivalence cannot substitute for it.
+
+
+## Native Mac GPU
+
+`LAYA_DEVICE` defaults to `cpu`; set it to `mps` to use an available Apple Metal
+GPU in a native macOS Python deployment. Only `cpu` and `mps` are accepted.
+Restart after changing it. Explicit MPS selection never silently falls back to
+CPU: unavailable devices or initialization failures leave readiness false.
+Authenticated metadata reports the configured device; readiness confirms worker
+initialization, including a real inference smoke check.
+
+Use the same verified artifacts, dedicated token and single-worker server:
+
+```sh
+# Set LAYA_API_KEY privately and LAYA_MODEL_DIR to verified original artifacts.
+LAYA_DEVICE=mps uv run --project services/laya --frozen uvicorn jev_laya.server:application --factory --host 127.0.0.1 --port 8090
+```
+
+The Linux Docker Compose deployment remains CPU-only; this native macOS option
+does not expose Metal inside Docker. `LAYA_CPU_THREADS` still controls CPU work.
+On one Apple M4, eager inference with head 512, one warmup and three measured
+runs yielded medians of 0.86 seconds on MPS versus 2.26 seconds on four CPU
+threads for twenty candidates plus effort. With longer input (2648/2839 positions
+for the two questions), medians were 1.69 versus 5.76 seconds. Choices matched
+in these samples. These are latency observations, not quality or concurrency
+certification; model loading and first-call warmup are additional costs.

@@ -36,7 +36,7 @@ def create_app(settings, supervisor):
         if not authenticated(request):
             return error_response(ServiceError('unauthorized', 'Authentication required.', 401))
         return JSONResponse({'model': settings.alias, 'model_revision': '1720e3e3357cfe1e281542e223f8273b0890ca34',
-                             'device': 'cpu', 'threads': settings.threads, 'context_tokens': settings.context,
+                             'device': settings.device, 'threads': settings.threads, 'context_tokens': settings.context,
                              'head_tokens': settings.head, 'body_bytes': BODY_LIMIT, 'max_questions': 2,
                              'criteria_parser_limit': 64, 'question_types': ['choice'],
                              'usage': 'Actual unpadded model positions across evaluated questions; singleton work is zero.',

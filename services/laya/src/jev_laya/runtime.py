@@ -18,6 +18,7 @@ class ModelSettings:
     threads: int
     context: int
     head: int = 512
+    device: str = 'cpu'
 
 
 class Runtime:
@@ -36,7 +37,7 @@ class Runtime:
             path.parent.mkdir(parents=True, exist_ok=True)
             if name == 'tokenizer/tokenizer_config.json': shutil.copyfile(source/name, path)
             else: path.symlink_to(source/name)
-        self.backend = LayaBackend(str(target), settings.threads)
+        self.backend = LayaBackend(str(target), settings.threads, device=settings.device)
         smoke = {'model': settings.alias, 'state': 'hello', 'questions': {'startup': {'type': 'choice', 'instructions': 'Select a greeting.', 'criteria': {'a': 'Hello', 'b': 'Goodbye'}}}}
         self(json.dumps(smoke).encode())
 

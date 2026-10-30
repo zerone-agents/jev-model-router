@@ -14,8 +14,11 @@ class Settings:
     context: int = 8192
     head: int = 512
     deadline: float = 60.0
+    device: str = 'cpu'
 
     def __post_init__(self):
+        if self.device not in ('cpu', 'mps'):
+            raise ValueError('Unsupported model device')
         if not self.token or not self.alias or not self.model_dir:
             raise ValueError('Service token, alias and model directory are required')
         if not 1 <= self.threads <= 64 or not 1 <= self.context <= 8192 or not 1 <= self.head <= 8188:
@@ -30,7 +33,7 @@ class Settings:
         if path:
             if token: raise ValueError('Use either token environment or token file')
             token = Path(path).read_text().strip()
-        return cls(token=token, model_dir=os.environ.get('LAYA_MODEL_DIR', '/models/current'),
+        return cls(device=os.environ.get('LAYA_DEVICE', 'cpu'), token=token, model_dir=os.environ.get('LAYA_MODEL_DIR', '/models/current'),
                    alias=os.environ.get('LAYA_MODEL_ALIAS', 'laya-multilingual'),
                    threads=int(os.environ.get('LAYA_CPU_THREADS', '4')),
                    context=int(os.environ.get('LAYA_CONTEXT_TOKENS', '8192')),

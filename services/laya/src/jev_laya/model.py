@@ -18,7 +18,7 @@ def evaluate(prepared: PreparedDecision, backend) -> dict:
 
 
 class LayaBackend:
-    def __init__(self, model_dir: str, threads: int = 4):
+    def __init__(self, model_dir: str, threads: int = 4, device: str = 'cpu'):
         import os
         os.environ['HF_HUB_OFFLINE'] = '1'
         os.environ['TRANSFORMERS_OFFLINE'] = '1'
@@ -26,7 +26,13 @@ class LayaBackend:
         import laya
         import torch
         torch.set_num_threads(threads)
-        self.agent = laya.load(model_dir, device='cpu', backend='eager')
+        if device not in ('cpu', 'mps'):
+            raise ValueError('Unsupported model device')
+        if device == 'mps' and not torch.backends.mps.is_available():
+            raise RuntimeError('Requested MPS device is unavailable')
+        self.agent = laya.load(model_dir, device=device, backend='eager')
+        if self.agent.device.type != device:
+            raise RuntimeError('Requested model device was not selected')
         self.tokenizer = self.agent.tok
 
     def __call__(self, questions):
