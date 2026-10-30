@@ -215,10 +215,12 @@ model support; live multi-question validation requires usable decision credentia
 
 The pinned `convaiinnovations/laya-multilingual` service supports choice-only
 model/effort decisions, with one or two questions and no Cartesian product.
-The parser ceiling of 64 options is not a fit guarantee. The 256-token head
-budget and SDK per-option cap are independent of the 8192 context ceiling.
-Actual Router six-effort input fits unchanged; synthetic 20/40-model probes exceed
-the head budget and are rejected rather than truncated.
+The parser ceiling of 64 options is not a fit guarantee. The configurable head
+budget (default 512) and SDK per-option cap are independent of the 8192 context ceiling.
+Actual Router six-effort input fits unchanged; the synthetic 20-model probe fits at 512, and the 40-model probe requires
+1024. Oversized inputs are rejected rather than truncated. Set LAYA_HEAD_TOKENS
+on the service and restart to change the budget; candidate count alone is not
+a fit guarantee.
 
 Short real-weight inference has been verified on macOS arm64 and native Linux
 arm64, including a network-disabled container with read-only weights. This does

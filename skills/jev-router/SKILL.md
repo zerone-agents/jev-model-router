@@ -209,8 +209,10 @@ is pending. Preserve existing Router configuration, credentials and volumes.
    not proof that the hosted Jev model was used.
 
 On `input_too_large`, report the relevant token limit; retain all candidate and
-prompt content. Do not silently shorten descriptions, raise trained head limits
-or switch to a cloud decider. On `overloaded`, wait for the active worker rather
+prompt content. The service head defaults to 512 tokens; operators can configure
+`LAYA_HEAD_TOKENS` (1–8188) and restart, while retaining the total context and
+per-option limits. Raising the budget requires workload validation. Do not silently
+shorten descriptions, change the configured budget or switch to a cloud decider. On `overloaded`, wait for the active worker rather
 than opening parallel retries. On `model_unavailable`, check service readiness and
 provisioned artifacts; Settings and explicit model requests remain independent.
 Local Laya selection does not establish sensitive-data protection or local generation.

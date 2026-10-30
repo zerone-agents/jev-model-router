@@ -17,6 +17,7 @@ class ModelSettings:
     alias: str
     threads: int
     context: int
+    head: int = 512
 
 
 class Runtime:
@@ -41,5 +42,5 @@ class Runtime:
 
     def __call__(self, body):
         request = parse_request(body, self.settings.alias)
-        prepared = prepare(request, self.backend.tokenizer, Limits(context=self.settings.context))
+        prepared = prepare(request, self.backend.tokenizer, Limits(context=self.settings.context, head=self.settings.head))
         return evaluate(prepared, self.backend)

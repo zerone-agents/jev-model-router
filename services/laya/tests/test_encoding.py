@@ -40,7 +40,7 @@ class EncodingTests(unittest.TestCase):
     def test_head_and_individual_option_clipping_rejected(self):
         for target in ['instructions', 'option', 'many']:
             value = request()
-            if target == 'instructions': value['questions']['model']['instructions'] = 'reason ' * 300
+            if target == 'instructions': value['questions']['model']['instructions'] = 'reason ' * 600
             if target == 'option': value['questions']['model']['criteria']['z'] = 'word ' * 60
             if target == 'many': value['questions']['model']['criteria'] = {str(i): 'Distinct option '+str(i) for i in range(64)}
             with self.subTest(target=target), self.assertRaises(ServiceError): self.prepare(value)

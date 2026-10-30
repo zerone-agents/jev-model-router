@@ -6,10 +6,10 @@ from .protocol import DecisionRequest, ServiceError
 @dataclass(frozen=True)
 class Limits:
     context: int = 8192
-    head: int = 256
+    head: int = 512
 
     def __post_init__(self):
-        if not 1 <= self.context <= 8192 or self.head != 256:
+        if not 1 <= self.context <= 8192 or not 1 <= self.head <= 8188:
             raise ValueError('Unsupported model token limits')
 
 
@@ -57,7 +57,7 @@ def prepare(request: DecisionRequest, tokenizer, limits: Limits = Limits()) -> P
             head += [tokenizer.mask_token_id] + option
         head.append(tokenizer.sep_token_id)
         if len(head) - 3 > limits.head:
-            raise oversized('head (256)')
+            raise oversized(f'head ({limits.head})')
         sdk_head, sdk_markers, _ = build_head(tokenizer, internal, limits.head)
         if head != sdk_head or markers != sdk_markers:
             raise oversized('SDK head allocation')

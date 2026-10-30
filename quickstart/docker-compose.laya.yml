@@ -9,6 +9,7 @@ services:
     environment:
       LAYA_API_KEY: ${DECISION_API_KEY:?Set a dedicated local decision service token}
       LAYA_MODEL_DIR: /models/current
+      LAYA_HEAD_TOKENS: ${LAYA_HEAD_TOKENS:-512}
       LAYA_CPU_THREADS: ${LAYA_CPU_THREADS:-4}
       LAYA_WORKER_TIMEOUT_SECONDS: ${LAYA_WORKER_TIMEOUT_SECONDS:-60}
     volumes:

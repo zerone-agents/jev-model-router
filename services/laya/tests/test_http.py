@@ -55,5 +55,5 @@ class HTTPTests(unittest.IsolatedAsyncioTestCase):
     async def test_metadata_requires_auth_and_exposes_budget(self):
         response = await self.client.get('/metadata', headers={'Authorization': 'Bearer private-token'})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()['head_tokens'], 256)
+        self.assertEqual(response.json()['head_tokens'], 512)
         self.assertNotIn('private-token', response.text)

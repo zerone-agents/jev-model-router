@@ -50,7 +50,8 @@ cancellation does not release capacity while inference continues. The default
 false during reload. Raw requests, secrets and model tracebacks are not logged.
 
 Settings: `LAYA_MODEL_DIR`, `LAYA_MODEL_ALIAS`, `LAYA_CPU_THREADS` (default 4),
-`LAYA_CONTEXT_TOKENS` (at most 8192), `LAYA_WORKER_TIMEOUT_SECONDS` (default 60).
+`LAYA_CONTEXT_TOKENS` (at most 8192),
+`LAYA_HEAD_TOKENS` (default 512, range 1–8188), `LAYA_WORKER_TIMEOUT_SECONDS` (default 60).
 Authentication accepts either `LAYA_API_KEY` or `LAYA_API_KEY_FILE`, never both.
 Linux arm64 short offline inference has been verified; amd64 is not yet verified.
 
@@ -102,7 +103,14 @@ answers and input-token accounting, for all four short fixtures.
 | Twenty short model descriptions | 328 | 259 | No |
 | Forty short model descriptions | 638 | 259 | No |
 
-The 256-token head budget excludes three framing tokens. The SDK also caps each
+The checkpoint default 256-token head budget excludes three framing tokens.
+The service now defaults to 512 and exposes `LAYA_HEAD_TOKENS`; the table above
+records the original 256-token experiment. A follow-up real-model probe retained
+all 328 framed tokens for twenty candidates at both 512 and 1024, with identical
+answers. Forty short candidates fit at 1024 (638 framed tokens). These results
+do not guarantee that arbitrary descriptions fit or that decision quality improves.
+The head shares the total context ceiling with the state; raising it does not
+raise the 48-token per-option cap. Restart the service after configuration changes. The SDK also caps each
 rendered option at 48 tokens and can shorten instructions. The service rejects any changed segment, not merely count retained candidate markers. These
 fixtures do not establish a universal supported candidate count.
 
