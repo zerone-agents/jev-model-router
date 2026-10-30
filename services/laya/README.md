@@ -53,7 +53,8 @@ Settings: `LAYA_MODEL_DIR`, `LAYA_MODEL_ALIAS`, `LAYA_CPU_THREADS` (default 4),
 `LAYA_CONTEXT_TOKENS` (at most 8192),
 `LAYA_HEAD_TOKENS` (default 512, range 1–8188), `LAYA_WORKER_TIMEOUT_SECONDS` (default 60).
 Authentication accepts either `LAYA_API_KEY` or `LAYA_API_KEY_FILE`, never both.
-Linux arm64 short offline inference has been verified; amd64 is not yet verified.
+Linux arm64 short offline inference was verified locally; the workflow requires
+native amd64 and arm64 validation before publishing either architecture.
 
 For offline provisioning, mount a directory containing the original manifest
 artifacts and run `python -m jev_laya.provision --destination /models
@@ -138,7 +139,9 @@ with the separate Docker Hub image name; it reuses `DOCKERHUB_USERNAME` and
 `DOCKERHUB_TOKEN`. An optional Huawei mirror uses `REGISTRY_LAYA_IMAGE`, the existing
 `REGISTRY_HOST`, `DOCKER_REGISTRY_USER` and `DOCKER_REGISTRY_PASSWORD`. Docker media
 types are used with provenance and SBOM attachments disabled for mirror compatibility.
-Only Linux arm64 is currently included; add amd64 after native runtime acceptance.
+Publication requires native Linux amd64 and arm64 validation, including real
+checkpoint inference on each runner. Each image is built on its matching CPU
+architecture, then combined into Docker-format manifest lists for both registries.
 
 ## Bounded routing-quality observation
 
