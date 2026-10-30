@@ -13,6 +13,8 @@ from test_protocol import request
 class EncodingTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        from laya.agent import _fix_tokenizer_config
+        _fix_tokenizer_config(os.environ['LAYA_MODEL_DIR'])
         from transformers import AutoTokenizer
         cls.tok = AutoTokenizer.from_pretrained(str(Path(os.environ['LAYA_MODEL_DIR'])/'tokenizer'), local_files_only=True)
 

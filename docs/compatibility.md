@@ -209,3 +209,25 @@ signed history; native acceptance uses full HTTP requests and upstream captures.
 Local mocked end-to-end tests cover both input protocols against OpenAI and
 Anthropic upstreams. They do not establish real Jev selection quality or upstream
 model support; live multi-question validation requires usable decision credentials.
+
+
+## Local Laya System One service
+
+The pinned `convaiinnovations/laya-multilingual` service supports choice-only
+model/effort decisions, with one or two questions and no Cartesian product.
+The parser ceiling of 64 options is not a fit guarantee. The 256-token head
+budget and SDK per-option cap are independent of the 8192 context ceiling.
+Actual Router six-effort input fits unchanged; synthetic 20/40-model probes exceed
+the head budget and are rejected rather than truncated.
+
+Short real-weight inference has been verified on macOS arm64 and native Linux
+arm64, including a network-disabled container with read-only weights. This does
+not verify amd64, full-length latency, routing quality, or sensitive-session
+protection. Agent integration exercises CLI configuration/readback, inspection,
+Chat and native Messages generation, local-decider fallback, and explicit-path
+availability while the decider fails. Generation in those tests is controlled,
+not a paid-provider quality benchmark.
+
+See the [service guide](../services/laya/README.md) for deployment and current
+publication status. Preserve the existing hosted decision backend when the local
+service is not explicitly configured; there is no implicit backend switching.

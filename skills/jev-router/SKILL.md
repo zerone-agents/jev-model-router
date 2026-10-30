@@ -29,7 +29,7 @@ Run `jev-router --help` and `jev-router --version` locally. Use `jev-router sche
 2. Prepare a complete replacement resource using its runtime schema. Prefer write-only `api_key` with encrypted managed storage for both LLM providers and the decision backend, following the credential-handling rules below. Use server-resolved `secret_ref` when external secret management is required. Give models task-oriented descriptions and explicit capability declarations. External ID `auto` is reserved, including for disabled models.
 3. Write with `--expected-version N --idempotency-key KEY`. On an unknown network outcome, retry the identical operation with the same key within 24 hours. A changed payload needs a new key; a version conflict needs a fresh read and a deliberate update.
 4. Create models disabled, run `models.test` with only their ID, then enable through `models.put` if authorized. The fixed test checks basic connectivity with `Reply OK.` and 16 output tokens; it does not prove all declared capabilities.
-5. Use `route.inspect` with a supported chat request to inspect selection. It generates no answer and changes no configuration; multiple candidates can invoke paid Jev. Read back saved resources and report the observed version and operation ID.
+5. Use `route.inspect` with a supported chat request to inspect selection. It generates no answer and changes no configuration; automatic model or effort selection can invoke the configured decision backend, which may be paid. Read back saved resources and report the observed version and operation ID.
 
 Machine results go to stdout; diagnostics go to stderr. A top-level successful `models.test` operation can contain `data.ok=false`; inspect both levels. Distinguish saved configuration, successful connectivity and successful generation.
 
@@ -182,3 +182,35 @@ only level directly. Auto fallback adapts each attempt independently.
 Playground route events expose optional `effective_effort` for the current attempt. The dashboard shows configured automatic effort levels and the actual outgoing effort read-only. Missing effort is shown as not set, without inferring provider defaults. Configuration remains CLI/Agent-managed; successful public inference response metadata is unchanged.
 
 Routing records expose optional `effective_effort` on the record and each generation attempt. The record retains the latest generation attempt value, including when a subsequent routing attempt fails. A later generation with no effort clears the previous value. Historical and unset values display as an em dash; no provider default is inferred. Attempt diagnostics carry the same optional field. Existing JSON record storage requires no table migration.
+
+
+## Configure local Laya decisions
+
+When asked to use local Laya, first read the optional Laya section in
+[Compose Quickstart](../../quickstart/README.md) and the
+[service guide](../../services/laya/README.md). Confirm image availability before
+choosing prebuilt deployment; use the documented build override while publication
+is pending. Preserve existing Router configuration, credentials and volumes.
+
+1. Provision the pinned weights explicitly. Confirm service readiness after
+   startup; a successful download alone is insufficient.
+2. Discover `decision.put` and read `decision.get` plus the current configuration
+   version. Use the Compose service address and allowlisted model alias from the
+   service guide. Use the dedicated `env:DECISION_API_KEY` reference, with its value
+   provided to both services through private deployment configuration.
+3. Save with the current version and an idempotency key, then read back the entire
+   decision resource. Report any unrelated configuration change as a failure.
+4. Run Chat-format Auto `route.inspect`, then actual inference through the desired
+   public protocol. For native Messages use `/v1/messages`; Chat inspection does
+   not verify native signed thinking or budget fields. Inspect routing records
+   for selected model, effort and failures.
+5. Distinguish configuration readiness, service health, successful decisions and
+   generation quality in the result. `jev_choice` is a legacy selection identifier,
+   not proof that the hosted Jev model was used.
+
+On `input_too_large`, report the relevant token limit; retain all candidate and
+prompt content. Do not silently shorten descriptions, raise trained head limits
+or switch to a cloud decider. On `overloaded`, wait for the active worker rather
+than opening parallel retries. On `model_unavailable`, check service readiness and
+provisioned artifacts; Settings and explicit model requests remain independent.
+Local Laya selection does not establish sensitive-data protection or local generation.

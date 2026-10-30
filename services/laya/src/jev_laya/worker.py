@@ -44,10 +44,21 @@ class Supervisor:
         self._closed = False
         self._owner = None
         self._loader = None
+        self._watcher = None
 
     def start(self):
+        if not self._closed and self._watcher is None:
+            self._watcher = asyncio.create_task(self._watch_idle())
         if not self._closed and self._loader is None:
             self._loader = asyncio.create_task(self._load())
+
+    async def _watch_idle(self):
+        while not self._closed:
+            await asyncio.sleep(0.05)
+            if (self._owner is None and self._loader is None and self._process is not None
+                    and not self._process.is_alive()):
+                await self._reap()
+                self.start()
 
     def ready(self):
         return bool(self._ready and not self._closed and self._process and self._process.is_alive())
@@ -129,6 +140,8 @@ class Supervisor:
     async def close(self):
         if self._closed: return
         self._closed = True
+        if self._watcher is not None:
+            await self._watcher
         for task in (self._loader, self._owner):
             if task is not None:
                 task.cancel()

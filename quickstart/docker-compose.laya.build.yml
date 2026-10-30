@@ -1,0 +1,11 @@
+services:
+  laya:
+    image: jev-model-router-laya:local
+    build:
+      context: ../services/laya
+    pull_policy: build
+  laya-provision:
+    image: jev-model-router-laya:local
+    build:
+      context: ../services/laya
+    pull_policy: build

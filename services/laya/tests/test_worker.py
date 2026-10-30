@@ -61,3 +61,11 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.wait_for(self.supervisor.close(), 2)
         with self.assertRaises((ServiceError, asyncio.CancelledError)): await running
         self.assertFalse(self.supervisor.ready())
+
+    async def test_idle_worker_exit_recovers(self):
+        first = await self.supervisor.submit(b'0')
+        os.kill(first['pid'], 15)
+        await asyncio.sleep(0.1)
+        await self.wait_ready()
+        result = await self.supervisor.submit(b'0')
+        self.assertNotEqual(result['pid'], first['pid'])

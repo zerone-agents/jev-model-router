@@ -1,0 +1,12 @@
+*
+!Dockerfile
+!pyproject.toml
+!uv.lock
+!model-manifest.json
+!src/
+!src/**
+**/__pycache__
+
+!NOTICE.md
+!licenses/
+!licenses/**

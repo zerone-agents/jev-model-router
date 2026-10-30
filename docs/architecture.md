@@ -2,7 +2,7 @@
 
 This document records product decisions and implementation boundaries. The phase-one Go/SQLite/CLI/Jev path is implemented; references to phase two remain design goals.
 
-Phase one is tracked in [Issue #1](https://github.com/zerone-agents/jev-model-router/issues/1) and covers single-instance Jev routing, CLI/SKILL and SQLite. Laya, sensitive-session locking and PostgreSQL belong to [phase two #2](https://github.com/zerone-agents/jev-model-router/issues/2). The simple management UI is delivered separately through [Issue #8](https://github.com/zerone-agents/jev-model-router/issues/8), reusing the phase-one management API.
+Phase one is tracked in [Issue #1](https://github.com/zerone-agents/jev-model-router/issues/1) and covers single-instance Jev routing, CLI/SKILL and SQLite. Local decision models and later sensitive-session locking are tracked in [#92](https://github.com/zerone-agents/jev-model-router/issues/92), PostgreSQL in [#93](https://github.com/zerone-agents/jev-model-router/issues/93), and ArbiterOS in [#94](https://github.com/zerone-agents/jev-model-router/issues/94). The former phase-two umbrella #2 is superseded. The simple management UI is delivered separately through [Issue #8](https://github.com/zerone-agents/jev-model-router/issues/8), reusing the phase-one management API.
 
 ## Entry points and call paths
 
@@ -60,7 +60,7 @@ The initial implementation uses one Go module. It does not pre-create empty pack
 
 `auto` is a reserved public model ID. Neither enabled nor disabled generation models may use it. Creation and ID changes are rejected before saving, keeping lists and request entry points unambiguous. Upstream model names are not subject to this restriction.
 
-`auto` sends eligible candidates and the editable prompt to the decision backend. Explicit model requests skip task-based selection while retaining the same constraints, and failures never switch models automatically. Jev mode does not enable sensitive-data routing. Local Laya may enable it; configuration changes and ordinary follow-up messages do not release a local lock.
+`auto` sends eligible candidates and the editable prompt to the decision backend. Explicit model requests skip task-based selection while retaining the same constraints, and failures never switch models automatically. Jev mode does not enable sensitive-data routing. The local Laya decision service does not yet enable it. Persistent local-only locks and their lifecycle remain future work.
 
 Each initial `auto` request selects independently, without caching or model stickiness. No candidates produces an error; one candidate skips model selection but may still need an automatic effort decision; multiple candidates use native Jev `choice`, strictly validated and mapped to model IDs by the adapter. The implementation neither requires nor generates natural-language reasons. It distinguishes explicit selection, a sole candidate, Jev selection and an estimated-capacity fallback. Probabilities are not converted into explanations. Editable prompts govern preferences; the adapter owns native protocol construction and candidate boundaries.
 
@@ -166,3 +166,30 @@ reports the effective parameter; native Messages is validated by execution.
 Playground route events expose optional `effective_effort` for the current attempt. The dashboard shows configured automatic effort levels and the actual outgoing effort read-only. Missing effort is shown as not set, without inferring provider defaults. Configuration remains CLI/Agent-managed; successful public inference response metadata is unchanged.
 
 Routing records expose optional `effective_effort` on the record and each generation attempt. The record retains the latest generation attempt value, including when a subsequent routing attempt fails. A later generation with no effort clears the previous value. Historical and unset values display as an em dash; no provider default is inferred. Attempt diagnostics carry the same optional field. Existing JSON record storage requires no table migration.
+
+
+## Independent local decision service
+
+`services/laya` runs the pinned multilingual Laya checkpoint in a separate Python
+process/service. The Go gateway uses its existing typed System One client;
+configuration stays in `decision.get`/`decision.put`. Python is absent from the
+Router image, and hosted-Jev operation has no new runtime dependency.
+
+The service validates the complete received projection, prepares immutable token
+inputs and executes those same inputs. Its independent head and per-option limits
+are enforced before inference; requests that SDK preprocessing would truncate
+fail explicitly. No candidate removal, prompt shortening or hosted decision
+fallback occurs inside the service. Generation history remains owned by the Router
+and is not replaced by this decision projection.
+
+A single supervised CPU worker has no queue. Disconnecting a caller does not free
+its execution slot; the slot remains occupied until work finishes or the worker
+is killed and reaped at its deadline. Model startup includes artifact verification
+and smoke inference. Model failure does not make management or explicit-model
+requests depend on this service. Compose adds no Router health dependency.
+
+Model artifacts are explicitly provisioned and checked against the pinned manifest.
+Serving uses verified read-only artifacts, offline loading and a private temporary
+copy for SDK tokenizer normalization. Local decision inference can still select a
+cloud generation provider. Sensitive-data classification and session locking are
+not part of this implementation.

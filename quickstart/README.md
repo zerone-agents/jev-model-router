@@ -113,3 +113,37 @@ For a remote dashboard, set `JEV_ROUTER_DASHBOARD_ORIGIN=https://router.example.
 ## Inference protocols
 
 OpenAI clients use the Router `/v1` base URL; Anthropic SDK clients use the Router root. `/v1/chat/completions` supports OpenAI-compatible and native Anthropic upstreams; `/v1/messages` currently supports only OpenAI-compatible upstreams. See [request examples](../README.md#call-the-inference-api) and [native Anthropic/BigModel configuration](../docs/configuration.md#native-anthropic-generation-upstream).
+
+## Optional local Laya decisions
+
+Use the independent Laya service to select a model and reasoning effort locally.
+This does not make generation local or provide sensitive-session locking. The
+Router remains usable for Settings and explicit model requests while Laya is
+loading or unavailable.
+
+Add a separate random `DECISION_API_KEY` to your private `.env`. The optional
+Compose override passes this token to both services; no host port is published
+for Laya. Never reuse your Settings or inference token.
+
+The intended prebuilt image is `zeroneai/jev-model-router-laya`, but its initial
+publication is pending. Until a release tag is available, build from this checkout:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.laya.yml -f docker-compose.laya.build.yml build laya
+docker compose -f docker-compose.yml -f docker-compose.laya.yml -f docker-compose.laya.build.yml run --rm laya-provision
+docker compose -f docker-compose.yml -f docker-compose.laya.yml -f docker-compose.laya.build.yml up -d router laya
+```
+
+After publication, set `LAYA_IMAGE` to a released image tag and omit the build
+override. The provisioning command downloads and verifies pinned weights; serving
+loads the verified named volume read-only without downloading. Provisioning is not
+automatic at startup.
+
+Discover `decision.put` through the CLI, then configure `base_url` as
+`http://laya:8090`, `path` as `/v1/systemone`, `model` as `laya-multilingual`, and
+`secret_ref` as `env:DECISION_API_KEY`. Include the current configuration version
+and an idempotency key. Read back `decision.get` and run a Chat-format Auto
+`route.inspect`; saving configuration alone does not test availability.
+
+See [service operations and limits](../services/laya/README.md) for offline
+prepopulation, worker timeouts, head-budget rejection and verified platform scope.

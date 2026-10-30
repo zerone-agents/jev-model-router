@@ -19,6 +19,7 @@ dependencies = [
 dev = ["pytest>=8,<10", "httpx>=0.28,<1"]
 
 [tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 laya = { git = "https://github.com/NandhaKishorM/laya.git", rev = "fe9a6c35023a7d94102e7feaaeaae8857d9d1b07" }
 
 [tool.pytest.ini_options]
@@ -28,3 +29,11 @@ markers = ["real_model: requires pinned model artifacts"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/jev_laya"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"model-manifest.json" = "jev_laya/model-manifest.json"
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

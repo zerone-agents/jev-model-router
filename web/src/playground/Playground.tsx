@@ -587,7 +587,7 @@ export function Playground({ client, lang, onError }: PageProps) {
                       "Only eligible model",
                       "唯一合格模型",
                     ),
-                    decision: text(lang, "Selected by Jev", "Jev 选模"),
+                    decision: text(lang, "Selected by decision model", "决策模型选模"),
                     context_estimate_fallback: text(
                       lang,
                       "Largest context fallback",
