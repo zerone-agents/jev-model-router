@@ -182,3 +182,22 @@ python services/laya/scripts/evaluate_choices.py --requests /tmp/laya-requests.j
 The script preserves Router question instructions, substitutes synthetic tasks
 and candidate descriptions, and records raw answers and request latency. Expected
 model labels are diagnostic annotations rather than automatic pass/fail gates.
+
+
+## Approved head-budget change
+
+On 2026-10-30 the user explicitly approved the 512-token service default and
+configurable head budget after the real twenty-candidate capacity experiment.
+This supersedes the original design restriction to the checkpoint default of 256;
+it does not change weights or establish routing quality.
+
+Acceptance separates capacity from quality: the unchanged Router twenty-candidate
+fixture must preserve all instructions/options at 512, match real SDK inference,
+and fail at 256. Configuration defaults/overrides, invalid ranges, runtime
+propagation and reported metadata must agree; context and per-option rejection
+remain in force. The configured upper bound is not a validated quality range.
+
+The capacity fixture has no selection-quality oracle. The bilingual/order and
+effort observations above remain limitations, not successful quality acceptance.
+Representative quality evaluation is still required before recommending this
+backend for production routing; SDK equivalence cannot substitute for it.
