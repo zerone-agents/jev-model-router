@@ -2,9 +2,26 @@
 
 English | [简体中文](README.zh-CN.md)
 
-A lightweight model routing gateway for agents. Connect OpenAI Chat Completions or Anthropic Messages clients, select an explicit model or let Jev choose from editable model cards, and manage providers through a CLI and bilingual dashboard.
+A lightweight, open-source model router for AI agents. Keep your OpenAI Chat Completions or Anthropic Messages client, choose a model explicitly, or use `auto` for automatic model selection on each request.
 
-The current release is [v0.1.19](https://github.com/zerone-agents/jev-model-router/releases/tag/v0.1.19). It runs as a single Go service with SQLite, streams text and tool calls, and supports OpenAI-compatible and native Anthropic generation upstreams within the matrix below. Local Laya, sensitive-session locking, ArbiterOS and PostgreSQL remain planned.
+## Why Jev
+
+- **One endpoint for Agent clients.** Use familiar OpenAI and Anthropic client entry points while Jev handles configured OpenAI-compatible and native Anthropic generation upstreams within the [compatibility matrix](docs/compatibility.md).
+- **Routing policy you can read and edit.** Describe each model's strengths, weaknesses, cost, and speed in natural language, then tune the shared routing prompt instead of hard-coding selection rules in every Agent.
+- **Evidence you can inspect.** Compare frozen fixed-model, Jev, and Semantic Router snapshots, including costs, limitations, and offline reproduction scripts.
+
+[Learn how Agent model routing works](docs/agent-model-routing.md), when per-request selection helps, and when a fixed model is the better choice.
+
+The [latest release](https://github.com/zerone-agents/jev-model-router/releases/latest) runs as a single Go service with SQLite, streams text and tool calls, and includes a management CLI and bilingual dashboard. Local Laya, sensitive-session locking, ArbiterOS and PostgreSQL remain planned.
+
+## Client and upstream support
+
+| Client entry point | OpenAI-compatible upstream | Native Anthropic upstream |
+| --- | --- | --- |
+| `/v1/chat/completions` | JSON / SSE | JSON / SSE, including supported thinking and tool continuations |
+| `/v1/messages` | JSON / SSE through conversion | JSON / SSE with native preservation |
+
+Support is limited to the fields and combinations in the [compatibility matrix](docs/compatibility.md). Unsupported conversions fail explicitly. BigModel `glm-5.3` and `glm-5.3-flash` passed 12 original Agent SDK examples through the local Router; see the [compatibility and validation scope](docs/compatibility.md). This does not establish compatibility with every Anthropic deployment or native signed thinking history.
 
 ## Benchmark results
 
@@ -19,26 +36,15 @@ Same Qwen3.8-Max / Flash model pool, frozen routing configurations. Each cell sh
 
 Jev Model Router used **13.05% less generation cost** than fixed Max on the code snapshot with three more passes, and **43.71% less** on non-code with two fewer passes. Code results are a selected shared-answer-bank replay; non-code results are independent online generations with failed-request recovery. These limited snapshots do not establish a stable ranking. Costs use frozen API-equivalent token prices and exclude routing fees, local compute and failed attempts; see the linked reports for accounting details and reproduction scripts.
 
-## Client and upstream support
+## Quick Start
 
-| Client entry point | OpenAI-compatible upstream | Native Anthropic upstream |
-| --- | --- | --- |
-| `/v1/chat/completions` | JSON / SSE | JSON / SSE, including supported thinking and tool continuations |
-| `/v1/messages` | JSON / SSE through conversion | Planned in [#51](https://github.com/zerone-agents/jev-model-router/issues/51) |
-
-Support is limited to the fields and combinations in the [compatibility matrix](docs/compatibility.md). Unsupported conversions fail explicitly. BigModel `glm-5.3` and `glm-5.3-flash` passed 12 original Agent SDK examples through the local Router; see the [compatibility and validation scope](docs/compatibility.md). This does not establish compatibility with every Anthropic deployment or native signed thinking history.
-
-## Getting started
+The recommended path is the [Docker Compose Quick Start](quickstart/README.md). It pulls the prebuilt image, persists SQLite, and includes the management UI; no local Go or Node installation is needed.
 
 ### For Agent
 
 Install the `jev-router` skill from this repository's [`skills/jev-router`](skills/jev-router/SKILL.md) directory using your skill installer (repository: `https://github.com/zerone-agents/jev-model-router`, path: `skills/jev-router`). Alternatively, clone the repository and register that directory with your agent's local skill loader. Keep the checkout available: the skill references its deployment and configuration docs.
 
 Load `jev-router` to deploy Jev Model Router with Docker Compose, configure providers, models and automatic routing, and verify connectivity. The skill includes the deployment steps and CLI configuration workflow.
-
-### Docker Compose
-
-Recommended: deploy the prebuilt Docker Hub image with [Docker Compose Quickstart](quickstart/README.md). It includes persistent SQLite and the management UI; no local Go or Node installation is needed.
 
 ### Local CLI
 
@@ -55,6 +61,8 @@ go build -o /tmp/jev-router ./cmd/jev-router
 ```
 
 The default listener is `127.0.0.1:8080`, and the database is `.data/router.sqlite`. Use `serve --config conf.json` and environment overrides as described in [startup configuration](docs/configuration.md). Two distinct credentials must be available at startup.
+
+If Jev is useful for your Agent, consider starring the repository to follow releases and help other developers discover it.
 
 ## Management UI
 
@@ -107,13 +115,13 @@ curl http://127.0.0.1:8080/v1/messages \
   -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}],"max_tokens":1024}'
 ```
 
-Add `"stream":true` for SSE. Messages currently selects only OpenAI-compatible upstreams; use Chat Completions if you have configured only native Anthropic upstreams. See the [Anthropic SDK example](examples/anthropic-messages.mjs) and [native upstream configuration](docs/configuration.md#native-anthropic-generation-upstream).
+Add `"stream":true` for SSE. Messages supports configured OpenAI-compatible and native Anthropic upstreams within the documented field and model-profile boundaries. See the [Anthropic SDK example](examples/anthropic-messages.mjs), [native Messages compatibility](docs/compatibility.md#native-messages-clients-with-native-anthropic-upstream-51), and [native upstream configuration](docs/configuration.md#native-anthropic-generation-upstream).
 
 ## Routing behavior
 
 - No candidates means failure; a single candidate is selected directly; multiple candidates invoke Jev on every request. Explicit model selection skips Jev.
 - Preferences live primarily in prompts and natural-language model cards. Code enforces authorization, capability, capacity, and protocol boundaries.
-- `auto` is a reserved ID. Generation requests are not truncated, parameters are not silently dropped, and requests are not retried or switched to another model.
+- `auto` is a reserved ID. Generation requests are not truncated and parameters are not silently dropped. SDK retries remain disabled; explicit requests never switch models, while Auto may reselect once before semantic output after an eligible generation failure.
 - Jev mode provides no sensitive-data routing guarantee. Conversation text may go to Jev. Image data, tool definitions, tool arguments and tool outputs are excluded; paired tool IDs and names remain.
 - Configuration writes affect new requests immediately. Disabling a model does not revoke snapshots already in use.
 - Records retain routing metadata and up to 120 characters from the latest user message. Default retention is seven days or 100,000 records, whichever limit is reached first. Writes are best effort and degraded status is exposed; these records are not audit logs.

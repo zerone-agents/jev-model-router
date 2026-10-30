@@ -6,7 +6,7 @@
 
 ## 启动（推荐）
 
-默认从 Docker Hub 拉取 `zeroneai/jev-model-router:latest`，无需安装 Go、Node 或本地编译。要固定本文对应版本，在 `.env` 设置 `ROUTER_IMAGE=zeroneai/jev-model-router:0.1.19`。
+默认从 Docker Hub 拉取 `zeroneai/jev-model-router:latest`，无需安装 Go、Node 或本地编译。要固定本文对应版本，在 `.env` 设置 `ROUTER_IMAGE=zeroneai/jev-model-router:0.1.28`。
 
 ```sh
 git clone https://github.com/zerone-agents/jev-model-router.git
@@ -112,7 +112,7 @@ ROUTER_IMAGE=swr.cn-east-3.myhuaweicloud.com/zerone/jev-model-router:latest
 
 ## 推理协议
 
-OpenAI 客户端使用 Router `/v1` base URL；Anthropic SDK 使用 Router 根地址。`/v1/chat/completions` 支持 OpenAI 兼容与原生 Anthropic 上游，`/v1/messages` 当前仅支持 OpenAI 兼容上游。见[调用示例](../README.zh-CN.md#调用推理接口)和[原生 Anthropic/BigModel 配置](../docs/configuration.md#native-anthropic-generation-upstream)。
+OpenAI 客户端使用 Router `/v1` base URL；Anthropic SDK 使用 Router 根地址。`/v1/chat/completions` 与 `/v1/messages` 均可在各自兼容边界内接入 OpenAI 兼容与原生 Anthropic 上游。见[调用示例](../README.zh-CN.md#调用推理接口)、[原生 Messages 兼容范围](../docs/compatibility.md#native-messages-clients-with-native-anthropic-upstream-51)和[原生 Anthropic/BigModel 配置](../docs/configuration.md#native-anthropic-generation-upstream)。
 
 ## 可选：本地 Laya 决策
 

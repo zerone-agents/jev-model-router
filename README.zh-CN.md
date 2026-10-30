@@ -2,9 +2,26 @@
 
 [English](README.md) | 简体中文
 
-面向 Agent 的轻量模型路由网关。接入 OpenAI Chat Completions 或 Anthropic Messages 客户端，显式指定模型或由 Jev 根据任务和可编辑模型卡自动选模，通过 CLI 和中英文管理界面维护供应商。
+面向 AI Agent 的轻量开源模型路由器。保留现有 OpenAI Chat Completions 或 Anthropic Messages 客户端，既可以显式指定模型，也可以使用 `auto` 为每个请求自动选模。
 
-当前正式版为 [v0.1.19](https://github.com/zerone-agents/jev-model-router/releases/tag/v0.1.19)。单个 Go 服务配合 SQLite，支持文本与工具调用流式输出，并按下表接入 OpenAI 兼容和原生 Anthropic 生成上游。本地 Laya、敏感会话锁定、ArbiterOS 与 PostgreSQL 仍属规划。
+## 为什么选择 Jev
+
+- **为 Agent 客户端提供一个入口。** 沿用熟悉的 OpenAI 和 Anthropic 客户端入口，由 Jev 在[兼容矩阵](docs/compatibility.md)范围内接入已配置的 OpenAI 兼容或原生 Anthropic 生成上游。
+- **路由策略可读、可改。** 用自然语言描述各模型的强项、弱项、费用和速度，再调整共享路由提示词，不必在每个 Agent 中硬编码选模规则。
+- **证据可以检查和复现。** 对照冻结的固定模型、Jev 与 Semantic Router 快照，查看费用、限制和离线复现脚本。
+
+阅读英文说明：[Agent 模型路由如何工作](docs/agent-model-routing.md)，以及何时应按请求选模、何时固定模型更合适。
+
+[最新正式版](https://github.com/zerone-agents/jev-model-router/releases/latest)以单个 Go 服务配合 SQLite 运行，支持文本与工具调用流式输出，并提供管理 CLI 和中英文控制台。本地 Laya、敏感会话锁定、ArbiterOS 与 PostgreSQL 仍属规划。
+
+## 客户端与上游支持
+
+| 客户端入口 | OpenAI 兼容上游 | 原生 Anthropic 上游 |
+| --- | --- | --- |
+| `/v1/chat/completions` | JSON / SSE | JSON / SSE，包含受支持的思考与工具续写 |
+| `/v1/messages` | 经转换支持 JSON / SSE | JSON / SSE，原生保真 |
+
+支持范围以[兼容矩阵](docs/compatibility.md)公布的字段组合为准，无法保留语义的转换明确失败。BigModel `glm-5.3` 和 `glm-5.3-flash` 通过本地 Router 完成了 12 个原始 Agent SDK 示例，见[兼容范围与验证方法](docs/compatibility.md)。该结果不代表所有 Anthropic 部署或原生签名历史均兼容。
 
 ## 测评结果
 
@@ -19,26 +36,15 @@
 
 相比固定 Max，Jev Model Router 在代码快照中多通过 3 题，**生成费用降低 13.05%**；非代码测评中少通过 2 题，**生成费用降低 43.71%**。代码结果为选定的共享答案库回放，非代码结果为独立在线生成并补跑失败请求。这些有限样本快照不代表稳定排名。费用按冻结的 API Token 单价估算，不含路由费、本地计算及失败请求费用；统计细节与复现脚本见上方报告。
 
-## 客户端与上游支持
-
-| 客户端入口 | OpenAI 兼容上游 | 原生 Anthropic 上游 |
-| --- | --- | --- |
-| `/v1/chat/completions` | JSON / SSE | JSON / SSE，包含受支持的思考与工具续写 |
-| `/v1/messages` | 经转换支持 JSON / SSE | 由 [#51](https://github.com/zerone-agents/jev-model-router/issues/51) 追踪，尚未支持 |
-
-支持范围以[兼容矩阵](docs/compatibility.md)公布的字段组合为准，无法保留语义的转换明确失败。BigModel `glm-5.3` 和 `glm-5.3-flash` 通过本地 Router 完成了 12 个原始 Agent SDK 示例，见[兼容范围与验证方法](docs/compatibility.md)。该结果不代表所有 Anthropic 部署或原生签名历史均兼容。
-
 ## 快速开始
+
+推荐使用 [Docker Compose 快速开始](quickstart/README.zh-CN.md)：直接拉取预构建镜像、持久化 SQLite，并包含管理界面，无需本地安装 Go 或 Node。
 
 ### For Agent
 
 通过你的 Skill 安装器安装本仓库的 [`skills/jev-router`](skills/jev-router/SKILL.md)：仓库地址为 `https://github.com/zerone-agents/jev-model-router`，目录为 `skills/jev-router`，技能名为 `jev-router`。也可以克隆仓库，再通过 Agent 的本地 Skill 加载机制注册该目录。请保留仓库副本，SKILL 会引用其中的部署和配置文档。
 
 加载 `jev-router` 后，按 SKILL 中的步骤通过 Docker Compose 部署 Jev Model Router，配置供应商、模型与自动路由，并验证连通性。SKILL 包含部署步骤和 CLI 配置流程。
-
-### Docker Compose
-
-推荐通过 [Docker Compose 快速开始](quickstart/README.zh-CN.md)部署 Docker Hub 预构建镜像，包含 SQLite 持久化和管理 UI，无需本地安装 Go 或 Node。
 
 ### 本地 CLI
 
@@ -55,6 +61,8 @@ go build -o /tmp/jev-router ./cmd/jev-router
 ```
 
 默认监听 `127.0.0.1:8080`，数据库为 `.data/router.sqlite`。支持 `serve --config conf.json` 和环境变量覆盖，详见[启动配置](docs/configuration.md)。启动时必须存在两种不同凭证。
+
+如果 Jev 对你的 Agent 有帮助，欢迎 Star 仓库以关注后续版本，也让更多开发者发现它。
 
 ## 管理 UI
 
@@ -107,13 +115,13 @@ curl http://127.0.0.1:8080/v1/messages \
   -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}],"max_tokens":1024}'
 ```
 
-增加 `"stream":true` 可使用 SSE。Messages 当前只选择 OpenAI 兼容上游；若只配置原生 Anthropic 上游，请使用 Chat Completions 入口。见 [Anthropic SDK 示例](examples/anthropic-messages.mjs)及[原生上游配置](docs/configuration.md#native-anthropic-generation-upstream)。
+增加 `"stream":true` 可使用 SSE。Messages 可在已记录的字段与模型配置边界内选择 OpenAI 兼容或原生 Anthropic 上游。见 [Anthropic SDK 示例](examples/anthropic-messages.mjs)、[原生 Messages 兼容范围](docs/compatibility.md#native-messages-clients-with-native-anthropic-upstream-51)及[原生上游配置](docs/configuration.md#native-anthropic-generation-upstream)。
 
 ## 路由约定
 
 - 零候选失败、单候选直达、多候选每次调用 Jev；显式选择跳过 Jev。
 - 偏好尽量交给提示词和自然语言模型卡；代码仅锁定权限、能力、容量及协议边界。
-- `auto` 为保留 ID。完整生成请求不裁剪，参数不静默丢失，不重试或换模。
+- `auto` 为保留 ID。完整生成请求不裁剪，参数不静默丢失。SDK 重试保持禁用，显式请求绝不换模；Auto 在符合条件的生成失败且尚未产生语义输出时，最多重新选模一次。
 - Jev 模式没有敏感路由保证；对话文本可能送往 Jev；图片数据、工具定义、参数和输出不发送，工具历史仅保留配对的 ID 与名称等关联记录。
 - 配置写入立即影响新请求；禁用模型不撤销在途快照。
 - 记录保存路由元数据和最后一条用户消息最多 120 字的文本摘要，默认保留 7 天且最多 10 万条，超限丢弃最旧记录，尽力写入并公开降级状态，不是审计日志。

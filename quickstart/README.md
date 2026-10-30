@@ -6,7 +6,7 @@ Run Jev Model Router with Docker Compose. One container serves the API and manag
 
 ## Run (recommended)
 
-The default stack pulls `zeroneai/jev-model-router:latest` from Docker Hub. No Go, Node, or source build is needed. To pin the current documented release, set `ROUTER_IMAGE=zeroneai/jev-model-router:0.1.19` in `.env`.
+The default stack pulls `zeroneai/jev-model-router:latest` from Docker Hub. No Go, Node, or source build is needed. To pin the current documented release, set `ROUTER_IMAGE=zeroneai/jev-model-router:0.1.28` in `.env`.
 
 ```sh
 git clone https://github.com/zerone-agents/jev-model-router.git
@@ -112,7 +112,7 @@ For a remote dashboard, set `JEV_ROUTER_DASHBOARD_ORIGIN=https://router.example.
 
 ## Inference protocols
 
-OpenAI clients use the Router `/v1` base URL; Anthropic SDK clients use the Router root. `/v1/chat/completions` supports OpenAI-compatible and native Anthropic upstreams; `/v1/messages` currently supports only OpenAI-compatible upstreams. See [request examples](../README.md#call-the-inference-api) and [native Anthropic/BigModel configuration](../docs/configuration.md#native-anthropic-generation-upstream).
+OpenAI clients use the Router `/v1` base URL; Anthropic SDK clients use the Router root. Both `/v1/chat/completions` and `/v1/messages` support OpenAI-compatible and native Anthropic upstreams within their documented compatibility boundaries. See [request examples](../README.md#call-the-inference-api), [native Messages compatibility](../docs/compatibility.md#native-messages-clients-with-native-anthropic-upstream-51), and [native Anthropic/BigModel configuration](../docs/configuration.md#native-anthropic-generation-upstream).
 
 ## Optional local Laya decisions
 
