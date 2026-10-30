@@ -6,7 +6,7 @@ on:
       - quickstart/docker-compose.laya*.yml
       - .github/workflows/laya.yml
   push:
-    tags: ['v*']
+    tags: ['laya-v*']
   workflow_dispatch:
     inputs:
       version:
@@ -69,7 +69,7 @@ jobs:
         if: always()
         run: docker rm -f laya-ci || true
   image:
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/laya-v')
     needs: validate
     strategy:
       fail-fast: false
@@ -83,18 +83,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - name: Validate image repositories
+      - name: Validate version and image repositories
+        id: release
         env:
           VERSION: ${{ inputs.version }}
           EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
           IMAGE: ${{ vars.DOCKERHUB_LAYA_IMAGE }}
           MIRROR: ${{ vars.REGISTRY_LAYA_IMAGE }}
           HOST: ${{ vars.REGISTRY_HOST }}
         run: |
           set -eu
-          if [ "$EVENT" = workflow_dispatch ]; then
-            echo "$VERSION" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          if [ "$EVENT" != workflow_dispatch ]; then
+            VERSION="${REF_NAME#laya-v}"
           fi
+          echo "$VERSION" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "$IMAGE" | grep -Eq '^[a-z0-9][a-z0-9_-]*/[a-z0-9][a-z0-9._-]*$'
           if [ -n "$MIRROR" ]; then
             test -n "$HOST"
@@ -118,9 +122,8 @@ jobs:
             ${{ vars.DOCKERHUB_LAYA_IMAGE }}
             ${{ vars.REGISTRY_LAYA_IMAGE }}
           tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=${{ inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
-            type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' || !contains(github.ref, '-') }}
+            type=raw,value=${{ steps.release.outputs.version }}
+            type=raw,value=latest
       - uses: docker/build-push-action@v6
         with:
           context: services/laya
@@ -133,7 +136,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   manifest:
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/laya-v')
     needs: image
     runs-on: ubuntu-24.04
     steps:
@@ -154,7 +157,7 @@ jobs:
           MIRROR: ${{ vars.REGISTRY_LAYA_IMAGE }}
         run: |
           set -eu
-          version="${VERSION#v}"
+          version="${VERSION#laya-v}"
           for image in "$IMAGE" "$MIRROR"; do
             [ -n "$image" ] || continue
             docker manifest create "$image:$version" "$image:$version-amd64" "$image:$version-arm64"

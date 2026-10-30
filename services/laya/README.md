@@ -129,8 +129,11 @@ controlled fixtures; these checks do not establish generation-model quality.
 
 ## Image publication configuration
 
-The Laya workflow validates pull requests without registry writes. Version tags
-publish only after validation. The Laya workflow also supports manual dispatch
+The Laya workflow validates pull requests without registry writes. Independent
+`laya-vMAJOR.MINOR.PATCH` tags (for example `laya-v0.1.1`) publish only Laya
+after validation. Image tags omit the prefix (`0.1.1` and `latest`). Project
+`v*` tags publish Router/CLI and do not trigger Laya. Laya tags do not trigger
+Router/CLI. Stable three-component versions are required. The Laya workflow also supports manual dispatch
 with a stable `version` such as `0.1.0` (without a `v` prefix). This publishes
 only Laya under that version and `latest`, after the same validation; it does
 not create a project release or trigger Router/CLI workflows. Select the reviewed
