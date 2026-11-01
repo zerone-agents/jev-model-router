@@ -182,8 +182,7 @@ func (s *anthropicUpstreamValidation) accept(typ string, raw []byte) error {
 		return nativeError(502)
 	}
 	if typ == "error" {
-		err := nativeEventError(event.Error.Type).(*routing.UpstreamError)
-		err.Details = routing.SanitizeUpstream(raw, s.secret)
+		err := nativeReportedError(nativeEventError(event.Error.Type).(*routing.UpstreamError).Status, raw, s.secret).(*routing.UpstreamError)
 		return err
 	}
 	if typ == "ping" {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
+	"strings"
 )
 
 func nativeError(status int) error {
@@ -106,6 +107,19 @@ func nativeReportedError(status int, raw any, secrets ...string) error {
 	if json.Unmarshal(b, &envelope) != nil {
 		return err
 	}
-	err.ReportedCode = routing.ReportedErrorCode(envelope.Error)
+	if envelope.Error["code"] == "1301" {
+		err.ReportedCode = "content_filter"
+		err.Body["code"] = "content_filter"
+		err.Body["type"] = "content_filter"
+		if details, ok := err.Details.Body.(map[string]any); ok {
+			if nested, ok := details["error"].(map[string]any); ok {
+				if message, ok := nested["message"].(string); ok && message != "" && !strings.Contains(message, "[omitted: malformed structured error]") {
+					err.Body["message"] = message
+				}
+			}
+		}
+	} else {
+		err.ReportedCode = routing.ReportedErrorCode(envelope.Error)
+	}
 	return err
 }
