@@ -72,3 +72,11 @@ func TestEmbeddedErrorsPreserveSafeExplanation(t *testing.T) {
 		t.Fatal(string(b))
 	}
 }
+
+func TestBracketedProviderCodePreservesSafeText(t *testing.T) {
+	raw := `{"error":{"code":"1301","message":"[1301][内容安全] Safety policy rejected content. Authorization: Bearer SECRET"}}`
+	b, _ := json.Marshal(SanitizeUpstream(raw))
+	if !strings.Contains(string(b), "[1301][内容安全] Safety policy rejected content.") || strings.Contains(string(b), "SECRET") {
+		t.Fatal(string(b))
+	}
+}

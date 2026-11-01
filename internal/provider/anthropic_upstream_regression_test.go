@@ -109,3 +109,58 @@ func TestNativeRegressionSSEErrorMapping(t *testing.T) {
 		}
 	}
 }
+
+func TestBigModel1301Classification(t *testing.T) {
+	err := nativeReportedError(400, `{"error":{"code":"1301","type":"invalid_request_error","message":"[1301] Safety policy rejected content."}}`)
+	got := routing.Diagnose(err)
+	if got.Code != "upstream_content_rejected" || got.UpstreamCode != "content_filter" {
+		t.Fatalf("unexpected diagnostic: %+v", got)
+	}
+}
+
+func TestBigModel1301StreamAndJSON(t *testing.T) {
+	raw := `{"type":"error","error":{"code":"1301","type":"invalid_request_error","message":"[1301][内容安全] Safety policy rejected content. Authorization: Bearer SECRET"}}`
+	for name, call := range map[string]func() error{
+		"json": func() error { return nativeReportedError(400, raw, "SECRET") },
+		"sse":  func() error { _, err := collectNative(t, nativeFrame("error", raw)); return err },
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := call()
+			var up *routing.UpstreamError
+			if !errors.As(err, &up) {
+				t.Fatalf("not upstream: %v", err)
+			}
+			d := routing.Diagnose(err)
+			if d.Code != "upstream_content_rejected" || up.Body["code"] != "content_filter" {
+				t.Fatalf("classification: %+v", d)
+			}
+			b, _ := json.Marshal(up)
+			if strings.Contains(string(b), "SECRET") || !strings.Contains(string(b), "Safety policy rejected content") {
+				t.Fatalf("redaction or message: %s", b)
+			}
+		})
+	}
+}
+
+func TestOversizedSSEErrorPreservesReportedType(t *testing.T) {
+	raw := `{"type":"error","error":{"type":"insufficient_quota","message":"` + strings.Repeat("x", 70<<10) + `"}}`
+	for name, call := range map[string]func() error{
+		"chat":     func() error { _, err := collectNative(t, nativeFrame("error", raw)); return err },
+		"messages": func() error { _, err := readNativeFixture(t, nativeFrame("error", raw)); return err },
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := call()
+			var up *routing.UpstreamError
+			if !errors.As(err, &up) {
+				t.Fatalf("expected upstream error: %v", err)
+			}
+			d := routing.Diagnose(err)
+			if d.Code != "upstream_quota" || d.UpstreamCode != "insufficient_quota" {
+				t.Fatalf("lost classification: %+v", d)
+			}
+			if up.Details == nil || !up.Details.Truncated {
+				t.Fatal("oversized body not omitted")
+			}
+		})
+	}
+}
