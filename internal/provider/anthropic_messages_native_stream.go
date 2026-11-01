@@ -76,7 +76,7 @@ func (s *nativeMessagesValidation) accept(typ string, raw []byte) error {
 		if json.Unmarshal(fields["error"], &e) != nil {
 			return nativeError(502)
 		}
-		err := nativeReportedError(nativeEventError(e.Type).(*routing.UpstreamError).Status, raw, s.secrets...).(*routing.UpstreamError)
+		err := nativeReportedEventError(e.Type, raw, s.secrets...)
 		return err
 	}
 	if typ == "ping" {

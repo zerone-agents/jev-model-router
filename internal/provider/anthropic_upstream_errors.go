@@ -123,3 +123,15 @@ func nativeReportedError(status int, raw any, secrets ...string) error {
 	}
 	return err
 }
+
+// Preserve the event type when the body is too large or its code is generic.
+func nativeReportedEventError(typ string, raw []byte, secrets ...string) *routing.UpstreamError {
+	event := nativeEventError(typ).(*routing.UpstreamError)
+	parsed := nativeReportedError(event.Status, raw, secrets...).(*routing.UpstreamError)
+	event.Details = parsed.Details
+	if parsed.ReportedCode == "content_filter" {
+		event.ReportedCode = parsed.ReportedCode
+		event.Body = parsed.Body
+	}
+	return event
+}
