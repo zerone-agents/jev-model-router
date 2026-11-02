@@ -71,16 +71,23 @@ def provision(destination, manifest, allowed_model, download=_download):
     with (root/'.provision.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         current = root / 'current'
+        # Keep immutable snapshots so a failed repair never damages the active
+        # target and a running worker can continue using its resolved directory.
+        if current.is_symlink():
+            target = current.resolve()
+            if target.parent == revisions.resolve() and (target.name == fingerprint or target.name.startswith(fingerprint + '-')):
+                try:
+                    verify(target, manifest)
+                    return current
+                except ArtifactError:
+                    pass
         revision = revisions / fingerprint
-        if current.exists() and current.resolve() == revision.resolve():
-            try:
-                verify(current, manifest)
-                return current
-            except ArtifactError:
-                pass
         if revision.exists():
-            verify(revision, manifest)
-        else:
+            try:
+                verify(revision, manifest)
+            except ArtifactError:
+                revision = revisions / (fingerprint + '-' + uuid.uuid4().hex)
+        if not revision.exists():
             staging = Path(tempfile.mkdtemp(prefix='.staging-', dir=revisions))
             try:
                 for entry in entries:
@@ -94,7 +101,7 @@ def provision(destination, manifest, allowed_model, download=_download):
                 if staging.exists(): shutil.rmtree(staging)
         link = root / ('.current-' + uuid.uuid4().hex)
         try:
-            link.symlink_to(Path('revisions') / fingerprint, target_is_directory=True)
+            link.symlink_to(Path('revisions') / revision.name, target_is_directory=True)
             os.replace(link, current)
         finally:
             with contextlib.suppress(FileNotFoundError): link.unlink()

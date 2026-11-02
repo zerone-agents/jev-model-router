@@ -15,7 +15,7 @@ on:
         required: true
         type: string
 concurrency:
-  group: decider-${{ github.event_name }}-${{ inputs.version || github.ref }}
+  group: decider-${{ inputs.version && format('decider-v{0}', inputs.version) || github.ref_name }}
   cancel-in-progress: false
 permissions:
   contents: read
@@ -117,17 +117,9 @@ jobs:
           registry: ${{ vars.REGISTRY_HOST }}
           username: ${{ secrets.DOCKER_REGISTRY_USER }}
           password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
-      - uses: docker/metadata-action@v5
-        id: meta
-        with:
-          flavor: suffix=-${{ matrix.arch }},onlatest=true
-          images: |
-            ${{ vars.DOCKERHUB_DECIDER_IMAGE }}
-            ${{ vars.REGISTRY_DECIDER_IMAGE }}
-          tags: |
-            type=raw,value=${{ steps.release.outputs.version }}
-            type=raw,value=latest
-      - uses: docker/build-push-action@v6
+      - name: Build and push architecture image
+        id: build
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: services/decider/Dockerfile
@@ -136,8 +128,20 @@ jobs:
           sbom: false
           outputs: type=image,oci-mediatypes=false
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ${{ vars.DOCKERHUB_DECIDER_IMAGE }}:build-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.arch }}
+            ${{ vars.REGISTRY_DECIDER_IMAGE != '' && format('{0}:build-{1}-{2}-{3}', vars.REGISTRY_DECIDER_IMAGE, github.run_id, github.run_attempt, matrix.arch) || '' }}
+      - name: Save image digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          printf '%s' "$DIGEST" > "$RUNNER_TEMP/digests/${{ matrix.arch }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: decider-digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/${{ matrix.arch }}
+          retention-days: 1
 
   manifest:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/decider-v')
@@ -154,6 +158,11 @@ jobs:
           registry: ${{ vars.REGISTRY_HOST }}
           username: ${{ secrets.DOCKER_REGISTRY_USER }}
           password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: decider-digest-*
+          path: ${{ runner.temp }}/digests
+          merge-multiple: true
       - name: Publish Docker manifest lists
         env:
           VERSION: ${{ inputs.version || github.ref_name }}
@@ -162,13 +171,16 @@ jobs:
         run: |
           set -eu
           version="${VERSION#decider-v}"
+          amd64="$(cat "$RUNNER_TEMP/digests/amd64")"
+          arm64="$(cat "$RUNNER_TEMP/digests/arm64")"
+          printf '%s\n%s\n' "$amd64" "$arm64" | grep -Ec '^sha256:[0-9a-f]{64}$' | grep -qx 2
           for image in "$IMAGE" "$MIRROR"; do
             [ -n "$image" ] || continue
-            docker manifest create "$image:$version" "$image:$version-amd64" "$image:$version-arm64"
+            docker manifest create "$image:$version" "$image@$amd64" "$image@$arm64"
             docker manifest push "$image:$version"
             case "$version" in
               *-*) ;;
-              *) docker manifest create "$image:latest" "$image:$version-amd64" "$image:$version-arm64"
+              *) docker manifest create "$image:latest" "$image@$amd64" "$image@$arm64"
                  docker manifest push "$image:latest" ;;
             esac
           done

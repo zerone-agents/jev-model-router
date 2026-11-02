@@ -50,3 +50,24 @@ class ProvisionTests(unittest.TestCase):
             self.assertEqual(len(calls), 1)
             self.assertEqual(paths[0].resolve(), paths[1].resolve())
             verify(paths[0], manifest)
+
+    def test_corrupt_revision_is_replaced_only_after_verified_download(self):
+        data = b'valid weights'
+        manifest = {'model': 'example/model', 'model_revision': 'a' * 40,
+                    'artifacts': [{'path': 'model', 'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()}]}
+        with tempfile.TemporaryDirectory() as temp:
+            current = provision(temp, manifest, 'example/model', lambda url, path: path.write_bytes(data))
+            damaged = current.resolve()
+            (damaged / 'model').write_bytes(b'bad')
+            with self.assertRaises(ArtifactError):
+                provision(temp, manifest, 'example/model', lambda url, path: path.write_bytes(b'bad'))
+            self.assertEqual(current.resolve(), damaged)
+            calls = []
+            def download(url, path):
+                calls.append(url)
+                path.write_bytes(data)
+            provision(temp, manifest, 'example/model', download)
+            self.assertEqual(len(calls), 1)
+            self.assertNotEqual(current.resolve(), damaged)
+            verify(current, manifest)
+            provision(temp, manifest, 'example/model', lambda url, path: self.fail('unexpected download'))
