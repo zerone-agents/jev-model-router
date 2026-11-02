@@ -63,13 +63,16 @@ class Runtime:
         torch.set_num_threads(settings.threads)
         if settings.device == 'cuda' and not torch.cuda.is_available():
             raise ValueError('Requested CUDA device is unavailable')
+        if settings.device == 'cpu':
+            from .cpu import prepare_cpu_kernels
+            prepare_cpu_kernels()
         if settings.kind == 'decider':
             from decider.infer import Decider
             model = Decider(settings.model_dir, device=settings.device, use_graphs=False)
         else:
             from transformers import AutoModel
             model = AutoModel.from_pretrained(settings.model_dir, trust_remote_code=True,
-                local_files_only=True, dtype=torch.bfloat16 if settings.device == 'cuda' else torch.float32).to(settings.device).eval()
+                local_files_only=True, dtype='auto').to(settings.device).eval()
         self.backend = DecisionBackend(model, settings.kind, settings.alias, settings.context)
         smoke = {'model': settings.alias, 'state': 'hello', 'questions': {'q': {
             'type': 'choice', 'instructions': 'Choose a greeting', 'criteria': {'a': 'hello', 'b': 'goodbye'}}}}

@@ -13,6 +13,9 @@ class RealModelTests(unittest.TestCase):
         kind = os.environ['DECISION_TEST_KIND']
         path = os.environ['DECISION_TEST_MODEL']
         device = os.environ.get('DECISION_TEST_DEVICE', 'cpu')
+        if device == 'cpu':
+            from decision_common.cpu import prepare_cpu_kernels
+            prepare_cpu_kernels()
         if kind == 'decider':
             from decider.infer import Decider
             model = Decider(path, device=device, use_graphs=False)
@@ -20,7 +23,7 @@ class RealModelTests(unittest.TestCase):
             import torch
             from transformers import AutoModel
             model = AutoModel.from_pretrained(path, trust_remote_code=True,
-                local_files_only=True, dtype=torch.bfloat16 if device == 'cuda' else torch.float32).to(device).eval()
+                local_files_only=True, dtype='auto').to(device).eval()
         backend = DecisionBackend(model, kind, 'laya-multilingual', 8192)
         fixtures = json.loads(Path(os.environ['DECISION_TEST_FIXTURES']).read_text())
         for name in ('models-2', 'models-20', 'models-40'):
