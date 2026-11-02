@@ -30,3 +30,15 @@ class SnapshotVerificationTests(unittest.TestCase):
                 manifest = {'artifacts': [{'path': name, 'size': 1, 'sha256': hashlib.sha256(b'a').hexdigest()}]}
                 with self.subTest(name=name), self.assertRaises(ArtifactError):
                     verify_snapshot(root, manifest)
+
+    def test_unlisted_model_code_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'model').write_bytes(b'a')
+            manifest = {'artifacts': [{'path': 'model', 'size': 1, 'sha256': hashlib.sha256(b'a').hexdigest()}]}
+            for name in ('extra.py', 'cached.pyc'):
+                code = root / name
+                code.write_bytes(b'code')
+                with self.subTest(name=name), self.assertRaises(ArtifactError):
+                    verify_snapshot(root, manifest)
+                code.unlink()

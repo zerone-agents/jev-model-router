@@ -147,3 +147,11 @@ and an idempotency key. Read back `decision.get` and run a Chat-format Auto
 
 See [service operations and limits](../services/laya/README.md) for offline
 prepopulation, worker timeouts, head-budget rejection and verified platform scope.
+
+## Optional Decider and D3 decisions
+
+Independent Decider 2B and D3 nano services use the existing Router decision
+configuration. Each has a separate Compose file, image and model volume. See the
+[local decision service guide](../services/decision_common/README.md) for explicit
+weight provisioning, CPU/GPU settings, service aliases and CLI setup. Check the
+availability of a released image before using it, or use the build override.

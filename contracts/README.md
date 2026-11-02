@@ -246,3 +246,12 @@ zero. The service refuses inputs that would lose instructions, descriptions or
 state under its pinned encoder. Errors retain routing-stage diagnostics, HTTP
 status and upstream code, including `input_too_large`, `overloaded` and
 `model_unavailable`. These are errors, never successful default selections.
+
+## Local decision backends
+
+Decider and D3 expose the same `/v1/systemone` choice subset as Laya. Use the
+existing versioned `decision.put` capability with the service alias and a dedicated
+`env:DECISION_API_KEY` reference. One or two independent questions are accepted;
+inputs that exceed the configured context fail explicitly. Readiness indicates
+worker initialization, not routing quality. See the local decision service guide
+for provisioning, resource and deployment boundaries.

@@ -1,0 +1,11 @@
+services:
+  decider:
+    environment:
+      DECISION_DEVICE: cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

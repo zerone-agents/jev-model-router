@@ -40,7 +40,8 @@ class DecisionBackend:
         prepared = runtime.prepare(state, questions)
         if prepared.errors:
             raise ServiceError('input_too_large', 'Input exceeds the model limit.', 413)
-        if any(len(sequence) > self.context for sequence in prepared.sequences.values()):
+        sequences = list(prepared.sequences.values()) + list(prepared.reversed_sequences.values())
+        if any(len(sequence) > self.context for sequence in sequences):
             raise ServiceError('input_too_large', 'Input exceeds the context limit.', 413)
         probabilities, tokens = runtime.run(prepared)
         result = runtime.respond(prepared, probabilities, tokens)

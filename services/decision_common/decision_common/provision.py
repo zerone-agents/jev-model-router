@@ -17,16 +17,6 @@ class ArtifactError(Exception):
     pass
 
 
-def load_manifest():
-    from importlib.resources import files
-    resource = files('jev_laya').joinpath('model-manifest.json')
-    if resource.is_file():
-        return json.loads(resource.read_text())
-    # Editable development installs resolve resources to src/; packaged wheels
-    # carry the same authoritative root manifest via force-include.
-    return json.loads((Path(__file__).resolve().parents[2] / 'model-manifest.json').read_text())
-
-
 def _entries(manifest):
     seen = set()
     for entry in manifest['artifacts']:
@@ -43,7 +33,13 @@ def _entries(manifest):
 
 def verify(directory, manifest):
     root = Path(directory).resolve()
-    for entry in _entries(manifest):
+    entries = list(_entries(manifest))
+    allowed_code = {entry['path'] for entry in entries if entry['path'].endswith('.py')}
+    for candidate in root.rglob('*'):
+        relative = candidate.relative_to(root).as_posix()
+        if candidate.suffix == '.pyc' or (candidate.suffix == '.py' and relative not in allowed_code):
+            raise ArtifactError('Unverified model code is not allowed')
+    for entry in entries:
         path = root
         for part in PurePosixPath(entry['path']).parts:
             path = path / part
@@ -103,3 +99,30 @@ def provision(destination, manifest, allowed_model, download=_download):
         finally:
             with contextlib.suppress(FileNotFoundError): link.unlink()
         return current
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Provision pinned decision-model artifacts.')
+    parser.add_argument('--manifest', required=True)
+    parser.add_argument('--destination', required=True)
+    parser.add_argument('--offline-source')
+    args = parser.parse_args()
+    manifest = json.loads(Path(args.manifest).read_text())
+    kind = os.environ.get('DECISION_BACKEND')
+    allowed = {'decider': 'Mapika/decider-2b', 'd3': 'vllm-sr/d3-nano'}.get(kind)
+    if allowed is None:
+        raise ArtifactError('Unsupported decision backend')
+    if args.offline_source:
+        source = Path(args.offline_source)
+        verify(source, manifest)
+        def copy(url, target):
+            relative = url.split('/' + manifest['model_revision'] + '/', 1)[1]
+            shutil.copyfile(source / relative, target)
+        provision(args.destination, manifest, allowed, copy)
+    else:
+        provision(args.destination, manifest, allowed)
+    print('Verified local model artifacts are ready.')
+
+
+if __name__ == '__main__':
+    main()

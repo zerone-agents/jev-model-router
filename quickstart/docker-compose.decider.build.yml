@@ -1,0 +1,9 @@
+services:
+  decider:
+    build:
+      context: ..
+      dockerfile: services/decider/Dockerfile
+  decider-provision:
+    build:
+      context: ..
+      dockerfile: services/decider/Dockerfile

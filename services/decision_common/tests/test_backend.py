@@ -34,3 +34,15 @@ class BackendTests(unittest.TestCase):
         backend._d3 = lambda state, questions: ({'model': {'choice': 'other'}}, 1)
         with self.assertRaises(ServiceError):
             backend(payload({'a': 'A', 'b': 'B'}))
+
+    def test_d3_rejects_oversized_reversed_sequence(self):
+        class Runtime:
+            def prepare(self, state, questions):
+                return SimpleNamespace(errors={}, sequences={'model': [1, 2]},
+                                       reversed_sequences={'model': [1] * 101})
+            def run(self, prepared):
+                raise AssertionError('must not execute rejected input')
+        backend = DecisionBackend(SimpleNamespace(_require=lambda: Runtime()), 'd3', 'test', 100)
+        with self.assertRaises(ServiceError) as caught:
+            backend(payload({'a': 'A', 'b': 'B'}))
+        self.assertEqual(caught.exception.code, 'input_too_large')

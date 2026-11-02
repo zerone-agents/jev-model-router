@@ -1,0 +1,174 @@
+name: DECIDER
+on:
+  pull_request:
+    paths:
+      - services/decision_common/**
+      - services/decider/**
+      - quickstart/docker-compose.decider*.yml
+      - .github/workflows/decider.yml
+  push:
+    tags: ['decider-v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'DECIDER image version (for example 0.1.0; no v prefix)'
+        required: true
+        type: string
+concurrency:
+  group: decider-${{ github.event_name }}-${{ inputs.version || github.ref }}
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.9.28'
+      - name: Unit and lifecycle tests
+        working-directory: services/decision_common
+        run: uv run --frozen pytest -q
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Generate real Router fixtures
+        run: LAYA_FIXTURE_OUTPUT=${{ runner.temp }}/laya-requests.json go test ./internal/decision -run TestLayaDecisionFixtures -count=1
+      - name: Provision pinned model and test real inference
+        working-directory: services/decision_common
+        env:
+          DECISION_TEST_MODEL: ${{ runner.temp }}/decider-models/current
+          DECISION_TEST_KIND: decider
+          DECISION_BACKEND: decider
+          DECISION_TEST_FIXTURES: ${{ runner.temp }}/laya-requests.json
+        run: |
+          uv run --frozen python -m decision_common.provision --manifest ../decider/model-manifest.json --destination "${{ runner.temp }}/decider-models"
+          uv run --frozen pytest -q
+      - uses: docker/setup-buildx-action@v3
+      - name: Build native image without publishing
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/decider/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          tags: jev-decider:ci
+          provenance: false
+          sbom: false
+      - name: Verify missing weights fail readiness
+        run: |
+          docker run -d --name decider-ci --network none -e DECISION_API_KEY=ci-only jev-decider:ci
+          docker exec decider-ci python -c 'import time,urllib.request,urllib.error; time.sleep(5); assert urllib.request.urlopen("http://127.0.0.1:8090/health/live").status == 200; exec("try:\n urllib.request.urlopen(\"http://127.0.0.1:8090/health/ready\")\n raise AssertionError(\"missing weights became ready\")\nexcept urllib.error.HTTPError as e:\n assert e.code == 503")'
+      - name: Cleanup
+        if: always()
+        run: docker rm -f decider-ci || true
+  image:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/decider-v')
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Validate version and image repositories
+        id: release
+        env:
+          VERSION: ${{ inputs.version }}
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          IMAGE: ${{ vars.DOCKERHUB_DECIDER_IMAGE }}
+          MIRROR: ${{ vars.REGISTRY_DECIDER_IMAGE }}
+          HOST: ${{ vars.REGISTRY_HOST }}
+        run: |
+          set -eu
+          if [ "$EVENT" != workflow_dispatch ]; then
+            VERSION="${REF_NAME#decider-v}"
+          fi
+          echo "$VERSION" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "$IMAGE" | grep -Eq '^[a-z0-9][a-z0-9_-]*/[a-z0-9][a-z0-9._-]*$'
+          if [ -n "$MIRROR" ]; then
+            test -n "$HOST"
+            case "$MIRROR" in "$HOST"/*) ;; *) exit 1;; esac
+          fi
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/login-action@v3
+        if: vars.REGISTRY_DECIDER_IMAGE != ''
+        with:
+          registry: ${{ vars.REGISTRY_HOST }}
+          username: ${{ secrets.DOCKER_REGISTRY_USER }}
+          password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          flavor: suffix=-${{ matrix.arch }},onlatest=true
+          images: |
+            ${{ vars.DOCKERHUB_DECIDER_IMAGE }}
+            ${{ vars.REGISTRY_DECIDER_IMAGE }}
+          tags: |
+            type=raw,value=${{ steps.release.outputs.version }}
+            type=raw,value=latest
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/decider/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          provenance: false
+          sbom: false
+          outputs: type=image,oci-mediatypes=false
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  manifest:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/decider-v')
+    needs: image
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/login-action@v3
+        if: vars.REGISTRY_DECIDER_IMAGE != ''
+        with:
+          registry: ${{ vars.REGISTRY_HOST }}
+          username: ${{ secrets.DOCKER_REGISTRY_USER }}
+          password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+      - name: Publish Docker manifest lists
+        env:
+          VERSION: ${{ inputs.version || github.ref_name }}
+          IMAGE: ${{ vars.DOCKERHUB_DECIDER_IMAGE }}
+          MIRROR: ${{ vars.REGISTRY_DECIDER_IMAGE }}
+        run: |
+          set -eu
+          version="${VERSION#decider-v}"
+          for image in "$IMAGE" "$MIRROR"; do
+            [ -n "$image" ] || continue
+            docker manifest create "$image:$version" "$image:$version-amd64" "$image:$version-arm64"
+            docker manifest push "$image:$version"
+            case "$version" in
+              *-*) ;;
+              *) docker manifest create "$image:latest" "$image:$version-amd64" "$image:$version-arm64"
+                 docker manifest push "$image:latest" ;;
+            esac
+          done
