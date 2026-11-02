@@ -18,6 +18,9 @@ class DecisionBackend:
         active = {key: value for key, value in questions.items() if len(value['criteria']) > 1}
         answers = {key: {'type': 'choice', 'choice': next(iter(value['criteria']))}
                    for key, value in questions.items() if len(value['criteria']) == 1}
+        singletons = {key: value for key, value in questions.items() if len(value['criteria']) == 1}
+        if singletons:
+            self._validate_singletons(request.state, singletons)
         tokens = 0
         if active:
             if self.kind == 'd3':
@@ -34,6 +37,30 @@ class DecisionBackend:
                     raise ServiceError('inference_error', 'Invalid model result.', 500)
                 answers[key] = {'type': 'choice', 'choice': choice}
         return {'answers': answers, 'usage': {'input_tokens': tokens, 'output_tokens': 0}}
+
+    def _validate_singletons(self, state, questions):
+        if self.kind == 'd3':
+            prepared = self.model._require().prepare(state, questions)
+            sequences = list(prepared.sequences.values()) + list(prepared.reversed_sequences.values())
+            if prepared.errors or any(len(sequence) > self.context for sequence in sequences):
+                raise ServiceError('input_too_large', 'Input exceeds the context limit.', 413)
+        elif self.kind == 'decider':
+            from decider.infer import Example, Q, _NoShuffle
+            from decider.prompt import build, MAX_OPTIONS
+            from decider.systemone import render_state
+            tokenizer = self.model.m.tok
+            rendered = render_state(state)
+            if len(tokenizer.encode('Context:\n' + rendered, add_special_tokens=False)) > self.context:
+                raise ServiceError('input_too_large', 'Input exceeds the context limit.', 413)
+            for question in questions.values():
+                options = [key + ': ' + value for key, value in question['criteria'].items()]
+                item = build(Example(rendered, [Q(question['instructions'], options, 0)]), tokenizer,
+                             _NoShuffle(), max_options=MAX_OPTIONS, max_ctx_tokens=self.context,
+                             layout='state_first', chat=self.model.chat)
+                if len(item['ids']) > self.context:
+                    raise ServiceError('input_too_large', 'Input exceeds the context limit.', 413)
+        else:
+            raise ServiceError('model_unavailable', 'Unknown model backend.', 503)
 
     def _d3(self, state, questions):
         runtime = self.model._require()

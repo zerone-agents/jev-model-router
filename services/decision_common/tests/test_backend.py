@@ -13,7 +13,12 @@ def payload(criteria):
 
 class BackendTests(unittest.TestCase):
     def test_singleton_does_not_invoke_model(self):
-        backend = DecisionBackend(None, 'd3', 'test', 100)
+        class Runtime:
+            def prepare(self, state, questions):
+                return SimpleNamespace(errors={}, sequences={'model': [1]}, reversed_sequences={})
+            def run(self, prepared):
+                raise AssertionError('singleton must not invoke inference')
+        backend = DecisionBackend(SimpleNamespace(_require=lambda: Runtime()), 'd3', 'test', 100)
         result = backend(payload({'only': 'Only choice'}))
         self.assertEqual(result['answers']['model']['choice'], 'only')
         self.assertEqual(result['usage']['input_tokens'], 0)
@@ -45,4 +50,13 @@ class BackendTests(unittest.TestCase):
         backend = DecisionBackend(SimpleNamespace(_require=lambda: Runtime()), 'd3', 'test', 100)
         with self.assertRaises(ServiceError) as caught:
             backend(payload({'a': 'A', 'b': 'B'}))
+        self.assertEqual(caught.exception.code, 'input_too_large')
+
+    def test_singleton_is_checked_before_bypass(self):
+        class Runtime:
+            def prepare(self, state, questions):
+                return SimpleNamespace(errors={'model': {'error': 'max_length_exceeded'}}, sequences={}, reversed_sequences={})
+        backend = DecisionBackend(SimpleNamespace(_require=lambda: Runtime()), 'd3', 'test', 100)
+        with self.assertRaises(ServiceError) as caught:
+            backend(payload({'only': 'long singleton'}))
         self.assertEqual(caught.exception.code, 'input_too_large')

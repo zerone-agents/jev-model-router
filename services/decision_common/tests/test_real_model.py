@@ -51,3 +51,11 @@ class RealModelTests(unittest.TestCase):
                 self.assertEqual(set(result['answers']), set(raw['questions']))
                 for key, answer in result['answers'].items():
                     self.assertIn(answer['choice'], raw['questions'][key]['criteria'])
+        singleton = {'model': 'laya-multilingual', 'state': 'hello', 'questions': {
+            'model': {'type': 'choice', 'instructions': 'Choose one', 'criteria': {'only': 'The only candidate'}}}}
+        small = DecisionBackend(model, kind, 'laya-multilingual', 512)
+        self.assertEqual(small(json.dumps(singleton).encode())['answers']['model']['choice'], 'only')
+        singleton['questions']['model']['instructions'] = 'word ' * 1000
+        from decision_common.protocol import ServiceError
+        with self.assertRaises(ServiceError):
+            small(json.dumps(singleton).encode())
