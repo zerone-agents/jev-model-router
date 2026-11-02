@@ -1,0 +1,9 @@
+services:
+  d3:
+    build:
+      context: ..
+      dockerfile: services/d3/Dockerfile
+  d3-provision:
+    build:
+      context: ..
+      dockerfile: services/d3/Dockerfile

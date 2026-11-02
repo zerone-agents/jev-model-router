@@ -1,0 +1,36 @@
+{
+  "artifacts": [
+    {
+      "path": "config.json",
+      "size": 1790,
+      "sha256": "6cb8daca9fb653c61485ff7452fc068bacd5c27cbee659ecd24b47186b0d1b52"
+    },
+    {
+      "path": "decider_config.json",
+      "size": 1868,
+      "sha256": "bbe0f382362b23a5ab9115e23d01a1b0511bf334c9355092a3b4d2ea0ddb5e1d"
+    },
+    {
+      "path": "generation_config.json",
+      "size": 116,
+      "sha256": "62153eb6c69f2e1f426beaa8002b7186437e949c7588167085df14e10e9c0a73"
+    },
+    {
+      "path": "model.safetensors",
+      "size": 3763692048,
+      "sha256": "1265b014ce710ef219eb137792705bc0e15a59f1c68460cf26394ae5416876e1"
+    },
+    {
+      "path": "tokenizer.json",
+      "size": 19989325,
+      "sha256": "06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523"
+    },
+    {
+      "path": "tokenizer_config.json",
+      "size": 1127,
+      "sha256": "171ecbe7ddae98d11840698f7df2b8d5b4722139db0f0620d3bbf429bd656250"
+    }
+  ],
+  "model": "Mapika/decider-2b",
+  "model_revision": "7614a6c7ea5a047aa7d7bcfb1a0015469381c3e3"
+}

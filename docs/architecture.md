@@ -193,3 +193,9 @@ Serving uses verified read-only artifacts, offline loading and a private tempora
 copy for SDK tokenizer normalization. Local decision inference can still select a
 cloud generation provider. Sensitive-data classification and session locking are
 not part of this implementation.
+
+Decider 2B and D3 nano use independent images and model volumes with a shared
+System One service contract. Each instance runs one supervised worker, validates
+pinned artifacts before offline loading, and rejects inputs that exceed its
+verified context. The Router uses the same `decision.put` capability and does
+not acquire a Python dependency. GPU access is an explicit Compose override.

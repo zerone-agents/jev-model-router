@@ -222,3 +222,14 @@ For native macOS Laya deployment, operators may set `LAYA_DEVICE=mps` and restar
 CPU remains the default. Confirm authenticated metadata and readiness, then run
 inspection. If MPS is unavailable, initialization fails without CPU fallback.
 Linux Compose remains CPU-only and does not expose the Mac GPU.
+
+## Configure local Decider or D3 decisions
+
+Follow the same schema discovery, versioned `decision.put`, readback and
+`route.inspect` sequence as local Laya. Consult
+[local decision service deployment](../../services/decision_common/README.md)
+for image availability, explicit weight provisioning and GPU configuration.
+Compose exposes `http://decider:8090` or `http://d3:8090` only on its internal
+network, with matching model aliases and `env:DECISION_API_KEY`. Do not infer
+sensitive-session protection from use of a local decision model. Confirm readiness
+and actual inference separately from a successful configuration write.
