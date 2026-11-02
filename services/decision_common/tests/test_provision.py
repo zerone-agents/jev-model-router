@@ -71,3 +71,31 @@ class ProvisionTests(unittest.TestCase):
             self.assertNotEqual(current.resolve(), damaged)
             verify(current, manifest)
             provision(temp, manifest, 'example/model', lambda url, path: self.fail('unexpected download'))
+
+    def test_dangling_revision_symlink_is_repaired_without_overwriting_it(self):
+        import json
+
+        data = b'valid weights'
+        manifest = {'model': 'example/model', 'model_revision': 'a' * 40,
+                    'artifacts': [{'path': 'model', 'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()}]}
+        fingerprint = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            revisions = root / 'revisions'
+            revisions.mkdir()
+            broken = revisions / fingerprint
+            broken.symlink_to('missing')
+            (root / 'current').symlink_to(Path('revisions') / fingerprint)
+            with self.assertRaises(ArtifactError):
+                provision(temp, manifest, 'example/model', lambda url, path: path.write_bytes(b'bad'))
+            self.assertEqual((root / 'current').readlink(), Path('revisions') / fingerprint)
+            calls = []
+            def download(url, path):
+                calls.append(url)
+                path.write_bytes(data)
+            current = provision(temp, manifest, 'example/model', download)
+            self.assertEqual(len(calls), 1)
+            self.assertTrue(broken.is_symlink())
+            self.assertNotEqual(current.readlink(), Path('revisions') / fingerprint)
+            verify(current, manifest)
+            provision(temp, manifest, 'example/model', lambda url, path: self.fail('unexpected download'))

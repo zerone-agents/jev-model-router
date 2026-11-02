@@ -82,7 +82,9 @@ def provision(destination, manifest, allowed_model, download=_download):
                 except ArtifactError:
                     pass
         revision = revisions / fingerprint
-        if revision.exists():
+        if revision.is_symlink():
+            revision = revisions / (fingerprint + '-' + uuid.uuid4().hex)
+        elif revision.exists():
             try:
                 verify(revision, manifest)
             except ArtifactError:
