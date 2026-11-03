@@ -30,6 +30,7 @@ export function Overview(props: PageProps) {
     ready: boolean;
     version: number;
     enabled_models: number;
+    healthy_models?: number;
     records_degraded: boolean;
   }>(props, "status.get", {}, refresh);
   return (
@@ -80,6 +81,10 @@ export function Overview(props: PageProps) {
                 <div>
                   <small>{text(lang, "Enabled models", "已启用模型")}</small>
                   <strong>{data.enabled_models}</strong>
+                </div>
+                <div>
+                  <small>{text(lang, "Healthy models", "健康模型")}</small>
+                  <strong>{data.healthy_models ?? "—"}</strong>
                 </div>
                 <div>
                   <small>
