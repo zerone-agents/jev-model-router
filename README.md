@@ -25,16 +25,19 @@ Support is limited to the fields and combinations in the [compatibility matrix](
 
 ## Benchmark results
 
-Same Qwen3.8-Max / Flash model pool, frozen routing configurations. Each cell shows **tasks passed · generation cost (CNY)**.
+Seven strategies replay the same Qwen3.8-Max / Flash answers. Score columns show tasks passed and generation cost (CNY), excluding routing overhead.
 
-| Strategy | [LiveCodeBench · 128 tasks](docs/benchmarks/livecodebench-128.md) | [Math, knowledge & reading · 96 tasks](docs/benchmarks/noncode-96.md) |
-| --- | ---: | ---: |
-| Fixed Max | 88 · 8.7390 | 88 · 0.9874 |
-| Fixed Flash | 85 · 0.9988 | 84 · 0.1811 |
-| **Jev Model Router** | **91 · 7.5988** | **86 · 0.5558** |
-| Semantic Router | 85 · 6.5021 | 86 · 0.3079 |
+| Strategy | Code (128 tasks) | Non-code (96 tasks) | Median decision latency: RTX 4090 / 4-core CPU (ms) |
+|---|---:|---:|---:|
+| Jev Model Router (cloud Jev) | 91 · 7.5988 | 86 · 0.5026 | — |
+| Semantic Router | 85 · 6.5021 | 85 · 0.3110 | — |
+| Jev Model Router (Laya) | 88 · 6.1811 | 84 · 0.2764 | 31.0 / 225.4 |
+| Jev Model Router (Decider 2B) | 88 · 6.4732 | 88 · 0.7316 | 29.6 / 2,172.1 |
+| Jev Model Router (D3 nano) | 87 · 8.3495 | 85 · 0.3746 | 28.3 / 2,248.9 |
+| Fixed Max | 88 · 8.7390 | 88 · 0.9874 | — |
+| Fixed Flash | 85 · 0.9988 | 84 · 0.1811 | — |
 
-Jev Model Router used **13.05% less generation cost** than fixed Max on the code snapshot with three more passes, and **43.71% less** on non-code with two fewer passes. Code results are a selected shared-answer-bank replay; non-code results are independent online generations with failed-request recovery. These limited snapshots do not establish a stable ranking. Costs use frozen API-equivalent token prices and exclude routing fees, local compute and failed attempts; see the linked reports for accounting details and reproduction scripts.
+Local latency uses eight tasks run serially after warmup. See the [full report](docs/benchmarks/local-routing-224.md) for routing counts, P95, historical cloud latency on a different sample, and reproduction steps.
 
 ## Quick Start
 
