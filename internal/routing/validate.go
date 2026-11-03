@@ -147,7 +147,7 @@ func ValidateChatSchema(b json.RawMessage) error {
 	if contracts.Validate("chat", b) != nil {
 		if field := contracts.ChatInvalidField(b); field != "" {
 			name, err := strconv.Unquote(field)
-			if err != nil {
+			if err != nil || name == "" {
 				name = "unknown_field"
 			}
 			return &Error{Code: "unsupported_request", Message: "unsupported or invalid chat field: " + field, Field: name}

@@ -405,6 +405,7 @@ func TestRejectedChatFieldRecordedSafely(t *testing.T) {
 		{`"metadata":{"token":"SECRET_VALUE"}`, "metadata"},
 		{`"SECRET_FIELD":"SECRET_VALUE"`, "unknown_field"},
 		{`"SECRET FIELD":"SECRET_VALUE"`, "unknown_field"},
+		{`"":1`, "unknown_field"},
 	} {
 		body := `{"model":"auto","messages":[{"role":"user","content":"hi"}],` + tc.extra + `}`
 		w := httptest.NewRecorder()
