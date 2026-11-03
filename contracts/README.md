@@ -255,3 +255,5 @@ existing versioned `decision.put` capability with the service alias and a dedica
 inputs that exceed the configured context fail explicitly. Readiness indicates
 worker initialization, not routing quality. See the local decision service guide
 for provisioning, resource and deployment boundaries.
+
+Routing records may include `error_field` for rejected Chat fields. Only allowlisted protocol field names are retained; other names are represented as `unknown_field`. Request values and upstream error bodies are not stored in this field. Older records omit it.

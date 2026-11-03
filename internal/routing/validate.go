@@ -2,8 +2,10 @@ package routing
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/zerone-agents/jev-model-router/contracts"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -149,4 +151,27 @@ func ValidateChatSchema(b json.RawMessage) error {
 		return Fail("unsupported_request", "request is outside the supported chat schema")
 	}
 	return nil
+}
+
+// SafeErrorField records only fixed protocol field names, never arbitrary input
+// names or values. Unknown names are deliberately represented generically.
+func SafeErrorField(err error) string {
+	var known *Error
+	if !errors.As(err, &known) || known.Code != "unsupported_request" {
+		return ""
+	}
+	const prefix = "unsupported or invalid chat field: "
+	if !strings.HasPrefix(known.Message, prefix) {
+		return ""
+	}
+	name, e := strconv.Unquote(strings.TrimPrefix(known.Message, prefix))
+	if e != nil {
+		return "unknown_field"
+	}
+	switch name {
+	case "model", "messages", "tools", "stream", "temperature", "top_p", "max_completion_tokens", "stop", "tool_choice", "parallel_tool_calls", "response_format", "stream_options", "max_tokens", "reasoning_effort", "chat_template_kwargs", "frequency_penalty", "presence_penalty", "logit_bias", "logprobs", "top_logprobs", "n", "seed", "user", "service_tier", "store", "metadata", "modalities", "audio", "prediction", "functions", "function_call", "web_search_options", "prompt_cache_key", "safety_identifier":
+		return name
+	default:
+		return "unknown_field"
+	}
 }
