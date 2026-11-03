@@ -23,6 +23,11 @@
           "type": "integer",
           "minimum": 0
         },
+        "healthy_models": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Enabled models whose observed upstream health is healthy; omitted when health is unavailable."
+        },
         "records_degraded": {
           "type": "boolean"
         },

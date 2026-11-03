@@ -233,7 +233,7 @@ Use the existing `decision.put` fields with `base_url: http://laya:8090`,
 `secret_ref: env:DECISION_API_KEY`. Version checks, idempotent replay and credential
 handling are unchanged. No Laya-specific management resource is introduced.
 
-Configuration readiness from `status.get` is not model liveness. Verify
+`status.get.healthy_models` counts enabled models with observed healthy status; it is omitted when health data is unavailable. Unknown and isolated models are not counted. Configuration readiness from `status.get` is not model liveness. Verify
 `decision.get` readback and perform a Chat-format Auto `route.inspect` to exercise
 the configured backend. Native Messages must be verified through `/v1/messages`;
 inspection remains Chat-only. The legacy `jev_choice` reason means typed-decider

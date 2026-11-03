@@ -20,6 +20,7 @@ it("shows readiness separately from actual upstream health", async () => {
         ready: true,
         version: 3,
         enabled_models: 2,
+        healthy_models: 1,
         records_degraded: true,
       })}
       lang="en"
@@ -28,6 +29,7 @@ it("shows readiness separately from actual upstream health", async () => {
   );
   expect(await screen.findByText("Ready")).toBeInTheDocument();
   expect(screen.getByText(/not an upstream health check/)).toBeInTheDocument();
+  expect(screen.getByText("Healthy models").nextElementSibling).toHaveTextContent("1");
   expect(screen.getByText(/degraded/i)).toBeInTheDocument();
 });
 it("empty records do not fabricate metrics", async () => {

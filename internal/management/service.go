@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/zerone-agents/jev-model-router/contracts"
+	"github.com/zerone-agents/jev-model-router/internal/health"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"sort"
 	"strings"
@@ -113,10 +114,21 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 	switch c.CapabilityID {
 	case "status.get":
 		n := 0
+		healthy := 0
+		healthAvailable := s.Health != nil
 		needsDecision := false
 		for _, m := range cfg.Models {
 			if m.Enabled {
 				n++
+				if s.Health != nil {
+					view, warning := s.modelView(ctx, cfg, m)
+					model := view.(modelView)
+					if warning || model.Health == nil {
+						healthAvailable = false
+					} else if model.Health.State == health.Healthy {
+						healthy++
+					}
+				}
 				if len(modelEffortLevels(cfg, m)) > 1 {
 					needsDecision = true
 				}
@@ -124,7 +136,13 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 		}
 		degraded := s.RecordsDegraded != nil && s.RecordsDegraded()
 		result := Success(map[string]any{"version": cfg.Version, "ready": n > 0 && ((n == 1 && !needsDecision) || cfg.Decision.Model != ""), "enabled_models": n, "records_degraded": degraded, "auto_fallback": s.Fallback}, time.Now())
-		if s.Health != nil && s.Health.Service.Warning() {
+		if healthAvailable {
+			var data map[string]any
+			_ = json.Unmarshal(result.Data, &data)
+			data["healthy_models"] = healthy
+			result.Data, _ = json.Marshal(data)
+		}
+		if s.Health != nil && (!healthAvailable || s.Health.Service.Warning()) {
 			result.Warnings = append(result.Warnings, "health_degraded")
 		}
 		if degraded {
