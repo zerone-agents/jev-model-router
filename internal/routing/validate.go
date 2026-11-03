@@ -2,8 +2,10 @@ package routing
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/zerone-agents/jev-model-router/contracts"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -138,15 +140,35 @@ func ValidateChatSchema(b json.RawMessage) error {
 	for _, name := range []string{"max_tokens", "max_completion_tokens"} {
 		if value, present := fields[name]; present {
 			if !contracts.ValidChatOutputLimit(value) {
-				return Fail("invalid_request", name+" must be an integer between 16 and 10000000")
+				return &Error{Code: "invalid_request", Message: name + " must be an integer between 16 and 10000000", Field: name}
 			}
 		}
 	}
 	if contracts.Validate("chat", b) != nil {
 		if field := contracts.ChatInvalidField(b); field != "" {
-			return Fail("unsupported_request", "unsupported or invalid chat field: "+field)
+			name, err := strconv.Unquote(field)
+			if err != nil || name == "" {
+				name = "unknown_field"
+			}
+			return &Error{Code: "unsupported_request", Message: "unsupported or invalid chat field: " + field, Field: name}
 		}
 		return Fail("unsupported_request", "request is outside the supported chat schema")
 	}
 	return nil
+}
+
+// SafeErrorField records only fixed protocol field names, never arbitrary input
+// names or values. Unknown names are deliberately represented generically.
+func SafeErrorField(err error) string {
+	var known *Error
+	if !errors.As(err, &known) || known.Field == "" {
+		return ""
+	}
+	name := known.Field
+	switch name {
+	case "model", "messages", "tools", "stream", "temperature", "top_p", "max_completion_tokens", "stop", "tool_choice", "parallel_tool_calls", "response_format", "stream_options", "max_tokens", "reasoning_effort", "chat_template_kwargs", "frequency_penalty", "presence_penalty", "logit_bias", "logprobs", "top_logprobs", "n", "seed", "user", "service_tier", "store", "metadata", "modalities", "audio", "prediction", "functions", "function_call", "web_search_options", "prompt_cache_key", "safety_identifier":
+		return name
+	default:
+		return "unknown_field"
+	}
 }

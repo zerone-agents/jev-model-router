@@ -2055,6 +2055,11 @@
               "error_code": {
                 "type": "string"
               },
+              "error_field": {
+                "type": "string",
+                "maxLength": 64,
+                "description": "Safe protocol field name for a rejected chat request, or unknown_field when the name cannot be safely retained."
+              },
               "request_summary": {
                 "type": "string",
                 "maxLength": 120

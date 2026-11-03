@@ -175,6 +175,7 @@ type Usage struct {
 	OutputTokens  int64           `json:"output_tokens"`
 }
 type Error struct {
+	Field                     string            `json:"-"`
 	HealthExclusionsTruncated bool              `json:"health_exclusions_truncated,omitempty"`
 	HealthExclusions          []HealthExclusion `json:"health_exclusions,omitempty"`
 	Code                      string            `json:"code"`

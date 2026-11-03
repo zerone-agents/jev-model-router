@@ -389,3 +389,41 @@ func TestRecordSelectionTimeExcludesGeneration(t *testing.T) {
 		})
 	}
 }
+
+func TestRejectedChatFieldRecordedSafely(t *testing.T) {
+	ctx := context.Background()
+	store, err := state.Open(filepath.Join(t.TempDir(), "records.sqlite"), time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	h := handler(testGen{}, Limits{Recorder: &routing.Recorder{Sink: store}})
+	for _, tc := range []struct{ extra, want string }{
+		{`"reasoning_effort":"SECRET_VALUE"`, "reasoning_effort"},
+		{`"max_tokens":1`, "max_tokens"},
+		{`"max_completion_tokens":1`, "max_completion_tokens"},
+		{`"metadata":{"token":"SECRET_VALUE"}`, "metadata"},
+		{`"SECRET_FIELD":"SECRET_VALUE"`, "unknown_field"},
+		{`"SECRET FIELD":"SECRET_VALUE"`, "unknown_field"},
+		{`"":1`, "unknown_field"},
+	} {
+		body := `{"model":"auto","messages":[{"role":"user","content":"hi"}],` + tc.extra + `}`
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(body)))
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("status %d: %s", w.Code, w.Body.String())
+		}
+		page, err := store.ListRecords(ctx, "", 1)
+		if err != nil || len(page.Records) != 1 {
+			t.Fatalf("records: %+v %v", page, err)
+		}
+		record := page.Records[0]
+		if record.ErrorField != tc.want {
+			t.Fatalf("error_field %q, want %q", record.ErrorField, tc.want)
+		}
+		b, _ := json.Marshal(record)
+		if strings.Contains(string(b), "SECRET_") {
+			t.Fatalf("secret persisted: %s", b)
+		}
+	}
+}

@@ -92,6 +92,7 @@ func (r *Request) Finish(err error) {
 	if err != nil {
 		r.record.Outcome = "error"
 		r.record.ErrorCode = routingErrorCode(err)
+		r.record.ErrorField = routing.SafeErrorField(err)
 	}
 	r.service.Recorder.Save(r.record)
 }

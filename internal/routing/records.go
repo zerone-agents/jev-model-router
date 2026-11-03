@@ -23,6 +23,7 @@ type Record struct {
 	RequestSummary  string           `json:"request_summary,omitempty"`
 	Outcome         string           `json:"outcome"`
 	ErrorCode       string           `json:"error_code,omitempty"`
+	ErrorField      string           `json:"error_field,omitempty"`
 	CreatedAt       time.Time        `json:"created_at"`
 }
 type RecordSink interface {
