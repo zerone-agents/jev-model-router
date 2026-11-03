@@ -121,9 +121,9 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 			if m.Enabled {
 				n++
 				if s.Health != nil {
-					view, warning := s.modelView(ctx, cfg, m)
+					view, _ := s.modelView(ctx, cfg, m)
 					model := view.(modelView)
-					if warning || model.Health == nil {
+					if model.Health == nil {
 						healthAvailable = false
 					} else if model.Health.State == health.Healthy {
 						healthy++
