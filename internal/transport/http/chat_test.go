@@ -400,8 +400,11 @@ func TestRejectedChatFieldRecordedSafely(t *testing.T) {
 	h := handler(testGen{}, Limits{Recorder: &routing.Recorder{Sink: store}})
 	for _, tc := range []struct{ extra, want string }{
 		{`"reasoning_effort":"SECRET_VALUE"`, "reasoning_effort"},
+		{`"max_tokens":1`, "max_tokens"},
+		{`"max_completion_tokens":1`, "max_completion_tokens"},
 		{`"metadata":{"token":"SECRET_VALUE"}`, "metadata"},
 		{`"SECRET_FIELD":"SECRET_VALUE"`, "unknown_field"},
+		{`"SECRET FIELD":"SECRET_VALUE"`, "unknown_field"},
 	} {
 		body := `{"model":"auto","messages":[{"role":"user","content":"hi"}],` + tc.extra + `}`
 		w := httptest.NewRecorder()
