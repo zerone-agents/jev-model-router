@@ -33,6 +33,6 @@ The measured test loop took approximately 1.6 seconds per model for 20
 sequential calls on this deployment; this is not a latency benchmark. Separate
 Router HTTP tests with real decision services and stub generation confirmed that
 these examples can select a local target and reject explicit cloud selection.
-They did not validate a real generation provider. Broader and independently
+A further end-to-end Router test used D3 for privacy classification and model selection while a controlled first local generation failed; fallback called only the remaining local fixture and usage reconciled. These tests did not validate a real generation provider. Broader and independently
 curated privacy evaluation is necessary before trusting any model with real
 sensitive data.

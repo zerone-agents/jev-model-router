@@ -314,3 +314,66 @@ func TestPrivacyDecisionFailureAndRejectedInputAccounting(t *testing.T) {
 		t.Fatal("credential reference leaked")
 	}
 }
+
+func TestPrivacyLiveDecisionFallbackAtWire(t *testing.T) {
+	base := os.Getenv("PRIVACY_E2E_URL")
+	if base == "" {
+		t.Skip("PRIVACY_E2E_URL is not set")
+	}
+	token, modelName := os.Getenv("PRIVACY_E2E_KEY"), os.Getenv("PRIVACY_E2E_MODEL")
+	if token == "" || modelName == "" {
+		t.Fatal("missing live configuration")
+	}
+	i := newInstance(t)
+	t.Setenv("PRIVACY_LIVE_TOKEN", token)
+	var localCalls, cloudCalls atomic.Int32
+	local := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if localCalls.Add(1) == 1 {
+			w.WriteHeader(503)
+			w.Write([]byte(`{"error":{"message":"unavailable"}}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"id":"c","object":"chat.completion","created":1,"model":"gpt-4o-mini","choices":[{"index":0,"message":{"role":"assistant","content":"OK"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":1,"total_tokens":4}}`))
+	}))
+	defer local.Close()
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { cloudCalls.Add(1); w.WriteHeader(500) }))
+	defer cloud.Close()
+	i.put("providers.put", map[string]any{"id": "p", "base_url": local.URL + "/v1", "secret_ref": "env:TEST_PROVIDER_KEY"})
+	i.put("providers.put", map[string]any{"id": "cloud-provider", "base_url": cloud.URL + "/v1", "secret_ref": "env:TEST_PROVIDER_KEY"})
+	for _, id := range []string{"a-local", "b-local"} {
+		m := model(id, true)
+		m["location"] = "local"
+		i.put("models.put", m)
+	}
+	remote := model("cloud-model", true)
+	remote["provider_id"] = "cloud-provider"
+	i.put("models.put", remote)
+	i.put("decision.put", map[string]any{"base_url": base, "model": modelName, "secret_ref": "env:PRIVACY_LIVE_TOKEN", "location": "local"})
+	i.put("privacy.put", map[string]any{"enabled": true})
+	code, body := i.request("POST", "/v1/chat/completions", "inference-secret", `{"model":"auto","messages":[{"role":"user","content":"Private password: dummy-password-528"}]}`)
+	if code != 200 || localCalls.Load() != 2 || cloudCalls.Load() != 0 {
+		t.Fatalf("status=%d local=%d cloud=%d body=%s", code, localCalls.Load(), cloudCalls.Load(), body)
+	}
+	records := i.call("records.list", map[string]any{}, 0, "")
+	var page struct {
+		Records []struct {
+			Outcome string `json:"privacy_outcome"`
+			Usage   struct {
+				Invocations int `json:"invocations"`
+			} `json:"decision_usage"`
+			Attempts []struct {
+				Usage struct {
+					Invocations int `json:"invocations"`
+				} `json:"decision_usage"`
+			} `json:"attempts"`
+		} `json:"records"`
+	}
+	if err := json.Unmarshal(records.Data, &page); err != nil || len(page.Records) != 1 {
+		t.Fatalf("records=%s err=%v", records.Data, err)
+	}
+	rec := page.Records[0]
+	if rec.Outcome != "sensitive" || len(rec.Attempts) != 2 || rec.Usage.Invocations != 2 || rec.Attempts[0].Usage.Invocations != 2 || rec.Attempts[1].Usage.Invocations != 0 {
+		t.Fatalf("record=%+v", rec)
+	}
+}
