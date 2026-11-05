@@ -41,13 +41,13 @@ Prefer encrypted managed `api_key` configuration for both `providers.put` (LLM p
 
 Supply exactly one of `api_key` or `secret_ref` over HTTPS (loopback HTTP permits local development and SSH tunnels). Use the version/idempotency workflow for writes and rotation. Responses return an opaque managed reference, never the plaintext key. Preserve the reference on metadata-only replacements. Provider references belong to their original provider; decision references belong to the decision backend. Never exchange references between those owners.
 
-Read back the saved configuration. For LLM providers, inspect masked status and explicitly run `models.test`. For the decision backend, use `route.inspect` with multiple eligible candidates, since a single candidate bypasses Jev. Saving alone does not test connectivity. Immutable encrypted revisions preserve credentials for in-flight requests. Deletion is not emergency revocation. Master-key rotation requires a separate migration; see [deployment and recovery](../../docs/configuration.md#managed-provider-credentials).
+Read back the saved configuration. For LLM providers, inspect masked status and explicitly run `models.test`. For the decision backend, use `route.inspect` with multiple eligible candidates to exercise model selection; privacy-enabled inspection also invokes classification. Saving alone does not test connectivity. Immutable encrypted revisions preserve credentials for in-flight requests. Deletion is not emergency revocation. Master-key rotation requires a separate migration; see [deployment and recovery](../../docs/configuration.md#managed-provider-credentials).
 
 ## Routing boundaries
 
-Edit `prompt` to adjust preferences; the default is one balanced template. `auto` evaluates each request independently. Explicit selection uses an enabled external model ID and still obeys compatibility checks; the upstream decides context capacity. Failures do not trigger fallback or retries.
+Edit `prompt` to adjust preferences; the default is one balanced template. `auto` evaluates each request independently and may retry once with another eligible model after a retryable generation failure. Explicit selection uses an enabled external model ID, still obeys compatibility checks, and is not silently switched.
 
-Jev mode offers no sensitive-data routing guarantee. Conversation text may go to Jev. Images, tool definitions, tool arguments and outputs are excluded; tool IDs, names and result associations remain. Local Laya, privacy session locking, ArbiterOS are future capabilities, not available in this version. Disabling a model affects new requests; it does not revoke an in-flight snapshot.
+With privacy routing disabled, conversation text may go to the configured decision service. The model-selection projection excludes images, tool definitions, tool arguments and outputs; tool IDs, names and result associations remain. Opt-in privacy routing instead classifies the complete current request locally before routing. It does not guarantee classification accuracy or retain a cross-request local lock. ArbiterOS and privacy session locking remain future capabilities. Disabling a model affects new requests; it does not revoke an in-flight snapshot.
 
 
 ## Reasoning controls
@@ -172,7 +172,7 @@ not a prediction guaranteed identical to a later decision. Native Messages
 budgets, output_config and signed history cannot be inspected through this Chat
 contract; verify them through full `/v1/messages` requests instead.
 
-Explicit model IDs never add automatic effort or a Jev call. Auto rejects manual
+Explicit model IDs never add automatic effort or a model-selection call; enabled privacy classification can still invoke the decision service. Auto rejects manual
 effort (Chat reasoning_effort or Messages output_config.effort), disabled thinking
 and fixed thinking budgets with HTTP 400. Use an explicit model for these controls.
 Enabled/adaptive thinking without a fixed budget remains subject to adapter support. A sole model with multiple
@@ -233,3 +233,11 @@ Compose exposes `http://decider:8090` or `http://d3:8090` only on its internal
 network, with matching model aliases and `env:DECISION_API_KEY`. Do not infer
 sensitive-session protection from use of a local decision model. Confirm readiness
 and actual inference separately from a successful configuration write.
+
+## Privacy routing configuration
+
+Discover `privacy.get`, `privacy.put`, `privacy.prompt.get`, and `privacy.prompt.put` before use. Privacy defaults off and requires the decision service to be explicitly configured with `location: local` before enabling. Location is an administrator declaration, not network verification. Writes use the current version and an idempotency key.
+
+Read `decision.get`, declare a verified local decision service using `decision.put`, and read it back. Then use `privacy.put` with `{"enabled":true}` and verify `privacy.get`. Customize the default prompt through `privacy.prompt.put` with `{"text":"..."}` and verify `privacy.prompt.get`. Mark eligible generation models `local` through `models.put`; the router trusts those declarations. If no compatible local model is available, sensitive or uncertain requests fail. Explicit cloud selections are rejected, not replaced. Auto fallback reuses the classification and remains local-only when restricted.
+
+Test with synthetic, non-secret examples using inference and Chat-format `route.inspect`. Inspection performs its own classification and may consume local decision resources. Inspect `records.list` for optional privacy outcome, restriction, duration, failure, and aggregate decision usage. The existing request summary remains stored and may contain sensitive content. Each request is classified independently; if the caller drops prior context, it cannot inherit a local-only lock. Classifiers can produce false negatives, and unsupported or oversized inputs are treated as uncertain. Evaluate the selected model for the intended data before enabling cloud routing; the included [limited evaluation](../../evals/privacy-routing-evaluation.md) documents observed misses.

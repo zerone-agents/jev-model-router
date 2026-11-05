@@ -10,6 +10,12 @@ import (
 )
 
 func ValidateSnapshot(s Snapshot) error {
+	if s.Privacy.Enabled && !validPrivacyPrompt(s.Privacy.Prompt) {
+		return Fail("invalid_request", "invalid privacy prompt")
+	}
+	if s.Privacy.Enabled && (s.Decision.Location != "local" || s.Decision.Model == "" || s.Decision.BaseURL == "") {
+		return Fail("invalid_request", "privacy routing requires a local decision service")
+	}
 	providers := map[string]bool{}
 	models := map[string]bool{}
 	for _, p := range s.Providers {
@@ -171,4 +177,9 @@ func SafeErrorField(err error) string {
 	default:
 		return "unknown_field"
 	}
+}
+
+func validPrivacyPrompt(text string) bool {
+	b, _ := json.Marshal(map[string]string{"text": text})
+	return contracts.Validate("privacy.prompt.put", b) == nil
 }

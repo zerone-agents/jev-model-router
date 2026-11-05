@@ -26,6 +26,51 @@ func (r *Request) Execute(req routing.Request, check func(routing.Target) error,
 		r.cancelBudget = cancel
 		r.ctx = ctx
 	}
+	privacyUsage := &routing.DecisionUsage{Complete: true}
+	privacyChecked := false
+	localOnly := false
+	if r.snapshot == nil {
+		snapshot, err := r.service.Store.Snapshot(r.ctx)
+		if err != nil {
+			return err
+		}
+		r.snapshot = &snapshot
+	}
+	if r.snapshot.Privacy.Enabled {
+		privacyChecked = true
+		start := time.Now()
+		ctx, cancel := routing.WithStageTimeout(r.ctx, r.service.DecisionTimeout)
+		assessment := routing.AssessPrivacy(ctx, *r.snapshot, r.service.Planner.PrivacyClassifier, req.PrivacyInput())
+		cancel()
+		privacyDuration := time.Since(start).Milliseconds()
+		r.record.PrivacyDurationMillis = &privacyDuration
+		*privacyUsage = assessment.Usage
+		if assessment.Failed {
+			r.record.PrivacyFailure = "classification_unavailable"
+		}
+		r.record.PrivacyOutcome = assessment.Outcome
+		localOnly = assessment.Outcome != routing.PrivacyNonSensitive
+		if localOnly {
+			r.record.PrivacyRestriction = "local_only"
+		} else {
+			r.record.PrivacyRestriction = "unrestricted"
+		}
+		r.record.DecisionUsage.Invocations += privacyUsage.Invocations
+		r.record.DecisionUsage.InputTokens += privacyUsage.InputTokens
+		r.record.DecisionUsage.OutputTokens += privacyUsage.OutputTokens
+		r.record.DecisionUsage.Complete = r.record.DecisionUsage.Complete && privacyUsage.Complete
+	}
+	if privacyChecked && (r.parent.Err() != nil || context.Cause(r.ctx) != nil) {
+		err := terminalError(r.ctx, context.Cause(r.ctx))
+		if r.parent.Err() != nil {
+			err = terminalError(r.parent, r.parent.Err())
+		}
+		diag := routing.Diagnose(err)
+		a := AttemptSummary{Index: 1, Stage: "routing", DurationMillis: *r.record.PrivacyDurationMillis, Outcome: "error", ErrorCode: diag.Code, DecisionUsage: privacyUsage}
+		r.record.Attempts = append(r.record.Attempts, a)
+		r.diagnostics = append(r.diagnostics, routing.AttemptDiagnostic{AttemptSummary: a, Diagnostic: &diag})
+		return r.wrap(err)
+	}
 	var excluded []string
 	var retry *routing.RetryContext
 	for index := 1; index <= 2; index++ {
@@ -36,11 +81,17 @@ func (r *Request) Execute(req routing.Request, check func(routing.Target) error,
 			return r.wrap(terminalError(r.ctx, e))
 		}
 		start := time.Now()
-		r.options = routing.PlanOptions{ExcludedModelIDs: excluded, Retry: retry}
+		r.options = routing.PlanOptions{ExcludedModelIDs: excluded, Retry: retry, PrivacyChecked: privacyChecked, LocalOnly: localOnly}
 		r.current = index
 		before := r.record.DecisionMillis
 		plan, err := r.PlanPrepared(req, check, estimate, summary)
 		a := AttemptSummary{DecisionUsage: plan.RecordedDecisionUsage(), Index: index, Stage: "routing", ModelID: plan.ModelID, Path: plan.Path, DecisionMillis: r.record.DecisionMillis - before, Outcome: "error"}
+		if index == 1 {
+			a.DecisionUsage.Invocations += privacyUsage.Invocations
+			a.DecisionUsage.InputTokens += privacyUsage.InputTokens
+			a.DecisionUsage.OutputTokens += privacyUsage.OutputTokens
+			a.DecisionUsage.Complete = a.DecisionUsage.Complete && privacyUsage.Complete
+		}
 		result := AttemptResult{Err: err}
 		if err == nil {
 			a.Stage = "generation"

@@ -66,7 +66,7 @@ func (s *Service) Catalog() []contracts.Capability {
 	return out
 }
 func builtin(id string) bool {
-	return id == "status.get" || strings.HasPrefix(id, "providers.") || strings.HasPrefix(id, "models.") && id != "models.test" || strings.HasPrefix(id, "decision.") || strings.HasPrefix(id, "prompt.")
+	return id == "status.get" || strings.HasPrefix(id, "providers.") || strings.HasPrefix(id, "models.") && id != "models.test" || strings.HasPrefix(id, "decision.") || strings.HasPrefix(id, "prompt.") || strings.HasPrefix(id, "privacy.")
 }
 func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result, error) {
 	s.mu.RLock()
@@ -149,6 +149,10 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 			result.Warnings = append(result.Warnings, "records_degraded")
 		}
 		return result, nil
+	case "privacy.get":
+		return Success(map[string]any{"version": cfg.Version, "enabled": cfg.Privacy.Enabled}, time.Now()), nil
+	case "privacy.prompt.get":
+		return Success(map[string]any{"version": cfg.Version, "text": cfg.Privacy.Prompt}, time.Now()), nil
 	case "prompt.get":
 		return Success(map[string]any{"version": cfg.Version, "text": cfg.Prompt}, time.Now()), nil
 	case "decision.get":

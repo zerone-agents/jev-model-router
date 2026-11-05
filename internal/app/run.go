@@ -136,7 +136,7 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 	service.Health = gate
 	budget := decision.DefaultBudget()
 	budget.MaxBytes = cfg.DecisionMaxBytes
-	planner := &routing.Planner{Health: gate, Decider: decision.New(nil, resolve, budget), PrepareCheck: provider.PrepareCheck}
+	planner := &routing.Planner{Health: gate, Decider: decision.New(nil, resolve, budget), PrivacyClassifier: decision.NewPrivacyClassifier(nil, resolve, budget), PrepareCheck: provider.PrepareCheck}
 	checks := management.Checks{Test: func(ctx context.Context, id string) (management.TestResult, error) {
 		return runtime.test(ctx, id, false)
 	}, Store: store, Planner: planner, Generator: gen, DecisionTimeout: cfg.DecisionTimeout, FirstEventTimeout: cfg.FirstEventTimeout}

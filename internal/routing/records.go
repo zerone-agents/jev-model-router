@@ -10,21 +10,25 @@ import (
 )
 
 type Record struct {
-	EffectiveEffort string           `json:"effective_effort,omitempty"`
-	DecisionUsage   *DecisionUsage   `json:"decision_usage,omitempty"`
-	Attempts        []AttemptSummary `json:"attempts,omitempty"`
-	RequestID       string           `json:"request_id"`
-	ConfigVersion   int64            `json:"config_version,omitempty"`
-	Mode            string           `json:"mode,omitempty"`
-	Path            string           `json:"path,omitempty"`
-	CandidateIDs    []string         `json:"candidate_ids,omitempty"`
-	ModelID         string           `json:"model_id,omitempty"`
-	DecisionMillis  int64            `json:"decision_ms"`
-	RequestSummary  string           `json:"request_summary,omitempty"`
-	Outcome         string           `json:"outcome"`
-	ErrorCode       string           `json:"error_code,omitempty"`
-	ErrorField      string           `json:"error_field,omitempty"`
-	CreatedAt       time.Time        `json:"created_at"`
+	PrivacyOutcome        PrivacyOutcome   `json:"privacy_outcome,omitempty"`
+	PrivacyDurationMillis *int64           `json:"privacy_duration_ms,omitempty"`
+	PrivacyRestriction    string           `json:"privacy_restriction,omitempty"`
+	PrivacyFailure        string           `json:"privacy_failure,omitempty"`
+	EffectiveEffort       string           `json:"effective_effort,omitempty"`
+	DecisionUsage         *DecisionUsage   `json:"decision_usage,omitempty"`
+	Attempts              []AttemptSummary `json:"attempts,omitempty"`
+	RequestID             string           `json:"request_id"`
+	ConfigVersion         int64            `json:"config_version,omitempty"`
+	Mode                  string           `json:"mode,omitempty"`
+	Path                  string           `json:"path,omitempty"`
+	CandidateIDs          []string         `json:"candidate_ids,omitempty"`
+	ModelID               string           `json:"model_id,omitempty"`
+	DecisionMillis        int64            `json:"decision_ms"`
+	RequestSummary        string           `json:"request_summary,omitempty"`
+	Outcome               string           `json:"outcome"`
+	ErrorCode             string           `json:"error_code,omitempty"`
+	ErrorField            string           `json:"error_field,omitempty"`
+	CreatedAt             time.Time        `json:"created_at"`
 }
 type RecordSink interface {
 	Append(context.Context, Record) error

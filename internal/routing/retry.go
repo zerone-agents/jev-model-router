@@ -9,6 +9,8 @@ type RetryContext struct {
 	UpstreamCode   string `json:"upstream_code,omitempty"`
 }
 type PlanOptions struct {
+	PrivacyChecked   bool
+	LocalOnly        bool
 	ExcludedModelIDs []string
 	Retry            *RetryContext
 }

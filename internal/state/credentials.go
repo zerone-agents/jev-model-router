@@ -72,6 +72,7 @@ func (s *Store) prepareCredential(ctx context.Context, tx *sql.Tx, c management.
 	}
 	var input struct {
 		Model     string                   `json:"model"`
+		Location  string                   `json:"location"`
 		Path      string                   `json:"path"`
 		Protocol  routing.ProviderProtocol `json:"protocol"`
 		ID        string                   `json:"id"`
@@ -105,7 +106,7 @@ func (s *Store) prepareCredential(ctx context.Context, tx *sql.Tx, c management.
 		input.SecretRef = "managed:" + revision
 	}
 	if c.CapabilityID == "decision.put" {
-		c.Input, _ = json.Marshal(routing.DecisionConfig{BaseURL: input.BaseURL, Path: input.Path, Model: input.Model, SecretRef: input.SecretRef})
+		c.Input, _ = json.Marshal(routing.DecisionConfig{BaseURL: input.BaseURL, Path: input.Path, Model: input.Model, SecretRef: input.SecretRef, Location: input.Location})
 		return c, nil
 	}
 	c.Input, _ = json.Marshal(routing.Provider{Protocol: input.Protocol, ID: input.ID, BaseURL: input.BaseURL, SecretRef: input.SecretRef})

@@ -59,12 +59,19 @@ type Model struct {
 	Capabilities Capabilities `json:"capabilities"`
 }
 type DecisionConfig struct {
+	Location  string `json:"location,omitempty"`
 	Path      string `json:"path,omitempty"`
 	BaseURL   string `json:"base_url"`
 	Model     string `json:"model"`
 	SecretRef string `json:"secret_ref"`
 }
+type PrivacyConfig struct {
+	Enabled bool   `json:"enabled"`
+	Prompt  string `json:"prompt"`
+}
+
 type Snapshot struct {
+	Privacy   PrivacyConfig  `json:"privacy"`
 	Version   int64          `json:"version"`
 	Providers []Provider     `json:"providers"`
 	Models    []Model        `json:"models"`
@@ -108,6 +115,7 @@ type Request struct {
 	Options           map[string]json.RawMessage
 	Stream            bool
 	raw               json.RawMessage
+	privacyRaw        json.RawMessage
 }
 
 func (r *Request) UnmarshalJSON(b []byte) error {
@@ -232,4 +240,19 @@ type Decision struct {
 }
 type Decider interface {
 	Choose(context.Context, DecisionConfig, DecisionInput) (Decision, error)
+}
+
+// PrivacyInput returns the complete protocol input, not the reduced projection.
+func (r Request) PrivacyInput() json.RawMessage {
+	if r.privacyRaw != nil {
+		return append(json.RawMessage(nil), r.privacyRaw...)
+	}
+	if r.raw != nil {
+		return append(json.RawMessage(nil), r.raw...)
+	}
+	b, _ := json.Marshal(r)
+	return b
+}
+func (r *Request) SetPrivacyInput(raw json.RawMessage) {
+	r.privacyRaw = append(json.RawMessage(nil), raw...)
 }
