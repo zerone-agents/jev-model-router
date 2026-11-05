@@ -675,9 +675,12 @@ export function PrivacyRecords(props: PageProps) {
                 {data.records.map((record) => (
                   <tr key={String(record.request_id)}>
                     <td>
-                      <span className="request-id">
-                        {String(record.request_id)}
-                      </span>
+                      <details>
+                        <summary className="request-id">
+                          {String(record.request_id)}
+                        </summary>
+                        <pre>{JSON.stringify(record, null, 2)}</pre>
+                      </details>
                       <small>{String(record.created_at || "—")}</small>
                     </td>
                     <td>{outcomeLabel(record.privacy_outcome)}</td>

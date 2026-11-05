@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -31,6 +32,9 @@ func TestPrivacyConfigurationRequiresLocalDecision(t *testing.T) {
 	}
 	if snapshot.Privacy.Enabled || snapshot.Privacy.Prompt == "" {
 		t.Fatal("privacy must default disabled with a prompt")
+	}
+	if strings.Count(snapshot.Privacy.Prompt, "Decision: sensitive.") != 2 || strings.Count(snapshot.Privacy.Prompt, "Decision: non_sensitive.") != 1 || !strings.Contains(snapshot.Privacy.Prompt, "private personnel file") {
+		t.Fatalf("default privacy prompt does not contain the selected examples: %q", snapshot.Privacy.Prompt)
 	}
 	version := initial.Version
 	enable := management.Call{CapabilityID: "privacy.put", Input: json.RawMessage(`{"enabled":true}`), ExpectedVersion: &version, IdempotencyKey: "enable"}

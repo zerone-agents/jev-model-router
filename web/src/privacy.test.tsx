@@ -84,5 +84,7 @@ it.each(["en", "zh"] as const)(
     ).toBeInTheDocument();
     expect(screen.getByText("0 ms")).toBeInTheDocument();
     expect(screen.getByText("old")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("one"));
+    expect(screen.getByText(/"privacy_outcome": "uncertain"/)).toBeVisible();
   },
 );
