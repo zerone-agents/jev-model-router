@@ -225,3 +225,22 @@ func TestPrivacyPreservesLongHistoryAndToolInputsExactly(t *testing.T) {
 		})
 	}
 }
+
+func TestPrivacyClassificationRejectsAmbiguousAnswersAndRetainsUsage(t *testing.T) {
+	for _, tc := range []struct{ name, body string }{
+		{"duplicate choice", `{"answers":{"privacy":{"type":"choice","choice":"sensitive","choice":"non_sensitive"}},"usage":{"input_tokens":17,"output_tokens":1}}`},
+		{"duplicate privacy", `{"answers":{"privacy":{"type":"choice","choice":"sensitive"},"privacy":{"type":"choice","choice":"non_sensitive"}},"usage":{"input_tokens":17,"output_tokens":1}}`},
+		{"duplicate answers", `{"answers":{"privacy":{"type":"choice","choice":"sensitive"}},"answers":{"privacy":{"type":"choice","choice":"non_sensitive"}},"usage":{"input_tokens":17,"output_tokens":1}}`},
+		{"invalid choice type", `{"answers":{"privacy":{"type":"choice","choice":42}},"usage":{"input_tokens":17,"output_tokens":1}}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(tc.body)) }))
+			defer server.Close()
+			c := NewPrivacyClassifier(server.Client(), func(string) ([]byte, error) { return []byte("test"), nil }, DefaultBudget())
+			got, err := c.Classify(context.Background(), routing.DecisionConfig{Location: "local", BaseURL: server.URL, Model: "local"}, "classify", json.RawMessage(`{"messages":[{"role":"user","content":"hello"}]}`))
+			if err == nil || got.Outcome != routing.PrivacyUncertain || got.Usage == nil || got.Usage.InputTokens != 17 {
+				t.Fatalf("result=%+v error=%v", got, err)
+			}
+		})
+	}
+}

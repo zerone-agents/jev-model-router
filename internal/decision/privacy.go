@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -49,18 +50,18 @@ func (j *jev) Classify(ctx context.Context, config routing.DecisionConfig, promp
 	if err != nil {
 		return result, decisionIOError(ctx, err)
 	}
+	var usageEnvelope struct{ Usage json.RawMessage }
+	if json.Unmarshal(b, &usageEnvelope) == nil {
+		result.Usage = parseDecisionUsage(usageEnvelope.Usage, config)
+	}
 	var envelope struct {
 		Answers map[string]struct{ Type, Choice string }
-		Usage   json.RawMessage
 	}
 	decodeErr := json.Unmarshal(b, &envelope)
-	if decodeErr == nil {
-		result.Usage = parseDecisionUsage(envelope.Usage, config)
-	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return result, routing.Fail("upstream_error", "privacy classification failed")
 	}
-	if decodeErr != nil {
+	if decodeErr != nil || rejectDuplicateJSONKeys(b) != nil {
 		return result, routing.Fail("invalid_decision", "invalid privacy classification")
 	}
 	a, ok := envelope.Answers["privacy"]
@@ -74,6 +75,53 @@ func (j *jev) Classify(ctx context.Context, config routing.DecisionConfig, promp
 		return result, routing.Fail("invalid_decision", "invalid privacy classification")
 	}
 	return result, nil
+}
+
+// Ambiguous object keys must never turn a conflicting classification into a
+// non-sensitive result. Inspect keys before trusting the decoded answer.
+func rejectDuplicateJSONKeys(raw []byte) error {
+	d := json.NewDecoder(bytes.NewReader(raw))
+	var visit func() error
+	visit = func() error {
+		token, err := d.Token()
+		if err != nil {
+			return err
+		}
+		delim, ok := token.(json.Delim)
+		if !ok {
+			return nil
+		}
+		switch delim {
+		case '{':
+			seen := map[string]bool{}
+			for d.More() {
+				key, err := d.Token()
+				if err != nil {
+					return err
+				}
+				name, ok := key.(string)
+				name = strings.ToLower(name)
+				if !ok || seen[name] {
+					return fmt.Errorf("duplicate or invalid JSON key")
+				}
+				seen[name] = true
+				if err := visit(); err != nil {
+					return err
+				}
+			}
+		case '[':
+			for d.More() {
+				if err := visit(); err != nil {
+					return err
+				}
+			}
+		default:
+			return fmt.Errorf("invalid JSON delimiter")
+		}
+		_, err = d.Token()
+		return err
+	}
+	return visit()
 }
 
 // The currently supported local classifiers accept text only; never fetch media.
