@@ -231,6 +231,8 @@ func TestPrivacyClassificationRejectsAmbiguousAnswersAndRetainsUsage(t *testing.
 		{"duplicate choice", `{"answers":{"privacy":{"type":"choice","choice":"sensitive","choice":"non_sensitive"}},"usage":{"input_tokens":17,"output_tokens":1}}`},
 		{"duplicate privacy", `{"answers":{"privacy":{"type":"choice","choice":"sensitive"},"privacy":{"type":"choice","choice":"non_sensitive"}},"usage":{"input_tokens":17,"output_tokens":1}}`},
 		{"duplicate answers", `{"answers":{"privacy":{"type":"choice","choice":"sensitive"}},"answers":{"privacy":{"type":"choice","choice":"non_sensitive"}},"usage":{"input_tokens":17,"output_tokens":1}}`},
+		{"unicode folded answers", `{"answers":{"privacy":{"type":"choice","choice":"sensitive"}},"anſwers":{"privacy":{"type":"choice","choice":"non_sensitive"}},"usage":{"input_tokens":17,"output_tokens":1}}`},
+		{"unicode folded choice", `{"answers":{"privacy":{"type":"choice","choice":"sensitive","choıce":"non_sensitive","CHOICE":"non_sensitive"}},"usage":{"input_tokens":17,"output_tokens":1}}`},
 		{"invalid choice type", `{"answers":{"privacy":{"type":"choice","choice":42}},"usage":{"input_tokens":17,"output_tokens":1}}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

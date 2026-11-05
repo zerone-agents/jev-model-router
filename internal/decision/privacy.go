@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"unicode"
 
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 )
@@ -100,7 +101,15 @@ func rejectDuplicateJSONKeys(raw []byte) error {
 					return err
 				}
 				name, ok := key.(string)
-				name = strings.ToLower(name)
+				name = strings.Map(func(r rune) rune {
+					for {
+						next := unicode.SimpleFold(r)
+						if next <= r {
+							return next
+						}
+						r = next
+					}
+				}, name)
 				if !ok || seen[name] {
 					return fmt.Errorf("duplicate or invalid JSON key")
 				}
