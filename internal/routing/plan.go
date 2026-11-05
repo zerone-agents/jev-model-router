@@ -19,6 +19,7 @@ type Plan struct {
 	PrivacyDecisionUsage      *DecisionUsage    `json:"privacy_decision_usage,omitempty"`
 	EffectiveEffort           string            `json:"effective_effort,omitempty"`
 	DecisionInvoked           bool              `json:"-"`
+	DecisionFailed            bool              `json:"-"`
 	HealthExclusionsTruncated bool              `json:"health_exclusions_truncated,omitempty"`
 	HealthExclusions          []HealthExclusion `json:"health_exclusions,omitempty"`
 	ConfigVersion             int64             `json:"config_version"`
@@ -284,6 +285,7 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 			models[i] = v.Model
 		}
 		result.DecisionInvoked = true
+		result.DecisionFailed = true
 		d, e := p.Decider.Choose(ctx, s.Decision, DecisionInput{SelectEffort: needsEffortDecision, Retry: options.Retry, Prompt: s.Prompt, Candidates: models, Request: r})
 		result.DecisionUsage = d.Usage
 		if e != nil {
@@ -309,6 +311,7 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 		if !found {
 			return result, Fail("invalid_decision", "unknown selected model")
 		}
+		result.DecisionFailed = false
 	}
 	levels := AutomaticEffortLevels(selected.Model, selected.Provider.EffectiveProtocol())
 	if selectEffort && len(levels) > 0 {

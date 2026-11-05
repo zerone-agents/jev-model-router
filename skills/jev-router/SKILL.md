@@ -136,10 +136,10 @@ Use the returned Router request ID to find its `records.list` entry and inspect 
 `records.list` exposes optional `decision_usage` on each record and attempt.
 `input_tokens` and `output_tokens` sum known decision usage, including failed
 decisions and Auto reselection. `complete=false` means one or more invoked
-decisions lack valid usage; the counts are only a lower bound, not a final cost.
+decisions failed or lack valid usage; the counts are only a lower bound, not a final cost.
 `invocations` counts decision adapter calls, including local failures before
-transmission, and is not a billable request count. Explicit and sole-candidate paths that do not require automatic effort
-selection report zero invocations and complete zero usage. Historical records omit
+transmission, and is not a billable request count. With privacy disabled, explicit and sole-candidate paths that do not require automatic effort
+selection report zero invocations and complete zero usage. When privacy is enabled, these paths can invoke the classifier. Historical records omit
 this object: treat their decision cost as unknown, never zero.
 
 These counts exclude generation usage. Use the actual inference request ID to

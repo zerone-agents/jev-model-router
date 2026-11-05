@@ -61,6 +61,7 @@ func TestPrivacyClassificationInvalidResponsesRemainUncertain(t *testing.T) {
 	}{
 		{"unknown choice", `{"answers":{"privacy":{"type":"choice","choice":"other"}},"usage":{"input_tokens":8,"output_tokens":1}}`, 200},
 		{"missing choice", `{"answers":{}}`, 200},
+		{"partially decoded answers", `{"answers":{"privacy":{"type":"choice","choice":"non_sensitive"},"extra":42},"usage":{"input_tokens":2,"output_tokens":1}}`, 200},
 		{"upstream error", `{"error":{"message":"SECRET"}}`, 500},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -65,6 +65,9 @@ func (r *Request) PlanPrepared(req routing.Request, check func(routing.Target) e
 	start := time.Now()
 	plan, err := r.service.Planner.PlanWithOptions(ctx, snapshot, req, check, estimate, r.options)
 	r.record.DecisionMillis += time.Since(start).Milliseconds()
+	if plan.DecisionInvoked && ctx.Err() != nil {
+		plan.DecisionFailed = true
+	}
 	u := plan.RecordedDecisionUsage()
 	r.record.DecisionUsage.InputTokens += u.InputTokens
 	r.record.DecisionUsage.OutputTokens += u.OutputTokens

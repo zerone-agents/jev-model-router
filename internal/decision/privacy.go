@@ -53,11 +53,15 @@ func (j *jev) Classify(ctx context.Context, config routing.DecisionConfig, promp
 		Answers map[string]struct{ Type, Choice string }
 		Usage   json.RawMessage
 	}
-	if json.Unmarshal(b, &envelope) == nil {
+	decodeErr := json.Unmarshal(b, &envelope)
+	if decodeErr == nil {
 		result.Usage = parseDecisionUsage(envelope.Usage, config)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return result, routing.Fail("upstream_error", "privacy classification failed")
+	}
+	if decodeErr != nil {
+		return result, routing.Fail("invalid_decision", "invalid privacy classification")
 	}
 	a, ok := envelope.Answers["privacy"]
 	if !ok || a.Type != "choice" {
