@@ -176,6 +176,22 @@ func TestPrivacyLiveClassifierEnforcesRouter(t *testing.T) {
 	if calls != 1 {
 		t.Fatalf("generation calls=%d", calls)
 	}
+	snap.Providers[0].Protocol = routing.ProtocolAnthropic
+	messageGen := &privacyMessagesGenerator{}
+	messageHandler := NewHandler(management.New(testStore{snap}, nil), testStore{snap}, &routing.Planner{PrivacyClassifier: classifier}, &routing.Executor{Generator: messageGen}, func(string) (management.Principal, error) { return management.Principal{Role: "inference"}, nil }, Limits{})
+	for _, tc := range []struct {
+		model  string
+		status int
+	}{{"auto", 200}, {"cloud", 403}} {
+		body := `{"model":"` + tc.model + `","max_tokens":1024,"system":"Private password: dummy-password-528","messages":[{"role":"user","content":"hello"}]}`
+		w := messagesCall(messageHandler, body, "router-key")
+		if w.Code != tc.status {
+			t.Fatalf("Messages model=%s status=%d body=%s", tc.model, w.Code, w.Body.String())
+		}
+	}
+	if messageGen.calls != 1 {
+		t.Fatalf("Messages generation calls=%d", messageGen.calls)
+	}
 }
 
 type privacyPlaygroundGenerator struct{ calls int }
