@@ -23,7 +23,7 @@ import { Session } from "./session";
 import { APIError, secureOrigin, type Client } from "./api";
 import { labels, text, type Lang } from "./i18n";
 import { ErrorBox } from "./components";
-import { Overview, Models, Records } from "./pages";
+import { Overview, Models, Records, PrivacyRecords } from "./pages";
 const Playground = lazy(() =>
   import("./playground/Playground").then((m) => ({ default: m.Playground })),
 );
@@ -35,6 +35,8 @@ const required: Record<Page, string> = {
   models: "models.list",
   prompt: "prompt.get",
   records: "records.list",
+  privacyPrompt: "privacy.prompt.get",
+  privacyRecords: "records.list",
 };
 const icons = {
   overview: SquaresFour,
@@ -42,6 +44,8 @@ const icons = {
   models: Stack,
   prompt: SlidersHorizontal,
   records: ListBullets,
+  privacyPrompt: SlidersHorizontal,
+  privacyRecords: ListBullets,
 };
 function initialLang(): Lang {
   try {
@@ -467,6 +471,15 @@ export function App() {
                       )
                     }
                   />
+                ) : page === "privacyPrompt" ? (
+                  <PromptEditor
+                    {...props}
+                    privacyPrompt
+                    canEdit={can("privacy.prompt.put")}
+                    onDirty={setDirty}
+                  />
+                ) : page === "privacyRecords" ? (
+                  <PrivacyRecords {...props} />
                 ) : page === "prompt" ? (
                   <PromptEditor
                     {...props}

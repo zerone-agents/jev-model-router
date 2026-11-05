@@ -16,6 +16,9 @@ func (p Plan) RecordedDecisionUsage() *DecisionUsage {
 		return u
 	}
 	u.Invocations = 1
+	if p.DecisionFailed {
+		u.Complete = false
+	}
 	if p.DecisionUsage == nil || p.DecisionUsage.InputTokens < 0 || p.DecisionUsage.OutputTokens < 0 {
 		u.Complete = false
 		return u

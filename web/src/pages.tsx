@@ -583,3 +583,133 @@ function SearchHighlight({ value, query }: { value: string; query: string }) {
   parts.push(value.slice(position));
   return <>{parts}</>;
 }
+
+export function PrivacyRecords(props: PageProps) {
+  const { lang } = props;
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [refresh, setRefresh] = useState(0);
+  const { data, error, loading } = useRead<{
+    records: Array<Record<string, unknown>>;
+    total: number;
+  }>(
+    props,
+    "records.list",
+    { offset: (page - 1) * pageSize, limit: pageSize },
+    refresh,
+  );
+  useEffect(() => {
+    if (data?.total !== undefined)
+      setPage((value) =>
+        Math.min(value, Math.max(1, Math.ceil(data.total / pageSize))),
+      );
+  }, [data?.total, pageSize]);
+  const outcomeLabel = (value: unknown) =>
+    value === "non_sensitive"
+      ? text(lang, "Non-sensitive", "非敏感")
+      : value === "sensitive"
+        ? text(lang, "Sensitive", "敏感")
+        : value === "uncertain"
+          ? text(lang, "Uncertain", "不确定")
+          : "—";
+  const restrictionLabel = (value: unknown) =>
+    value === "local_only"
+      ? text(lang, "Local only", "仅本地")
+      : value === "unrestricted"
+        ? text(lang, "Unrestricted", "不限制")
+        : "—";
+  const failureLabel = (value: unknown) =>
+    value === "classification_unavailable"
+      ? text(lang, "Classification unavailable", "分类不可用")
+      : "—";
+  return (
+    <>
+      <PageTitle
+        title={text(lang, "Privacy records", "隐私记录")}
+        description={text(
+          lang,
+          "Privacy classification for routing requests.",
+          "查看路由请求的敏感分类结果。",
+        )}
+      >
+        <button
+          onClick={() => {
+            setPage(1);
+            setRefresh((value) => value + 1);
+          }}
+        >
+          {text(lang, "Refresh", "刷新")}
+        </button>
+      </PageTitle>
+      {loading ? (
+        <Loading />
+      ) : error ? (
+        <ErrorBox error={error} lang={lang} />
+      ) : !data?.records.length ? (
+        <Empty
+          title={text(lang, "No routing records yet", "暂无路由记录")}
+          detail={text(
+            lang,
+            "Requests sent through the inference API will appear here.",
+            "通过推理 API 发起请求后，可在这里查看记录。",
+          )}
+        />
+      ) : (
+        <>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  {[
+                    text(lang, "Request / time", "请求 / 时间"),
+                    text(lang, "Classification", "分类结果"),
+                    text(lang, "Duration", "分类耗时"),
+                    text(lang, "Restriction", "路由限制"),
+                    text(lang, "Failure", "失败原因"),
+                  ].map((label) => (
+                    <th key={label}>{label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.records.map((record) => (
+                  <tr key={String(record.request_id)}>
+                    <td>
+                      <details>
+                        <summary className="request-id">
+                          {String(record.request_id)}
+                        </summary>
+                        <pre>{JSON.stringify(record, null, 2)}</pre>
+                      </details>
+                      <small>{String(record.created_at || "—")}</small>
+                    </td>
+                    <td>{outcomeLabel(record.privacy_outcome)}</td>
+                    <td>
+                      {typeof record.privacy_duration_ms === "number"
+                        ? `${record.privacy_duration_ms} ms`
+                        : "—"}
+                    </td>
+                    <td>{restrictionLabel(record.privacy_restriction)}</td>
+                    <td>{failureLabel(record.privacy_failure)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <NumberedPager
+            lang={lang}
+            kind="records"
+            total={data.total}
+            page={page}
+            pageSize={pageSize}
+            onPage={setPage}
+            onPageSize={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        </>
+      )}
+    </>
+  );
+}

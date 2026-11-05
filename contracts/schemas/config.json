@@ -154,6 +154,14 @@
         "pattern": "^(/[A-Za-z0-9_-]+)+/?$",
         "maxLength": 2048,
         "description": "Path appended to base_url; omitted defaults to /v1/systemone. Set the path documented by the third-party Jev-compatible service."
+      },
+      "location": {
+        "type": "string",
+        "enum": [
+          "local",
+          "cloud"
+        ],
+        "description": "Administrator-declared decision service location."
       }
     },
     "required": [
@@ -247,6 +255,14 @@
         "pattern": "^[^\\r\\n\\x00]+$",
         "writeOnly": true,
         "description": "Write-only credential, at most 16384 UTF-8 bytes. Requires a configured encryption key. Never returned; remote CLI submission requires HTTPS (loopback HTTP allowed)."
+      },
+      "location": {
+        "type": "string",
+        "enum": [
+          "local",
+          "cloud"
+        ],
+        "description": "Administrator-declared decision service location."
       }
     },
     "required": [

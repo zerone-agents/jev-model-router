@@ -25,7 +25,7 @@ func (s *Store) Snapshot(ctx context.Context) (routing.Snapshot, error) {
 func snapshot(ctx context.Context, q queryer) (routing.Snapshot, error) {
 	s := routing.Snapshot{Providers: []routing.Provider{}, Models: []routing.Model{}}
 	var d string
-	if e := q.QueryRowContext(ctx, `SELECT version,prompt,decision FROM config_meta WHERE id=1`).Scan(&s.Version, &s.Prompt, &d); e != nil {
+	if e := q.QueryRowContext(ctx, `SELECT version,prompt,decision,privacy_enabled,privacy_prompt FROM config_meta WHERE id=1`).Scan(&s.Version, &s.Prompt, &d, &s.Privacy.Enabled, &s.Privacy.Prompt); e != nil {
 		return s, storageError()
 	}
 	if json.Unmarshal([]byte(d), &s.Decision) != nil {
@@ -233,6 +233,20 @@ func mutate(s *routing.Snapshot, c management.Call) (any, error) {
 		s.Decision = routing.DecisionConfig{}
 		json.Unmarshal(c.Input, &s.Decision)
 		return s.Decision, nil
+	case "privacy.put":
+		var p struct {
+			Enabled bool `json:"enabled"`
+		}
+		json.Unmarshal(c.Input, &p)
+		s.Privacy.Enabled = p.Enabled
+		return p, nil
+	case "privacy.prompt.put":
+		var p struct {
+			Text string `json:"text"`
+		}
+		json.Unmarshal(c.Input, &p)
+		s.Privacy.Prompt = p.Text
+		return p, nil
 	case "prompt.put":
 		var p struct {
 			Text string `json:"text"`
@@ -274,7 +288,7 @@ func save(ctx context.Context, tx *sql.Tx, s routing.Snapshot) error {
 		return storageError()
 	}
 	d, _ := json.Marshal(s.Decision)
-	if _, e := tx.ExecContext(ctx, `UPDATE config_meta SET version=?,prompt=?,decision=? WHERE id=1`, s.Version, s.Prompt, string(d)); e != nil {
+	if _, e := tx.ExecContext(ctx, `UPDATE config_meta SET version=?,prompt=?,decision=?,privacy_enabled=?,privacy_prompt=? WHERE id=1`, s.Version, s.Prompt, string(d), s.Privacy.Enabled, s.Privacy.Prompt); e != nil {
 		return storageError()
 	}
 	return nil

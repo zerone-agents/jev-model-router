@@ -16,6 +16,7 @@ type Props = PageProps & {
   canReadProvider?: boolean;
   canTest?: boolean;
   onDirty: (value: boolean) => void;
+  privacyPrompt?: boolean;
 };
 export function PromptEditor(props: Props) {
   const [refresh, setRefresh] = useState(0);
@@ -29,18 +30,26 @@ export function PromptEditor(props: Props) {
   );
   const state = useRead<{ text: string; version: number }>(
     props,
-    "prompt.get",
+    props.privacyPrompt ? "privacy.prompt.get" : "prompt.get",
     {},
     refresh,
   );
   return (
     <>
       <PageTitle
-        title={text(props.lang, "Routing prompt", "路由提示词")}
+        title={
+          props.privacyPrompt
+            ? text(props.lang, "Privacy prompt", "隐私提示词")
+            : text(props.lang, "Routing prompt", "路由提示词")
+        }
         description={text(
           props.lang,
-          "One balanced template. Your routing preferences.",
-          "一份均衡模板，表达你的选模偏好。",
+          props.privacyPrompt
+            ? "Guide the local privacy classifier."
+            : "One balanced template. Your routing preferences.",
+          props.privacyPrompt
+            ? "调整本地敏感分类提示词。"
+            : "一份均衡模板，表达你的选模偏好。",
         )}
       >
         <button
@@ -123,7 +132,11 @@ function Editor(props: Props & { initial: Snapshot }) {
       ? attempt!
       : new WriteAttempt(
           prepareWrite(
-            snapshot.model ? "models.put" : "prompt.put",
+            snapshot.model
+              ? "models.put"
+              : props.privacyPrompt
+                ? "privacy.prompt.put"
+                : "prompt.put",
             snapshot.model
               ? descriptionInput(snapshot.model, draft)
               : { text: draft },
@@ -169,9 +182,12 @@ function Editor(props: Props & { initial: Snapshot }) {
         ? await client.call<Resource>("models.get", {
             input: { id: snapshot.model.id },
           })
-        : await client.call<{ version: number; text: string }>("prompt.get", {
-            input: {},
-          });
+        : await client.call<{ version: number; text: string }>(
+            props.privacyPrompt ? "privacy.prompt.get" : "prompt.get",
+            {
+              input: {},
+            },
+          );
       if (!alive.current) return;
       const data = result.data;
       const next: Snapshot =

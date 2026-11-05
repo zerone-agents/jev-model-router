@@ -7,15 +7,19 @@ import (
 )
 
 type Planner struct {
-	Health       *HealthGate
-	Decider      Decider
-	Check        func(Target, Request) error
-	PrepareCheck func(Request) func(Target) error
-	Estimate     func(Model, Request) (int64, bool, error)
+	PrivacyClassifier PrivacyClassifier
+	Health            *HealthGate
+	Decider           Decider
+	Check             func(Target, Request) error
+	PrepareCheck      func(Request) func(Target) error
+	Estimate          func(Model, Request) (int64, bool, error)
 }
 type Plan struct {
+	PrivacyOutcome            PrivacyOutcome    `json:"privacy_outcome,omitempty"`
+	PrivacyDecisionUsage      *DecisionUsage    `json:"privacy_decision_usage,omitempty"`
 	EffectiveEffort           string            `json:"effective_effort,omitempty"`
 	DecisionInvoked           bool              `json:"-"`
+	DecisionFailed            bool              `json:"-"`
 	HealthExclusionsTruncated bool              `json:"health_exclusions_truncated,omitempty"`
 	HealthExclusions          []HealthExclusion `json:"health_exclusions,omitempty"`
 	ConfigVersion             int64             `json:"config_version"`
@@ -54,6 +58,10 @@ func (p *Planner) PlanPreparedWithEstimate(ctx context.Context, s Snapshot, r Re
 
 func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Target) error, prepared bool, preparedEstimate PreparedEstimate, options PlanOptions) (result Plan, retErr error) {
 	result = Plan{ConfigVersion: s.Version, CandidateIDs: []string{}, EffectiveEffort: ExplicitEffort(r)}
+	// Every privacy-enabled planning path must pass through the shared gate.
+	if s.Privacy.Enabled && !options.PrivacyChecked {
+		return result, Fail("config_missing", "privacy classification was not performed")
+	}
 	if !prepared {
 		if e := ValidateRequest(r); e != nil {
 			return result, e
@@ -132,6 +140,12 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 			continue
 		}
 		if !m.Enabled {
+			continue
+		}
+		if options.LocalOnly && m.Location != "local" {
+			if r.Model != "auto" {
+				return result, Fail("forbidden", "privacy routing requires a local model")
+			}
 			continue
 		}
 		var provider Provider
@@ -271,6 +285,7 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 			models[i] = v.Model
 		}
 		result.DecisionInvoked = true
+		result.DecisionFailed = true
 		d, e := p.Decider.Choose(ctx, s.Decision, DecisionInput{SelectEffort: needsEffortDecision, Retry: options.Retry, Prompt: s.Prompt, Candidates: models, Request: r})
 		result.DecisionUsage = d.Usage
 		if e != nil {
@@ -296,6 +311,7 @@ func (p *Planner) plan(ctx context.Context, s Snapshot, r Request, check func(Ta
 		if !found {
 			return result, Fail("invalid_decision", "unknown selected model")
 		}
+		result.DecisionFailed = false
 	}
 	levels := AutomaticEffortLevels(selected.Model, selected.Provider.EffectiveProtocol())
 	if selectEffort && len(levels) > 0 {

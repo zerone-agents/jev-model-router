@@ -34,9 +34,25 @@ func (c *Checks) Inspect(ctx context.Context, r routing.Request) (routing.Plan, 
 	if d <= 0 {
 		d = 10 * time.Second
 	}
-	ctx, cancel := context.WithTimeout(ctx, d)
+	options := routing.PlanOptions{}
+	var assessment routing.PrivacyAssessment
+	if s.Privacy.Enabled {
+		classificationCtx, cancel := context.WithTimeout(ctx, d)
+		assessment = routing.AssessPrivacy(classificationCtx, s, c.Planner.PrivacyClassifier, r.PrivacyInput())
+		cancel()
+		if ctx.Err() != nil {
+			return routing.Plan{}, routing.Fail("cancelled", "request cancelled")
+		}
+		options.PrivacyChecked = true
+		options.LocalOnly = assessment.Outcome != routing.PrivacyNonSensitive
+	}
+	planCtx, cancel := context.WithTimeout(ctx, d)
 	defer cancel()
-	plan, err := c.Planner.Plan(ctx, s, r)
+	plan, err := c.Planner.PlanWithOptions(planCtx, s, r, nil, nil, options)
+	if s.Privacy.Enabled {
+		plan.PrivacyOutcome = assessment.Outcome
+		plan.PrivacyDecisionUsage = &assessment.Usage
+	}
 	plan.Close()
 	return plan, err
 }

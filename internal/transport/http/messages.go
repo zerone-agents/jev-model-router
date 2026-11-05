@@ -90,7 +90,9 @@ func (s *server) messages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	started := false
-	finalErr = execution.Execute(prepared.Projection(), prepared.Check, prepared.Estimate, prepared.Summary(), func(attemptCtx context.Context, plan routing.Plan, _ int) inference.AttemptResult {
+	projection := prepared.Projection()
+	projection.SetPrivacyInput(body)
+	finalErr = execution.Execute(projection, prepared.Check, prepared.Estimate, prepared.Summary(), func(attemptCtx context.Context, plan routing.Plan, _ int) inference.AttemptResult {
 		effective, err := prepared.WithEffectiveEffort(plan.EffectiveEffort)
 		if err == nil {
 			err = effective.Check(plan.Target)

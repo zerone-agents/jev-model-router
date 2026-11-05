@@ -1104,6 +1104,13 @@
                   "pattern": "^(/[A-Za-z0-9_-]+)+/?$",
                   "maxLength": 2048,
                   "description": "Path appended to base_url; omitted defaults to /v1/systemone. Set the path documented by the third-party Jev-compatible service."
+                },
+                "location": {
+                  "type": "string",
+                  "enum": [
+                    "local",
+                    "cloud"
+                  ]
                 }
               },
               "required": [
@@ -1171,6 +1178,13 @@
           "pattern": "^[^\\r\\n\\x00]+$",
           "writeOnly": true,
           "description": "Write-only credential, at most 16384 UTF-8 bytes. Requires a configured encryption key. Never returned; remote CLI submission requires HTTPS (loopback HTTP allowed)."
+        },
+        "location": {
+          "type": "string",
+          "enum": [
+            "local",
+            "cloud"
+          ]
         }
       },
       "required": [
@@ -1221,6 +1235,13 @@
               "pattern": "^(/[A-Za-z0-9_-]+)+/?$",
               "maxLength": 2048,
               "description": "Path appended to base_url; omitted defaults to /v1/systemone. Set the path documented by the third-party Jev-compatible service."
+            },
+            "location": {
+              "type": "string",
+              "enum": [
+                "local",
+                "cloud"
+              ]
             }
           },
           "required": [
@@ -1879,6 +1900,41 @@
             "max"
           ],
           "description": "Final outgoing effort for this Chat-format inspection; omitted when no parameter is sent."
+        },
+        "privacy_outcome": {
+          "type": "string",
+          "enum": [
+            "non_sensitive",
+            "sensitive",
+            "uncertain"
+          ]
+        },
+        "privacy_decision_usage": {
+          "type": "object",
+          "properties": {
+            "input_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "output_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "invocations": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "complete": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "input_tokens",
+            "output_tokens",
+            "invocations",
+            "complete"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
@@ -2174,6 +2230,32 @@
               "effective_effort": {
                 "type": "string",
                 "description": "Outgoing effort for this generation attempt; omitted for historical records or when unset."
+              },
+              "privacy_outcome": {
+                "type": "string",
+                "enum": [
+                  "non_sensitive",
+                  "sensitive",
+                  "uncertain"
+                ],
+                "description": "Per-request privacy classification; absent for old records or disabled privacy."
+              },
+              "privacy_duration_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "privacy_restriction": {
+                "type": "string",
+                "enum": [
+                  "local_only",
+                  "unrestricted"
+                ]
+              },
+              "privacy_failure": {
+                "type": "string",
+                "enum": [
+                  "classification_unavailable"
+                ]
               }
             },
             "required": [
@@ -2207,5 +2289,187 @@
       {}
     ],
     "write": false
+  },
+  {
+    "id": "privacy.get",
+    "description": "Read privacy routing state",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "version",
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
+    "side_effects": [],
+    "risk": "L0",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {}
+    ],
+    "write": false
+  },
+  {
+    "id": "privacy.put",
+    "description": "Enable or disable privacy routing",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resource": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "enabled"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "resource"
+      ],
+      "additionalProperties": false
+    },
+    "side_effects": [
+      "config_write"
+    ],
+    "risk": "L2",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {
+        "enabled": false
+      }
+    ],
+    "write": true
+  },
+  {
+    "id": "privacy.prompt.get",
+    "description": "Read privacy classification prompt",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "side_effects": [],
+    "risk": "L0",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {}
+    ],
+    "write": false
+  },
+  {
+    "id": "privacy.prompt.put",
+    "description": "Replace privacy classification prompt",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resource": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16384
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "resource"
+      ],
+      "additionalProperties": false
+    },
+    "side_effects": [
+      "config_write"
+    ],
+    "risk": "L2",
+    "availability": "implemented_when_registered",
+    "examples": [
+      {
+        "text": "Classify the request for sensitivity."
+      }
+    ],
+    "write": true
   }
 ]

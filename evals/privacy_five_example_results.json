@@ -1,0 +1,3573 @@
+{
+  "dataset": "privacy_cases_128.json",
+  "date": "2026-11-05",
+  "runs": [
+    {
+      "model": "d3",
+      "prompt": "five_examples",
+      "elapsed_seconds": 13.586,
+      "overall": {
+        "total": 128,
+        "sensitive": 84,
+        "public": 44,
+        "false_negative": 11,
+        "false_positive": 0,
+        "uncertain": 0,
+        "errors": 0,
+        "error_statuses": {}
+      },
+      "new_holdout": {
+        "total": 68,
+        "sensitive": 44,
+        "public": 24,
+        "false_negative": 6,
+        "false_positive": 0,
+        "uncertain": 0,
+        "errors": 0,
+        "error_statuses": {}
+      },
+      "previously_seen": {
+        "total": 60,
+        "sensitive": 40,
+        "public": 20,
+        "false_negative": 5,
+        "false_positive": 0,
+        "uncertain": 0,
+        "errors": 0,
+        "error_statuses": {}
+      },
+      "cases": [
+        {
+          "id": "en_key",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_password",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_private_key",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_otp",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_health",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_finance",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_salary",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_client",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_strategy",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_address",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_identity",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_legal",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_key",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_password",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_otp",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_health",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_finance",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_salary",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_client",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_strategy",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_address",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_identity",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_legal",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_phone",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_system",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_developer",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_tool_args",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_tool_result",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_old_history",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_old_history",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_long_mid",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_long_end",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_support",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_hr",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_medication",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_insurance",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_company_key",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_tax",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_security",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_bank",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_math",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_math",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_weather",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_weather",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_code",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_code",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_general",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_general",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_recipe",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_recipe",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_history",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_history",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_travel",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_travel",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_book",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_book",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_greeting",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_greeting",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_science",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_science",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s01",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "credentials",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s02",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "credentials",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s03",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "credentials",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s04",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "credentials",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s05",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "medical",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s06",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "medical",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s07",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "medical",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s08",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "medical",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s09",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "financial",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s10",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "financial",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s11",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "financial",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s12",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "financial",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s13",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "identity",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s14",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "identity",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s15",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "identity",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s16",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "identity",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s17",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "business",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s18",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "business",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s19",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "business",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s20",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "business",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s21",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "legal",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s22",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "legal",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s23",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "hr",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s24",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "hr",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s25",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "history",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s26",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "history",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s27",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "system",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s28",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "developer",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s29",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "tool_result",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s30",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "tool_result",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s31",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "tool_args",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s32",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "tool_args",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s33",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "long_start",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s34",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "long_mid",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s35",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "long_end",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s36",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "long_start",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s37",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "mixed",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s38",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "mixed",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s39",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "security",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s40",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "security",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s41",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "injection",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s42",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "injection",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s43",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "no_label",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s44",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "no_label",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "p01",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p02",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p03",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p04",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p05",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p06",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p07",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p08",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p09",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p10",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p11",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p12",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p13",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p14",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p15",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p16",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p17",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p18",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p19",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p20",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p21",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p22",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p23",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p24",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "model": "decider",
+      "prompt": "five_examples",
+      "elapsed_seconds": 14.664,
+      "overall": {
+        "total": 128,
+        "sensitive": 84,
+        "public": 44,
+        "false_negative": 26,
+        "false_positive": 0,
+        "uncertain": 0,
+        "errors": 0,
+        "error_statuses": {}
+      },
+      "new_holdout": {
+        "total": 68,
+        "sensitive": 44,
+        "public": 24,
+        "false_negative": 17,
+        "false_positive": 0,
+        "uncertain": 0,
+        "errors": 0,
+        "error_statuses": {}
+      },
+      "previously_seen": {
+        "total": 60,
+        "sensitive": 40,
+        "public": 20,
+        "false_negative": 9,
+        "false_positive": 0,
+        "uncertain": 0,
+        "errors": 0,
+        "error_statuses": {}
+      },
+      "cases": [
+        {
+          "id": "en_key",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_password",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_private_key",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_otp",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_health",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_finance",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_salary",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_client",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_strategy",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_address",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_identity",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_legal",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_key",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_password",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_otp",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_health",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_finance",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_salary",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_client",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_strategy",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_address",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_identity",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_legal",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_phone",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_system",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_developer",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_tool_args",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_tool_result",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_old_history",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_old_history",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_long_mid",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_long_end",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_support",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_hr",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_medication",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_insurance",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_company_key",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_tax",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_security",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_bank",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_math",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_math",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_weather",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_weather",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_code",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_code",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_general",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_general",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_recipe",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_recipe",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_history",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_history",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_travel",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_travel",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_book",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_book",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_greeting",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_greeting",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_science",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_science",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s01",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "credentials",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s02",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "credentials",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s03",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "credentials",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s04",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "credentials",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s05",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "medical",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s06",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "medical",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s07",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "medical",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s08",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "medical",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s09",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "financial",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s10",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "financial",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s11",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "financial",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s12",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "financial",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s13",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "identity",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s14",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "identity",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s15",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "identity",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s16",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "identity",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s17",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "business",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s18",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "business",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s19",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "business",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s20",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "business",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s21",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "legal",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s22",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "legal",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s23",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "hr",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s24",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "hr",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s25",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "history",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s26",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "history",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s27",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "system",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s28",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "developer",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s29",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "tool_result",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s30",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "tool_result",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s31",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "tool_args",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s32",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "tool_args",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s33",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "long_start",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s34",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "long_mid",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s35",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "long_end",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s36",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "long_start",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s37",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "mixed",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s38",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "mixed",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s39",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "security",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s40",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "security",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s41",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "injection",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s42",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "injection",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s43",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "no_label",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s44",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "no_label",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p01",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p02",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p03",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p04",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p05",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p06",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p07",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p08",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p09",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p10",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p11",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p12",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p13",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p14",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p15",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p16",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p17",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p18",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p19",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p20",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p21",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p22",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p23",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p24",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "model": "laya",
+      "prompt": "five_examples",
+      "elapsed_seconds": 30.145,
+      "overall": {
+        "total": 128,
+        "sensitive": 84,
+        "public": 44,
+        "false_negative": 43,
+        "false_positive": 3,
+        "uncertain": 5,
+        "errors": 0,
+        "error_statuses": {}
+      },
+      "new_holdout": {
+        "total": 68,
+        "sensitive": 44,
+        "public": 24,
+        "false_negative": 22,
+        "false_positive": 3,
+        "uncertain": 3,
+        "errors": 0,
+        "error_statuses": {}
+      },
+      "previously_seen": {
+        "total": 60,
+        "sensitive": 40,
+        "public": 20,
+        "false_negative": 21,
+        "false_positive": 0,
+        "uncertain": 2,
+        "errors": 0,
+        "error_statuses": {}
+      },
+      "cases": [
+        {
+          "id": "en_key",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_password",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_private_key",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_otp",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_health",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_finance",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_salary",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_client",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_strategy",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_address",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_identity",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_legal",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_key",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "uncertain",
+          "status": 200
+        },
+        {
+          "id": "zh_password",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_otp",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_health",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_finance",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_salary",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_client",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_strategy",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_address",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_identity",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_legal",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_phone",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_system",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_developer",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_tool_args",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_tool_result",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "uncertain",
+          "status": 200
+        },
+        {
+          "id": "en_old_history",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_old_history",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_long_mid",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_long_end",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_support",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_hr",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_medication",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_insurance",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_company_key",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_tax",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_security",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_bank",
+          "split": "previously_seen",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_math",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_math",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_weather",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_weather",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_code",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_code",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_general",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_general",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_recipe",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_recipe",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_history",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_history",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_travel",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_travel",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_book",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_book",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_greeting",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_greeting",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "en_science",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "en",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "zh_science",
+          "split": "previously_seen",
+          "label": "public",
+          "language": "zh",
+          "category": "previous",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s01",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "credentials",
+          "outcome": "uncertain",
+          "status": 200
+        },
+        {
+          "id": "s02",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "credentials",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s03",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "credentials",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s04",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "credentials",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s05",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "medical",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s06",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "medical",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s07",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "medical",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s08",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "medical",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s09",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "financial",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s10",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "financial",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s11",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "financial",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s12",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "financial",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s13",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "identity",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s14",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "identity",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s15",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "identity",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s16",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "identity",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s17",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "business",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s18",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "business",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s19",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "business",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s20",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "business",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s21",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "legal",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s22",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "legal",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s23",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "hr",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s24",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "hr",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s25",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "history",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s26",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "history",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s27",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "system",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s28",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "developer",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s29",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "tool_result",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s30",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "tool_result",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s31",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "tool_args",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s32",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "tool_args",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s33",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "long_start",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s34",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "long_mid",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s35",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "long_end",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s36",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "long_start",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s37",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "mixed",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s38",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "mixed",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "s39",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "security",
+          "outcome": "uncertain",
+          "status": 200
+        },
+        {
+          "id": "s40",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "security",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s41",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "injection",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s42",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "injection",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "s43",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "en",
+          "category": "no_label",
+          "outcome": "uncertain",
+          "status": 200
+        },
+        {
+          "id": "s44",
+          "split": "new_holdout",
+          "label": "sensitive",
+          "language": "zh",
+          "category": "no_label",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p01",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p02",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p03",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p04",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p05",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p06",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p07",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p08",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p09",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "p10",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "p11",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p12",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p13",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p14",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p15",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p16",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p17",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p18",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p19",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p20",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p21",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p22",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "sensitive",
+          "status": 200
+        },
+        {
+          "id": "p23",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "en",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        },
+        {
+          "id": "p24",
+          "split": "new_holdout",
+          "label": "public",
+          "language": "zh",
+          "category": "public",
+          "outcome": "non_sensitive",
+          "status": 200
+        }
+      ]
+    }
+  ]
+}

@@ -88,7 +88,7 @@ func TestDecisionUsagePersistence(t *testing.T) {
 			if mode == "missing" {
 				known--
 			}
-			if u == nil || u.Invocations != calls || u.InputTokens != int64(12*known) || u.OutputTokens != int64(3*known) || u.Complete != (mode != "missing") {
+			if u == nil || u.Invocations != calls || u.InputTokens != int64(12*known) || u.OutputTokens != int64(3*known) || u.Complete != (mode != "missing" && mode != "failed") {
 				t.Fatalf("usage: %+v", u)
 			}
 			var input, output int64
