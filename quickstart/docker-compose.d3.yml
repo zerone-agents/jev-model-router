@@ -10,6 +10,7 @@ services:
       DECISION_DEVICE: ${DECISION_DEVICE:-cpu}
       DECISION_MODEL_ALIAS: ${DECISION_MODEL_ALIAS:-d3}
       DECISION_CONTEXT_TOKENS: ${DECISION_CONTEXT_TOKENS:-8192}
+      D3_VARIANT: ${D3_VARIANT:-nano}
     volumes:
       - d3_models:/models:ro
     read_only: true
@@ -21,7 +22,9 @@ services:
   d3-provision:
     image: ${D3_IMAGE:-zeroneai/jev-model-router-d3:latest}
     profiles: [provision]
-    command: [python, -m, decision_common.provision, --manifest, /app/model-manifest.json, --destination, /models]
+    command: [python, -m, decision_common.provision, --destination, /models]
+    environment:
+      D3_VARIANT: ${D3_VARIANT:-nano}
     volumes:
       - d3_models:/models
     read_only: true

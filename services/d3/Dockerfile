@@ -11,7 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev &
 WORKDIR /app
 COPY --from=build /app/.venv /app/.venv
 COPY services/d3/model-manifest.json /app/model-manifest.json
-ENV PATH="/app/.venv/bin:$PATH" DECISION_BACKEND=d3 DECISION_MANIFEST=/app/model-manifest.json DECISION_MODEL_DIR=/models/current HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 USE_TF=0 PYTHONDONTWRITEBYTECODE=1 XDG_CACHE_HOME=/tmp/cache HF_HOME=/tmp/hf HF_MODULES_CACHE=/tmp/hf-modules TRITON_CACHE_DIR=/tmp/triton
+COPY services/d3/manifests /app/d3-manifests
+ENV PATH="/app/.venv/bin:$PATH" DECISION_BACKEND=d3 DECISION_MANIFEST=/app/model-manifest.json D3_MANIFEST_DIR=/app/d3-manifests DECISION_MODEL_DIR=/models/current HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 USE_TF=0 PYTHONDONTWRITEBYTECODE=1 XDG_CACHE_HOME=/tmp/cache HF_HOME=/tmp/hf HF_MODULES_CACHE=/tmp/hf-modules TRITON_CACHE_DIR=/tmp/triton
 USER 10001:10001
 EXPOSE 8090
 HEALTHCHECK --interval=10s --timeout=3s --start-period=120s CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health/ready', timeout=2)"

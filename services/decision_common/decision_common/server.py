@@ -8,6 +8,7 @@ from .app import create_app
 from .artifacts import verify_snapshot
 from .backend import DecisionBackend
 from .worker import Supervisor
+from .variants import selected_manifest
 
 
 @dataclass(frozen=True)
@@ -39,8 +40,8 @@ def read_settings():
     deadline = float(os.environ.get('DECISION_WORKER_TIMEOUT_SECONDS', '60'))
     if not token or device not in ('cpu', 'cuda') or not 1 <= threads <= 64 or not 1 <= context <= 32768 or not 0 < deadline < float('inf'):
         raise ValueError('Invalid decision service settings')
-    manifest = json.loads(Path(os.environ['DECISION_MANIFEST']).read_text())
-    expected_model = {'decider': 'Mapika/decider-2b', 'd3': 'vllm-sr/d3-nano'}[kind]
+    manifest_path, expected_model = selected_manifest(kind)
+    manifest = json.loads(manifest_path.read_text())
     if manifest.get('model') != expected_model:
         raise ValueError('Manifest does not match the decision backend')
     alias = os.environ.get('DECISION_MODEL_ALIAS', kind)
@@ -55,10 +56,12 @@ class Runtime:
         os.environ['HF_HUB_OFFLINE'] = '1'
         os.environ['TRANSFORMERS_OFFLINE'] = '1'
         os.environ['USE_TF'] = '0'
-        manifest = json.loads(Path(os.environ['DECISION_MANIFEST']).read_text())
-        if manifest['model_revision'] != settings.revision:
+        manifest_path, expected_model = selected_manifest(settings.kind)
+        manifest = json.loads(manifest_path.read_text())
+        if manifest['model_revision'] != settings.revision or manifest.get('model') != expected_model:
             raise ValueError('Model revision changed')
-        verify_snapshot(settings.model_dir, manifest)
+        snapshot = str(Path(settings.model_dir).resolve(strict=True))
+        verify_snapshot(snapshot, manifest)
         import torch
         torch.set_num_threads(settings.threads)
         if settings.device == 'cuda' and not torch.cuda.is_available():
@@ -68,10 +71,10 @@ class Runtime:
             prepare_cpu_kernels()
         if settings.kind == 'decider':
             from decider.infer import Decider
-            model = Decider(settings.model_dir, device=settings.device, use_graphs=False)
+            model = Decider(snapshot, device=settings.device, use_graphs=False)
         else:
             from transformers import AutoModel
-            model = AutoModel.from_pretrained(settings.model_dir, trust_remote_code=True,
+            model = AutoModel.from_pretrained(snapshot, trust_remote_code=True,
                 local_files_only=True, dtype='auto').to(settings.device).eval()
         self.backend = DecisionBackend(model, settings.kind, settings.alias, settings.context)
         smoke = {'model': settings.alias, 'state': 'hello', 'questions': {'q': {

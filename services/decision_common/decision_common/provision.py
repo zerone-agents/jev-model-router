@@ -11,6 +11,7 @@ import shutil
 import tempfile
 import urllib.request
 import uuid
+from .variants import selected_manifest
 
 
 class ArtifactError(Exception):
@@ -112,15 +113,15 @@ def provision(destination, manifest, allowed_model, download=_download):
 
 def main():
     parser = argparse.ArgumentParser(description='Provision pinned decision-model artifacts.')
-    parser.add_argument('--manifest', required=True)
+    parser.add_argument('--manifest')
     parser.add_argument('--destination', required=True)
     parser.add_argument('--offline-source')
     args = parser.parse_args()
-    manifest = json.loads(Path(args.manifest).read_text())
     kind = os.environ.get('DECISION_BACKEND')
-    allowed = {'decider': 'Mapika/decider-2b', 'd3': 'vllm-sr/d3-nano'}.get(kind)
-    if allowed is None:
-        raise ArtifactError('Unsupported decision backend')
+    manifest_path, allowed = selected_manifest(kind, args.manifest)
+    manifest = json.loads(manifest_path.read_text())
+    if args.manifest and json.loads(Path(args.manifest).read_text()) != manifest:
+        raise ArtifactError('Manifest does not match selected model')
     if args.offline_source:
         source = Path(args.offline_source)
         verify(source, manifest)
