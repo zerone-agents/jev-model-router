@@ -397,7 +397,7 @@ func TestRejectedChatFieldRecordedSafely(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	h := handler(testGen{}, Limits{Recorder: &routing.Recorder{Sink: store}})
+	h := handler(testGen{}, Limits{Recorder: &routing.Recorder{Sink: store, Timeout: 5 * time.Second}})
 	for _, tc := range []struct{ extra, want string }{
 		{`"reasoning_effort":"SECRET_VALUE"`, "reasoning_effort"},
 		{`"max_tokens":1`, "max_tokens"},
@@ -418,6 +418,9 @@ func TestRejectedChatFieldRecordedSafely(t *testing.T) {
 			t.Fatalf("records: %+v %v", page, err)
 		}
 		record := page.Records[0]
+		if record.RequestID != w.Header().Get("X-Request-ID") {
+			t.Fatalf("record request ID %q, want %q", record.RequestID, w.Header().Get("X-Request-ID"))
+		}
 		if record.ErrorField != tc.want {
 			t.Fatalf("error_field %q, want %q", record.ErrorField, tc.want)
 		}
