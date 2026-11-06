@@ -33,7 +33,7 @@ class SnapshotPinningTests(unittest.TestCase):
             transformers = types.SimpleNamespace(AutoModel=types.SimpleNamespace(from_pretrained=load))
             with patch.dict(os.environ, {'DECISION_MANIFEST':str(manifest)}, clear=True), patch.dict(sys.modules, {'torch':torch, 'transformers':transformers}), patch.object(server, 'verify_snapshot', verify), patch.object(server, 'DecisionBackend', return_value=lambda _: None):
                 server.Runtime(settings)
-            self.assertEqual(seen, [('verify', str(first)), ('load', str(first))])
+            self.assertEqual(seen, [('verify', str(first.resolve())), ('load', str(first.resolve()))])
 
     def test_rejects_configured_variant_when_manifest_model_differs(self):
         with tempfile.TemporaryDirectory() as temp:
