@@ -136,4 +136,4 @@ docker compose -f docker-compose.yml -f docker-compose.laya.yml -f docker-compos
 
 ## 可选：Decider 与 D3 本地决策
 
-Decider 2B 和 D3 nano 使用独立服务、镜像和模型卷，通过现有 Router 决策配置接入。权重预置、CPU/GPU 配置、服务别名和 CLI 操作见[本地决策服务说明](../services/decision_common/README.md)。使用预发布镜像前请确认镜像可用，也可使用构建覆盖文件。
+Decider 2B 和 D3 使用独立服务、镜像和模型卷，通过现有 Router 决策配置接入。通过 `D3_VARIANT` 选择模型尺寸，默认为 `nano`。权重预置、CPU/GPU 配置、服务别名和 CLI 操作见[本地决策服务说明](../services/decision_common/README.md)。使用预发布镜像前请确认镜像可用，也可使用构建覆盖文件。

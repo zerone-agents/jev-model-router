@@ -7,6 +7,45 @@ from decision_common.provision import ArtifactError, provision, verify
 
 
 class ProvisionTests(unittest.TestCase):
+    def test_cli_accepts_legacy_manifest_without_environment(self):
+        import json
+        import os
+        import subprocess
+        import sys
+
+        data = b'legacy'
+        for kind, model in [('d3', 'vllm-sr/d3-nano'), ('decider', 'Mapika/decider-2b')]:
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temp:
+                manifest = {'model': model, 'model_revision': 'a' * 40,
+                            'artifacts': [{'path': 'model', 'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()}]}
+                root = Path(temp)
+                source = root / 'source'
+                source.mkdir()
+                (source / 'model').write_bytes(data)
+                manifest_path = root / 'manifest.json'
+                manifest_path.write_text(json.dumps(manifest))
+                env = dict(os.environ, DECISION_BACKEND=kind)
+                env.pop('DECISION_MANIFEST', None)
+                env.pop('D3_MANIFEST_DIR', None)
+                env.pop('D3_VARIANT', None)
+                result = subprocess.run([sys.executable, '-m', 'decision_common.provision', '--manifest', str(manifest_path), '--destination', str(root / 'models'), '--offline-source', str(source)], env=env, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                verify(root / 'models' / 'current', manifest)
+
+    def test_switch_back_reuses_verified_snapshot_without_network(self):
+        def manifest(data, model, revision):
+            return {'model': model, 'model_revision': revision * 40,
+                    'artifacts': [{'path':'model', 'size':len(data), 'sha256':hashlib.sha256(data).hexdigest()}]}
+        first = manifest(b'nano', 'example/nano', 'a')
+        second = manifest(b'mini', 'example/mini', 'b')
+        with tempfile.TemporaryDirectory() as temp:
+            current = provision(temp, first, first['model'], lambda url, path: path.write_bytes(b'nano'))
+            old = current.resolve()
+            provision(temp, second, second['model'], lambda url, path: path.write_bytes(b'mini'))
+            self.assertNotEqual(current.resolve(), old)
+            provision(temp, first, first['model'], lambda url, path: self.fail('unexpected download'))
+            self.assertEqual(current.resolve(), old)
+
     def test_failed_download_preserves_current_and_cached_use_is_offline(self):
         payload = b'first'
         def manifest(data, revision):

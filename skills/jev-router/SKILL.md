@@ -101,6 +101,8 @@ Playground makes real decision/generation calls and can incur charges. Discover 
 
 ### Third-party Jev-compatible endpoints
 
+For local D3 deployments and model-size switching, follow the [decision service guide](../../services/decision_common/README.md#d3-model-variants): select `D3_VARIANT` (default `nano`), provision its verified snapshot, then recreate the service. Configure the Router using the existing `decision.put` capability; the service does not download weights during inference.
+
 Discover `decision.put` before configuring a third-party Jev-compatible service. Set `base_url`, `path` and `model` from that service's API documentation; no third-party provider is special-cased. The optional `path` defaults to the official `/v1/systemone`. Supported services must accept Bearer authentication and native Jev `state` / `questions` requests, returning Choice answers. Verify compatibility rather than assuming any decision API is interchangeable.
 
 Prefer write-only `api_key`, following the credential-handling rules above; external `env:` or `file:` references remain supported. Preserve `path` on replacements unless intentionally resetting it to the official default. Use `route.inspect` with multiple eligible candidates to verify the decision backend; one candidate bypasses Jev. Never put a real key in documentation or committed examples.

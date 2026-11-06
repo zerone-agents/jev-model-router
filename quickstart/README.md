@@ -150,8 +150,8 @@ prepopulation, worker timeouts, head-budget rejection and verified platform scop
 
 ## Optional Decider and D3 decisions
 
-Independent Decider 2B and D3 nano services use the existing Router decision
+Independent Decider 2B and D3 services use the existing Router decision
 configuration. Each has a separate Compose file, image and model volume. See the
 [local decision service guide](../services/decision_common/README.md) for explicit
-weight provisioning, CPU/GPU settings, service aliases and CLI setup. Check the
+weight provisioning, CPU/GPU settings, service aliases and CLI setup. Set `D3_VARIANT` to select a D3 size; `nano` is the default. Check the
 availability of a released image before using it, or use the build override.
