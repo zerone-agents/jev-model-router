@@ -81,6 +81,6 @@ Stable tags `decider-vMAJOR.MINOR.PATCH` and `d3-vMAJOR.MINOR.PATCH` trigger
 separate image workflows. Configure `DOCKERHUB_DECIDER_IMAGE` and
 `DOCKERHUB_D3_IMAGE`; optional Huawei mirrors use `REGISTRY_DECIDER_IMAGE` and
 `REGISTRY_D3_IMAGE` under the existing `REGISTRY_HOST`. Existing registry login
-secrets are reused. Pull requests validate and build without publishing. Releases
-require native amd64 and arm64 validation and publish Docker-format manifest
-lists. GPU support requires NVIDIA Container Toolkit on the target host.
+secrets are reused. D3 validation is performed locally; D3 release tags build
+and publish native amd64 and arm64 images with Docker-format manifest lists.
+Decider pull requests retain their existing validation workflow. GPU support requires NVIDIA Container Toolkit on the target host.
