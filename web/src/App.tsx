@@ -149,7 +149,7 @@ export function App() {
         (e.status === 401 || e.status === 403) &&
         session.client === client
       ) {
-        if (e.status === 401) disconnect();
+        if (e.status === 401 && e.code === "unauthorized") disconnect();
         else setLogoutFailed(false);
         setError(e);
       }

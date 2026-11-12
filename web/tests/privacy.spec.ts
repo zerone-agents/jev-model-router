@@ -110,3 +110,49 @@ for (const width of [1440, 390]) {
     });
   });
 }
+
+test("background HTML 401 preserves a privacy prompt draft; verified unauthorized expires the session", async ({
+  page,
+}) => {
+  let failure: "none" | "html" | "unauthorized" = "none";
+  await page.route("**/admin/v1/call/privacy.get", (route) => {
+    if (failure === "html")
+      return route.fulfill({
+        status: 401,
+        contentType: "text/html",
+        body: "<html>Proxy authentication failed</html>",
+      });
+    if (failure === "unauthorized")
+      return route.fulfill({
+        status: 401,
+        json: { ok: false, error: { code: "unauthorized" }, meta: {} },
+      });
+    return route.fulfill({
+      json: { ok: true, data: { enabled: true }, meta: {} },
+    });
+  });
+  await page.goto("/dashboard/");
+  await page.getByLabel("Settings credential").fill("ui-test-settings");
+  await page.getByRole("button", { name: "Connect to instance" }).click();
+  await page
+    .getByRole("button", { name: "Privacy prompt", exact: true })
+    .click();
+  const draft = page.getByLabel("Prompt content");
+  await draft.fill("Unsaved privacy draft survives proxy errors");
+  failure = "html";
+  const htmlResponse = page.waitForResponse(
+    (r) => r.url().endsWith("/privacy.get") && r.status() === 401,
+  );
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await htmlResponse;
+  await expect(
+    page.getByRole("button", { name: "Privacy prompt", exact: true }),
+  ).toHaveCount(0);
+  await expect(draft).toHaveValue(
+    "Unsaved privacy draft survives proxy errors",
+  );
+  await expect(page.getByLabel("Settings credential")).toHaveCount(0);
+  failure = "unauthorized";
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.getByLabel("Settings credential")).toBeVisible();
+});
