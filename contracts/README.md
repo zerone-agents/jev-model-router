@@ -261,3 +261,14 @@ Routing records may include `error_field` for rejected Chat fields. Only allowli
 Privacy routing configuration defaults to disabled. `privacy.get`/`privacy.put` manage enablement and `privacy.prompt.get`/`privacy.prompt.put` manage the classification prompt through the standard versioned Settings contract. Enabling requires an explicitly `local` decision service; location is administrator-declared rather than inferred from an address.
 
 Each request is independently classified using its complete supported input. Sensitive and uncertain requests may use only declared local generation models; explicit cloud selection fails and Auto fallback remains local. Unsupported or oversized inputs and classification failures become uncertain. `route.inspect` performs its own classification and returns `privacy_outcome` and `privacy_decision_usage` when enabled. Records retain the existing request summary and can expose bounded privacy outcome, duration, restriction and failure metadata. Classification usage contributes once to the first attempt and the record total; an invoked adapter failure is incomplete, including a failure before network transmission. Explicit and single-candidate requests can therefore incur a decision invocation. Model classification is probabilistic and does not guarantee detection or continuity between requests.
+
+
+### Privacy record queries
+
+Use `records.list` with `{"privacy_only":true}` to retrieve only records with
+privacy outcome, duration, restriction or failure metadata. Filtering happens
+before pagination and counting, so `total`, offsets and cursors refer to the
+same subset. Omit the flag or use `false` to retain the full routing history.
+Historical privacy records remain queryable when privacy routing is disabled.
+The dashboard shows Privacy prompt and Privacy records only when
+`privacy.get.enabled` is true, and formats record times in the browser timezone.

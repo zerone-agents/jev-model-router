@@ -237,3 +237,48 @@ func TestRecordEffortPersistsAcrossReopen(t *testing.T) {
 		}
 	}
 }
+
+func TestPrivacyRecordsFilterBeforePagination(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(filepath.Join(t.TempDir(), "db"), time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	zero := int64(0)
+	records := []routing.Record{
+		{RequestID: "ordinary"},
+		{RequestID: "classified", PrivacyOutcome: routing.PrivacyNonSensitive},
+		{RequestID: "ordinary-between"},
+		{RequestID: "failure", PrivacyFailure: "classification_unavailable"},
+		{RequestID: "restricted", PrivacyRestriction: "local_only"},
+		{RequestID: "zero-duration", PrivacyDurationMillis: &zero},
+		{RequestID: "ordinary-latest"},
+	}
+	for _, r := range records {
+		r.CreatedAt = time.Now()
+		if err := s.Append(ctx, r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	first, err := s.ListPrivacyRecords(ctx, "", 2)
+	if err != nil || first.Total != 4 || len(first.Records) != 2 || first.Records[0].RequestID != "zero-duration" || first.Records[1].RequestID != "restricted" || first.NextCursor == "" {
+		t.Fatalf("first %+v %v", first, err)
+	}
+	next, err := s.ListPrivacyRecords(ctx, first.NextCursor, 2)
+	if err != nil || next.Total != 4 || len(next.Records) != 2 || next.Records[0].RequestID != "failure" || next.Records[1].RequestID != "classified" || next.NextCursor != "" {
+		t.Fatalf("next %+v %v", next, err)
+	}
+	offset, err := s.ListPrivacyRecords(ctx, "", 2, 2)
+	if err != nil || offset.Total != 4 || len(offset.Records) != 2 || offset.Records[0].RequestID != "failure" {
+		t.Fatalf("offset %+v %v", offset, err)
+	}
+	empty, err := s.ListPrivacyRecords(ctx, "", 2, 99)
+	if err != nil || empty.Total != 4 || len(empty.Records) != 0 {
+		t.Fatalf("empty %+v %v", empty, err)
+	}
+	all, err := s.ListRecords(ctx, "", 20)
+	if err != nil || all.Total != len(records) {
+		t.Fatalf("all %+v %v", all, err)
+	}
+}

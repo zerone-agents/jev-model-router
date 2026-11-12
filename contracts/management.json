@@ -2048,6 +2048,10 @@
     "input_schema": {
       "type": "object",
       "properties": {
+        "privacy_only": {
+          "type": "boolean",
+          "description": "Return only records with privacy classification metadata or restrictions, including classification failures. Filtering precedes pagination and total counting; omitted or false returns all routing records."
+        },
         "cursor": {
           "type": "string",
           "minLength": 0,

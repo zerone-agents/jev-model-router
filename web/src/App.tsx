@@ -183,6 +183,53 @@ export function App() {
     id === "playground"
       ? session.capabilities.some((c) => !!c.call?.protocol?.playground)
       : session.capabilities.some((c) => c.id === id);
+  const hasPrivacy = can("privacy.get");
+  const [privacy, setPrivacy] = useState<{
+    client: Client;
+    enabled: boolean;
+  }>();
+  useEffect(() => {
+    if (!client || !hasPrivacy) return;
+    let active = true;
+    let pending = false;
+    const controller = new AbortController();
+    const refresh = async () => {
+      if (pending || document.visibilityState === "hidden") return;
+      pending = true;
+      try {
+        const result = await client.call<{ enabled: boolean }>(
+          "privacy.get",
+          { input: {} },
+          AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
+        );
+        if (active)
+          setPrivacy({ client, enabled: result.data.enabled === true });
+      } catch (e) {
+        if (active) {
+          setPrivacy({ client, enabled: false });
+          onError(e);
+        }
+      } finally {
+        pending = false;
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 15000);
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      active = false;
+      controller.abort();
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [client, hasPrivacy, onError]);
+  const privacyEnabled =
+    hasPrivacy && privacy?.client === client && privacy?.enabled === true;
+  // Gate navigation, keeping an open editor mounted to preserve unsaved drafts.
+  const visible = (p: Page) =>
+    (p !== "privacyPrompt" && p !== "privacyRecords") || privacyEnabled;
   const nav = (
     <>
       <a
@@ -200,7 +247,7 @@ export function App() {
       </a>
       <div className="nav-caption">{text(lang, "WORKSPACE", "工作区")}</div>
       <nav>
-        {(Object.keys(labels.en) as Page[]).map((p) => {
+        {(Object.keys(labels.en) as Page[]).filter(visible).map((p) => {
           const Icon = icons[p];
           return (
             <button

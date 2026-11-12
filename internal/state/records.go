@@ -74,6 +74,16 @@ func (s *Store) ConfigureRecordLimit(ctx context.Context, max int) error {
 	return nil
 }
 func (s *Store) ListRecords(ctx context.Context, cursor string, limit int, offsets ...int) (RecordPage, error) {
+	return s.listRecords(ctx, cursor, limit, false, offsets...)
+}
+
+// ListPrivacyRecords filters before counting and pagination, including failed
+// classifications and restriction-only records.
+func (s *Store) ListPrivacyRecords(ctx context.Context, cursor string, limit int, offsets ...int) (RecordPage, error) {
+	return s.listRecords(ctx, cursor, limit, true, offsets...)
+}
+
+func (s *Store) listRecords(ctx context.Context, cursor string, limit int, privacyOnly bool, offsets ...int) (RecordPage, error) {
 	out := RecordPage{Records: []routing.Record{}}
 	if limit == 0 {
 		limit = 50
@@ -104,10 +114,19 @@ func (s *Store) ListRecords(ctx context.Context, cursor string, limit int, offse
 		return out, storageError()
 	}
 	defer tx.Rollback()
-	if e = tx.QueryRowContext(ctx, `SELECT total FROM routing_record_count WHERE id=1`).Scan(&out.Total); e != nil {
+	filter := ""
+	countQuery := `SELECT total FROM routing_record_count WHERE id=1`
+	if privacyOnly {
+		filter = ` AND (COALESCE(json_extract(body,'$.privacy_outcome'),'') != ''
+ OR json_extract(body,'$.privacy_duration_ms') IS NOT NULL
+ OR COALESCE(json_extract(body,'$.privacy_restriction'),'') != ''
+ OR COALESCE(json_extract(body,'$.privacy_failure'),'') != '')`
+		countQuery = `SELECT COUNT(*) FROM routing_records WHERE 1=1` + filter
+	}
+	if e = tx.QueryRowContext(ctx, countQuery).Scan(&out.Total); e != nil {
 		return out, storageError()
 	}
-	rows, e := tx.QueryContext(ctx, `SELECT sequence,body FROM routing_records WHERE sequence<? ORDER BY sequence DESC LIMIT ? OFFSET ?`, before, limit+1, offset)
+	rows, e := tx.QueryContext(ctx, `SELECT sequence,body FROM routing_records WHERE sequence<?`+filter+` ORDER BY sequence DESC LIMIT ? OFFSET ?`, before, limit+1, offset)
 	if e != nil {
 		return out, storageError()
 	}
