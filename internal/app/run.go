@@ -144,14 +144,19 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 	service.RecordsDegraded = recorder.Degraded
 	service.Register("records.list", func(ctx context.Context, _ string, call management.Call) (management.Result, error) {
 		var in struct {
-			Cursor string
-			Limit  int
-			Offset int
+			Cursor      string
+			Limit       int
+			Offset      int
+			PrivacyOnly bool `json:"privacy_only"`
 		}
 		if err := json.Unmarshal(call.Input, &in); err != nil {
 			return management.Result{}, routing.Fail("invalid_request", "invalid record pagination")
 		}
-		page, e := store.ListRecords(ctx, in.Cursor, in.Limit, in.Offset)
+		list := store.ListRecords
+		if in.PrivacyOnly {
+			list = store.ListPrivacyRecords
+		}
+		page, e := list(ctx, in.Cursor, in.Limit, in.Offset)
 		if e != nil {
 			return management.Result{}, e
 		}

@@ -9,7 +9,7 @@ import {
   type PageProps,
 } from "./components";
 import { HealthBadge, type ModelHealth } from "./health";
-import { text } from "./i18n";
+import { text, type Lang } from "./i18n";
 export type Model = {
   automatic_effort_levels?: string[];
   health?: ModelHealth;
@@ -397,8 +397,7 @@ export function PromptRead(props: PageProps) {
     </>
   );
 }
-export function Records(props: PageProps) {
-  const { lang } = props;
+function recordTimeFormatter(lang: Lang) {
   const dateFormatter = new Intl.DateTimeFormat(
     lang === "zh" ? "zh-CN" : "en-US",
     {
@@ -412,11 +411,15 @@ export function Records(props: PageProps) {
       timeZoneName: "shortOffset",
     },
   );
-  const formatTime = (value: unknown) => {
+  return (value: unknown) => {
     if (typeof value !== "string" || !value) return "—";
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date);
   };
+}
+export function Records(props: PageProps) {
+  const { lang } = props;
+  const formatTime = recordTimeFormatter(lang);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [refresh, setRefresh] = useState(0);
@@ -586,6 +589,7 @@ function SearchHighlight({ value, query }: { value: string; query: string }) {
 
 export function PrivacyRecords(props: PageProps) {
   const { lang } = props;
+  const formatTime = recordTimeFormatter(lang);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [refresh, setRefresh] = useState(0);
@@ -595,7 +599,7 @@ export function PrivacyRecords(props: PageProps) {
   }>(
     props,
     "records.list",
-    { offset: (page - 1) * pageSize, limit: pageSize },
+    { offset: (page - 1) * pageSize, limit: pageSize, privacy_only: true },
     refresh,
   );
   useEffect(() => {
@@ -647,11 +651,11 @@ export function PrivacyRecords(props: PageProps) {
         <ErrorBox error={error} lang={lang} />
       ) : !data?.records.length ? (
         <Empty
-          title={text(lang, "No routing records yet", "暂无路由记录")}
+          title={text(lang, "No privacy records yet", "暂无隐私记录")}
           detail={text(
             lang,
-            "Requests sent through the inference API will appear here.",
-            "通过推理 API 发起请求后，可在这里查看记录。",
+            "Requests evaluated by privacy routing will appear here.",
+            "经过隐私路由评估的请求会显示在这里。",
           )}
         />
       ) : (
@@ -681,7 +685,9 @@ export function PrivacyRecords(props: PageProps) {
                         </summary>
                         <pre>{JSON.stringify(record, null, 2)}</pre>
                       </details>
-                      <small>{String(record.created_at || "—")}</small>
+                      <small title={String(record.created_at ?? "")}>
+                        {formatTime(record.created_at)}
+                      </small>
                     </td>
                     <td>{outcomeLabel(record.privacy_outcome)}</td>
                     <td>
