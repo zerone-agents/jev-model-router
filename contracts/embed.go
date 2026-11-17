@@ -66,6 +66,16 @@ func initSchemas() {
 	protocol["playground"] = PlaygroundPolicy()
 	encodedProtocol, _ := json.Marshal(protocol)
 	for i := range caps {
+		if caps[i].ID == "route.inspect" {
+			var schema map[string]any
+			if err := json.Unmarshal(caps[i].InputSchema, &schema); err != nil {
+				panic(err)
+			}
+			props := schema["properties"].(map[string]any)
+			messages := props["messages"].(map[string]any)
+			messages["maxItems"] = ChatMessageLimit()
+			caps[i].InputSchema, _ = json.Marshal(schema)
+		}
 		schema := callSchema(caps[i].Write)
 		props := schema["properties"].(map[string]any)
 		props["input"] = caps[i].InputSchema

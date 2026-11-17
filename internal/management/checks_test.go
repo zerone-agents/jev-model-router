@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/zerone-agents/jev-model-router/contracts"
 	"github.com/zerone-agents/jev-model-router/internal/management"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"strings"
@@ -156,5 +157,23 @@ func TestChatInspectionEffectiveEffort(t *testing.T) {
 	b, _ := json.Marshal(result.Data)
 	if !strings.Contains(string(b), `"effective_effort":"high"`) || g.calls != 0 {
 		t.Fatalf("%s calls=%d", b, g.calls)
+	}
+}
+
+func TestInspectionMessageCountLimit(t *testing.T) {
+	checks, store, _ := checksFixture()
+	store.s.Models[0].Enabled = true
+	service := management.New(store, nil)
+	checks.Register(service)
+	limit := contracts.ChatMessageLimit()
+	for _, n := range []int{2049, limit, limit + 1} {
+		input := json.RawMessage(`{"model":"auto","messages":[` + strings.TrimSuffix(strings.Repeat(`{"role":"user","content":"x"},`, n), ",") + `]}`)
+		result, err := service.Execute(context.Background(), "settings", management.Call{CapabilityID: "route.inspect", Input: input})
+		if n <= limit && (err != nil || !result.OK) {
+			t.Fatalf("%d rejected: %+v %v", n, result, err)
+		}
+		if n > limit && (err == nil || !strings.Contains(err.Error(), fmt.Sprintf("%d items; maximum is %d", n, limit))) {
+			t.Fatalf("%d incorrect error: %v", n, err)
+		}
 	}
 }
