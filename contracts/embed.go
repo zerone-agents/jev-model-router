@@ -66,6 +66,16 @@ func initSchemas() {
 	protocol["playground"] = PlaygroundPolicy()
 	encodedProtocol, _ := json.Marshal(protocol)
 	for i := range caps {
+		if caps[i].ID == "route.inspect" {
+			var schema map[string]any
+			if err := json.Unmarshal(caps[i].InputSchema, &schema); err != nil {
+				panic(err)
+			}
+			props := schema["properties"].(map[string]any)
+			messages := props["messages"].(map[string]any)
+			messages["maxItems"] = ChatMessageLimit()
+			caps[i].InputSchema, _ = json.Marshal(schema)
+		}
 		schema := callSchema(caps[i].Write)
 		props := schema["properties"].(map[string]any)
 		props["input"] = caps[i].InputSchema
@@ -242,4 +252,23 @@ func ValidChatOutputLimit(input json.RawMessage) bool {
 	once.Do(initSchemas)
 	value, err := Decode(input)
 	return err == nil && validators["chat"].Properties["max_completion_tokens"].Validate(value) == nil
+}
+
+// ChatMessageLimit is read from the same embedded schema used for validation.
+func ChatMessageLimit() int {
+	b, err := files.ReadFile("schemas/chat.json")
+	if err != nil {
+		panic(err)
+	}
+	var schema struct {
+		Properties struct {
+			Messages struct {
+				MaxItems int `json:"maxItems"`
+			} `json:"messages"`
+		} `json:"properties"`
+	}
+	if err := json.Unmarshal(b, &schema); err != nil || schema.Properties.Messages.MaxItems <= 0 {
+		panic("invalid chat message limit")
+	}
+	return schema.Properties.Messages.MaxItems
 }
