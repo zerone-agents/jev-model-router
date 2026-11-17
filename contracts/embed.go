@@ -243,3 +243,22 @@ func ValidChatOutputLimit(input json.RawMessage) bool {
 	value, err := Decode(input)
 	return err == nil && validators["chat"].Properties["max_completion_tokens"].Validate(value) == nil
 }
+
+// ChatMessageLimit is read from the same embedded schema used for validation.
+func ChatMessageLimit() int {
+	b, err := files.ReadFile("schemas/chat.json")
+	if err != nil {
+		panic(err)
+	}
+	var schema struct {
+		Properties struct {
+			Messages struct {
+				MaxItems int `json:"maxItems"`
+			} `json:"messages"`
+		} `json:"properties"`
+	}
+	if err := json.Unmarshal(b, &schema); err != nil || schema.Properties.Messages.MaxItems <= 0 {
+		panic("invalid chat message limit")
+	}
+	return schema.Properties.Messages.MaxItems
+}

@@ -3,6 +3,7 @@ package routing
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/zerone-agents/jev-model-router/contracts"
 	"net/url"
 	"strconv"
@@ -148,6 +149,12 @@ func ValidateChatSchema(b json.RawMessage) error {
 			if !contracts.ValidChatOutputLimit(value) {
 				return &Error{Code: "invalid_request", Message: name + " must be an integer between 16 and 10000000", Field: name}
 			}
+		}
+	}
+	if raw, ok := fields["messages"]; ok {
+		var messages []json.RawMessage
+		if json.Unmarshal(raw, &messages) == nil && len(messages) > contracts.ChatMessageLimit() {
+			return &Error{Code: "invalid_request", Message: fmt.Sprintf("messages contains %d items; maximum is %d", len(messages), contracts.ChatMessageLimit()), Field: "messages"}
 		}
 	}
 	if contracts.Validate("chat", b) != nil {

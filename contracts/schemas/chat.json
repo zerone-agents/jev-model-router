@@ -172,7 +172,7 @@
           }
         ]
       },
-      "maxItems": 2048,
+      "maxItems": 10000,
       "minItems": 1
     },
     "tools": {
