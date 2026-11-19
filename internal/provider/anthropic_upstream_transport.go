@@ -7,6 +7,8 @@ import (
 	"io"
 	"time"
 
+	"github.com/zerone-agents/jev-model-router/internal/failurecapture"
+
 	bifrost "github.com/maximhq/bifrost/core"
 	"github.com/maximhq/bifrost/core/providers/anthropic"
 	"github.com/maximhq/bifrost/core/schemas"
@@ -19,6 +21,7 @@ func nativePassthroughRequest(req *schemas.BifrostChatRequest) *schemas.BifrostP
 	return nativeMessagesTransportRequest(req.Model, req.RawRequestBody)
 }
 func completeNativePassthrough(ctx *schemas.BifrostContext, client *bifrost.Bifrost, req *schemas.BifrostChatRequest, tools, signatureOptional bool) (routing.Completion, error) {
+	record := failurecapture.BeginNative(ctx, req.RawRequestBody)
 	out, fail := client.Passthrough(ctx, schemas.Anthropic, nativePassthroughRequest(req))
 	if fail != nil {
 		return routing.Completion{}, anthropicUpstreamError(ctx, fail)
@@ -26,6 +29,8 @@ func completeNativePassthrough(ctx *schemas.BifrostContext, client *bifrost.Bifr
 	if out == nil {
 		return routing.Completion{}, nativeError(502)
 	}
+	failurecapture.RecordSDKHeaders(record, out.Headers)
+	record(out.StatusCode, "application/json", out.Body, "complete")
 	if out.StatusCode != 200 {
 		err := nativeReportedError(out.StatusCode, out.Body, upstreamSecret(ctx)).(*routing.UpstreamError)
 		addUpstreamRequestID(ctx, err.Details, out.Headers)
@@ -49,6 +54,7 @@ type nativeTransportReader struct {
 	ctx     *schemas.BifrostContext
 	ch      chan *schemas.BifrostStreamChunk
 	pending []byte
+	record  func(int, string, []byte, string)
 }
 
 func (r *nativeTransportReader) fill() error {
@@ -71,10 +77,17 @@ func (r *nativeTransportReader) fill() error {
 				return nativeError(502)
 			}
 			if out.StatusCode != 200 {
+				if r.record != nil {
+					failurecapture.RecordSDKHeaders(r.record, out.Headers)
+					r.record(out.StatusCode, "application/json", out.Body, "complete")
+				}
 				err := nativeReportedError(out.StatusCode, out.Body, upstreamSecret(r.ctx)).(*routing.UpstreamError)
 				addUpstreamRequestID(r.ctx, err.Details, out.Headers)
 				err.RetryAfter = retryAfterHeaders(out.Headers)
 				return err
+			}
+			if r.record != nil {
+				failurecapture.RecordSDKHeaders(r.record, out.Headers)
 			}
 			r.pending = out.Body
 		}
@@ -90,6 +103,7 @@ func (r *nativeTransportReader) Read(p []byte) (int, error) {
 	return n, nil
 }
 func streamNativePassthrough(ctx *schemas.BifrostContext, client *bifrost.Bifrost, req *schemas.BifrostChatRequest, tools, signatureOptional bool, release func()) (routing.EventStream, error) {
+	record := failurecapture.BeginNative(ctx, req.RawRequestBody)
 	raw, fail := client.PassthroughStream(ctx, schemas.Anthropic, nativePassthroughRequest(req))
 	if fail != nil {
 		err := anthropicUpstreamError(ctx, fail)
@@ -118,7 +132,7 @@ func streamNativePassthrough(ctx *schemas.BifrostContext, client *bifrost.Bifros
 			state.mu.Unlock()
 			send(&schemas.BifrostStreamChunk{BifrostError: &schemas.BifrostError{IsBifrostError: true}})
 		}
-		transport := &nativeTransportReader{ctx: ctx, ch: raw}
+		transport := &nativeTransportReader{ctx: ctx, ch: raw, record: record}
 		// Passthrough filters Content-Encoding without decoding SSE. Detect
 		// gzip by its magic bytes (which cannot start a valid SSE field).
 		buffered := bufio.NewReader(&nativeBoundedReader{reader: transport, remaining: nativeStreamLimit + 1})
@@ -137,7 +151,8 @@ func streamNativePassthrough(ctx *schemas.BifrostContext, client *bifrost.Bifros
 			defer zip.Close()
 			source = zip
 		}
-		reader := newAnthropicUpstreamReader(source, state)
+		defer record(0, "", nil, "closed")
+		reader := newAnthropicUpstreamReader(failurecapture.ObserveNativeStream(source, record), state)
 		for {
 			_, body, err := reader.ReadEvent()
 			if err == io.EOF {

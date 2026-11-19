@@ -272,3 +272,27 @@ same subset. Omit the flag or use `false` to retain the full routing history.
 Historical privacy records remain queryable when privacy routing is disabled.
 The dashboard shows Privacy prompt and Privacy records only when
 `privacy.get.enabled` is true, and formats record times in the browser timezone.
+
+## Failure capture
+
+Terminal failures from authenticated Chat, Messages and Playground generation
+may have a retained diagnostic capture. Successful requests discard captured
+evidence, including earlier failed attempts when fallback succeeds.
+`records.list` reports `failure_capture_available` while capture evidence
+remains available.
+
+`records.capture.list`, `records.capture.get` and `records.capture.delete`
+require Settings Bearer authentication. List is independent of routing records.
+Its optional `before` cursor uses the preceding response's `next_before`;
+zero denotes the first page in input and the end in output. Get and delete
+accept a Request ID. Get returns `not_found` for missing or expired captures.
+Delete is retry-safe and does not alter configuration versions or ordinary
+routing records. Capture HTTP responses use `Cache-Control: no-store`.
+
+Capture evidence identifies downstream protocol and response status, plus
+upstream exchanges by stage and attempt. SDK exchanges can indicate
+`request_unavailable` or `response_unavailable` when evidence is missing.
+A body projection marks omissions and truncation separately. SSE preserves
+safe event order, the last complete frame projection and terminal evidence
+even when earlier frames exceed the retention budget. Free text and
+credentials are excluded from capture body projections.

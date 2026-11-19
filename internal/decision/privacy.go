@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/zerone-agents/jev-model-router/internal/failurecapture"
 	"io"
 	"net/http"
 	"strings"
@@ -42,7 +43,7 @@ func (j *jev) Classify(ctx context.Context, config routing.DecisionConfig, promp
 	}
 	req.Header.Set("Authorization", "Bearer "+string(key))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := j.client.Do(req)
+	resp, err := failurecapture.DoJSON(j.client, req, "privacy", body)
 	if err != nil {
 		return result, decisionIOError(ctx, err)
 	}

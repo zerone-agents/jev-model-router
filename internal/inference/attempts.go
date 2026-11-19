@@ -3,6 +3,7 @@ package inference
 import (
 	"context"
 	"errors"
+	"github.com/zerone-agents/jev-model-router/internal/failurecapture"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"time"
 )
@@ -97,7 +98,7 @@ func (r *Request) Execute(req routing.Request, check func(routing.Target) error,
 			a.Stage = "generation"
 			a.EffectiveEffort = plan.EffectiveEffort
 			r.record.EffectiveEffort = plan.EffectiveEffort
-			result = run(r.ctx, plan, index)
+			result = run(failurecapture.WithAttempt(r.ctx, index), plan, index)
 		}
 		plan.Close()
 		result.Err = terminalError(r.ctx, result.Err)

@@ -53,25 +53,32 @@ func (p *playgroundHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{"enabled": p.limits.Enabled, "limits": p.limits, "timeout_seconds": int(p.limits.Timeout / time.Second), "quota": q})
 		return
 	}
+	w, r, finishCapture := beginFailureCapture(w, r, p.inference.Store)
+	var finalErr error
+	defer func() { finishCapture(finalErr) }()
+	fail := func(err error) {
+		finalErr = err
+		playgroundError(w, err)
+	}
 	if !p.limits.Enabled {
-		playgroundError(w, routing.Fail("playground_unavailable", "playground is disabled"))
+		fail(routing.Fail("playground_unavailable", "playground is disabled"))
 		return
 	}
 	req, e := p.parse(w, r)
 	if e != nil {
-		playgroundError(w, e)
+		fail(e)
 		return
 	}
 	lease, e := p.admission.Acquire(r.Context(), id)
 	if e != nil {
-		playgroundError(w, e)
+		fail(e)
 		return
 	}
 	defer lease.Release()
 	ctx, cancel := context.WithTimeoutCause(r.Context(), p.limits.Timeout, routing.ErrRequestBudgetExhausted)
 	defer cancel()
 	execution := p.inference.Begin(ctx, w.Header().Get("X-Request-ID"))
-	finalErr := routing.Fail("internal_error", "playground execution interrupted")
+	finalErr = routing.Fail("internal_error", "playground execution interrupted")
 	defer func() { execution.Finish(finalErr) }()
 	send := func(name string, value any) error {
 		return writeWithinRequest(execution.Context(), w, 0, func() error { return sendPlaygroundEvent(w, name, value) })
