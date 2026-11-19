@@ -49,10 +49,11 @@ func messagesPrincipal(r *http.Request, auth func(string) (management.Principal,
 	return p, nil
 }
 func (s *server) messages(w http.ResponseWriter, r *http.Request) {
+	w, r, finishCapture := beginFailureCapture(w, r, s.store)
 	id := w.Header().Get("X-Request-ID")
 	execution := s.inference.Begin(r.Context(), id)
 	var finalErr error
-	defer func() { execution.Finish(finalErr) }()
+	defer func() { execution.Finish(finalErr); finishCapture(finalErr) }()
 	fail := func(err error) { finalErr = err; writeMessagesError(w, err, id) }
 	if r.Header.Get("anthropic-version") != "2023-06-01" || len(r.Header.Values("anthropic-version")) != 1 {
 		fail(routing.Fail("invalid_request", "anthropic-version must be 2023-06-01"))

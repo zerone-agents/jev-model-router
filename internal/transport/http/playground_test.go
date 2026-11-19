@@ -42,6 +42,17 @@ func (g *pgGenerator) Stream(ctx context.Context, _ routing.Target, r routing.Re
 	}
 	return onceStream(), nil
 }
+
+type playgroundCaptureStore struct {
+	testStore
+	*state.Store
+}
+
+// Snapshot uses the fixture configuration while capture uses SQLite.
+func (s playgroundCaptureStore) Snapshot(ctx context.Context) (routing.Snapshot, error) {
+	return s.testStore.Snapshot(ctx)
+}
+
 func pgFixture(t *testing.T, l playground.Limits, g *pgGenerator) (http.Handler, string, string, *playground.Service) {
 	sh, auth := sessionHTTPFixture(t, "")
 	token, info := sessionLogin(t, auth, "")
@@ -51,7 +62,7 @@ func pgFixture(t *testing.T, l playground.Limits, g *pgGenerator) (http.Handler,
 	}
 	t.Cleanup(func() { st.Close() })
 	svc := playground.NewService(st, l, time.Now)
-	h := NewPlaygroundHandler(sh, svc, &inference.Service{Store: testStore{snapshot()}, Planner: &routing.Planner{}, DecisionTimeout: time.Second}, &routing.Executor{Generator: g}, l)
+	h := NewPlaygroundHandler(sh, svc, &inference.Service{Store: playgroundCaptureStore{testStore{snapshot()}, st}, Planner: &routing.Planner{}, DecisionTimeout: time.Second}, &routing.Executor{Generator: g}, l)
 	return h, token, info.CSRFToken, svc
 }
 func TestPlaygroundAdmissionBeforeUpstream(t *testing.T) {
@@ -306,6 +317,14 @@ func TestPlaygroundFailureRetainsSelectedModel(t *testing.T) {
 			if !strings.Contains(body, "upstream_quota") || !strings.Contains(body, `"upstream_status":429`) || !strings.Contains(body, `"stage":"generation"`) || strings.Contains(body, "SECRET") || strings.Count(body, "event: error") != 1 || strings.Contains(body, "event: done") {
 				t.Fatal(body)
 			}
+			store := h.(*playgroundHTTP).inference.Store.(playgroundCaptureStore)
+			capture, err := store.GetFailureCapture(req.Context(), w.Header().Get("X-Request-ID"))
+			if err != nil || !strings.Contains(string(capture.Evidence), `"event":"error"`) ||
+				!strings.Contains(string(capture.Evidence), `"event":"route"`) ||
+				strings.Contains(string(capture.Evidence), "SECRET") {
+				t.Fatalf("unexpected Playground capture: %s (%v)", capture.Evidence, err)
+			}
+
 			if late && !strings.Contains(body, "partial") {
 				t.Fatal(body)
 			}
@@ -345,5 +364,18 @@ func TestPlaygroundJevFailureHasRoutingDiagnostics(t *testing.T) {
 	body := w.Body.String()
 	if g.calls.Load() != 0 || !strings.Contains(body, `"stage":"routing"`) || !strings.Contains(body, `"upstream_status":429`) || !strings.Contains(body, `"upstream_code":"insufficient_quota"`) || !strings.Contains(body, w.Header().Get("X-Request-ID")) || strings.Contains(body, "SECRET") || strings.Contains(body, "event: route") {
 		t.Fatal(body)
+	}
+}
+
+func TestPlaygroundSuccessDoesNotPersistCapture(t *testing.T) {
+	h, token, csrf, _ := pgFixture(t, playground.DefaultLimits(), &pgGenerator{t: t})
+	w := sessionRequest(h, "POST", "/admin/v1/playground/completions", pgInput, token, csrf)
+	if w.Code != 200 || !strings.Contains(w.Body.String(), "event: done") {
+		t.Fatalf("unexpected Playground response: %d %s", w.Code, w.Body)
+	}
+	store := h.(*playgroundHTTP).inference.Store.(playgroundCaptureStore)
+	captures, err := store.ListFailureCaptures(context.Background(), 0, 10)
+	if err != nil || len(captures) != 0 {
+		t.Fatalf("successful request persisted captures: %+v (%v)", captures, err)
 	}
 }

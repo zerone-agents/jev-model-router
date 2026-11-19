@@ -95,6 +95,10 @@ func TestAgentAutoFallback(t *testing.T) {
 					if !records.OK || !strings.Contains(string(records.Data), `"index":2`) || strings.Contains(string(records.Data), "busy") {
 						t.Fatalf("records=%s", records.Data)
 					}
+					captures := i.call("records.capture.list", map[string]any{}, 0, "")
+					if !captures.OK || !strings.Contains(string(captures.Data), `"captures":[]`) {
+						t.Fatalf("successful fallback persisted capture: %s", captures.Data)
+					}
 					s := i.call("status.get", map[string]any{}, 0, "")
 					if !strings.Contains(string(s.Data), `"auto_fallback"`) {
 						t.Fatal(string(s.Data))

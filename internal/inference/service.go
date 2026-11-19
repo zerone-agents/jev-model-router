@@ -6,6 +6,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/zerone-agents/jev-model-router/internal/failurecapture"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 )
 
@@ -60,7 +61,7 @@ func (r *Request) PlanPrepared(req routing.Request, check func(routing.Target) e
 	}
 	snapshot := *r.snapshot
 	r.record.ConfigVersion = snapshot.Version
-	ctx, cancel := routing.WithStageTimeout(r.ctx, r.service.DecisionTimeout)
+	ctx, cancel := routing.WithStageTimeout(failurecapture.WithAttempt(r.ctx, r.current), r.service.DecisionTimeout)
 	defer cancel()
 	start := time.Now()
 	plan, err := r.service.Planner.PlanWithOptions(ctx, snapshot, req, check, estimate, r.options)

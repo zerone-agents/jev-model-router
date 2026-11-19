@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -19,11 +20,12 @@ import (
 var migrations embed.FS
 
 type Store struct {
-	recordLimit int // Configured before serving requests.
-	cipher      *credential.Cipher
-	db          *sql.DB
-	mu          sync.Mutex
-	now         func() time.Time
+	failureCaptureDegraded atomic.Bool
+	recordLimit            int // Configured before serving requests.
+	cipher                 *credential.Cipher
+	db                     *sql.DB
+	mu                     sync.Mutex
+	now                    func() time.Time
 }
 
 func Open(path string, now func() time.Time) (*Store, error) {

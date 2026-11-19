@@ -142,6 +142,8 @@ func Handler(cfg Config) (http.Handler, func(), error) {
 	}, Store: store, Planner: planner, Generator: gen, DecisionTimeout: cfg.DecisionTimeout, FirstEventTimeout: cfg.FirstEventTimeout}
 	checks.Register(service)
 	service.RecordsDegraded = recorder.Degraded
+	service.FailureCaptureDegraded = store.FailureCaptureDegraded
+	registerFailureCaptures(service, store)
 	service.Register("records.list", func(ctx context.Context, _ string, call management.Call) (management.Result, error) {
 		var in struct {
 			Cursor      string

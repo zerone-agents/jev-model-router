@@ -8,6 +8,7 @@ import (
 	bifrost "github.com/maximhq/bifrost/core"
 	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
 	"github.com/maximhq/bifrost/core/schemas"
+	"github.com/zerone-agents/jev-model-router/internal/failurecapture"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"io"
 	"strings"
@@ -240,6 +241,7 @@ func (s *nativeMessagesValidation) accept(typ string, raw []byte) error {
 }
 
 type nativeMessagesStream struct {
+	record    func(int, string, []byte, string)
 	ctx       *schemas.BifrostContext
 	transport io.Reader
 	reader    providerUtils.SSEEventReader
@@ -258,6 +260,7 @@ func streamNativeMessages(ctx *schemas.BifrostContext, client *bifrost.Bifrost, 
 		release()
 		return nil, err
 	}
+	record := failurecapture.BeginNative(ctx, body)
 	ch, failure := client.PassthroughStream(ctx, schemas.Anthropic, nativeMessagesTransportRequest(target.Model.UpstreamName, body))
 	if ctx.Err() != nil || failure != nil {
 		err = anthropicUpstreamError(ctx, failure)
@@ -265,10 +268,16 @@ func streamNativeMessages(ctx *schemas.BifrostContext, client *bifrost.Bifrost, 
 		release()
 		return nil, err
 	}
-	return &nativeMessagesStream{ctx: ctx, transport: &nativeTransportReader{ctx: ctx, ch: ch}, target: target, prepared: p, release: release}, nil
+	return &nativeMessagesStream{ctx: ctx, record: record, transport: &nativeTransportReader{ctx: ctx, ch: ch, record: record}, target: target, prepared: p, release: release}, nil
 }
 func (s *nativeMessagesStream) Close() error {
-	s.once.Do(func() { s.ctx.Cancel(); s.release() })
+	s.once.Do(func() {
+		s.ctx.Cancel()
+		if s.record != nil {
+			s.record(0, "", nil, "closed")
+		}
+		s.release()
+	})
 	return nil
 }
 func (s *nativeMessagesStream) Next(ctx context.Context) (event MessageEvent, err error) {
@@ -311,6 +320,9 @@ func (s *nativeMessagesStream) Next(ctx context.Context) (event MessageEvent, er
 				return event, nativeError(502)
 			}
 			source = s.zip
+		}
+		if s.record != nil {
+			source = failurecapture.ObserveNativeStream(source, s.record)
 		}
 		s.reader = newNativeMessagesEventReader(source, s.target, s.prepared, upstreamSecret(s.ctx))
 	}

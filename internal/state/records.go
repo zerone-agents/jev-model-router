@@ -126,7 +126,7 @@ func (s *Store) listRecords(ctx context.Context, cursor string, limit int, priva
 	if e = tx.QueryRowContext(ctx, countQuery).Scan(&out.Total); e != nil {
 		return out, storageError()
 	}
-	rows, e := tx.QueryContext(ctx, `SELECT sequence,body FROM routing_records WHERE sequence<?`+filter+` ORDER BY sequence DESC LIMIT ? OFFSET ?`, before, limit+1, offset)
+	rows, e := tx.QueryContext(ctx, `SELECT sequence,body,EXISTS (SELECT 1 FROM failure_captures WHERE request_id=routing_records.request_id AND created_ns>?) FROM routing_records WHERE sequence<?`+filter+` ORDER BY sequence DESC LIMIT ? OFFSET ?`, s.now().Add(-captureRetention).UnixNano(), before, limit+1, offset)
 	if e != nil {
 		return out, storageError()
 	}
@@ -135,7 +135,8 @@ func (s *Store) listRecords(ctx context.Context, cursor string, limit int, priva
 	for rows.Next() {
 		var seq int64
 		var b []byte
-		if rows.Scan(&seq, &b) != nil {
+		var captureAvailable bool
+		if rows.Scan(&seq, &b, &captureAvailable) != nil {
 			return out, storageError()
 		}
 		if len(out.Records) == limit {
@@ -146,6 +147,7 @@ func (s *Store) listRecords(ctx context.Context, cursor string, limit int, priva
 		if json.Unmarshal(b, &r) != nil {
 			return out, storageError()
 		}
+		r.FailureCaptureAvailable = captureAvailable
 		out.Records = append(out.Records, r)
 		last = seq
 	}
@@ -172,7 +174,7 @@ func (s *Store) Prune(ctx context.Context, now time.Time, days int) error {
 			return storageError()
 		}
 		if n < recordPruneBatch {
-			return nil
+			return s.pruneFailureCaptures(ctx, now)
 		}
 	}
 }

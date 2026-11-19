@@ -2,6 +2,7 @@ package provider
 
 import (
 	"encoding/json"
+	"github.com/zerone-agents/jev-model-router/internal/failurecapture"
 	"io"
 	"sync"
 
@@ -18,11 +19,14 @@ type capturedError struct {
 
 // The SDK discards RawResponse for OpenAI SSE errors. Capture only error
 // frames at its reader boundary; keep its normal parsing and terminal behavior.
-func captureStreamErrors(ctx *schemas.BifrostContext) {
+func captureStreamErrors(ctx *schemas.BifrostContext, taps ...func(int, string, []byte, string)) {
 	state := &capturedError{}
 	ctx.SetValue(capturedErrorKey{}, state)
 	ctx.SetValue(schemas.BifrostContextKeySSEReaderFactory, &providerUtils.SSEReaderFactory{
 		NewDataReader: func(reader io.Reader) providerUtils.SSEDataReader {
+			if len(taps) != 0 {
+				reader = failurecapture.ObserveNativeStream(reader, taps[0])
+			}
 			return &errorDataReader{SSEDataReader: providerUtils.GetSSEDataReader(nil, reader), state: state, secret: upstreamSecret(ctx)}
 		},
 	})
