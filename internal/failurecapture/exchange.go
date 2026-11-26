@@ -15,6 +15,7 @@ const exchangeLimit = 8
 const entityBudget = 48 << 10
 
 type Exchange struct {
+	original            []byte
 	Method              string `json:"method"`
 	Origin              string `json:"upstream_origin,omitempty"`
 	Protocol            string `json:"protocol,omitempty"`
@@ -85,7 +86,7 @@ func DoJSON(client *http.Client, req *http.Request, stage string, encoded []byte
 		collector.mu.Unlock()
 		return client.Do(req)
 	}
-	exchange := &Exchange{Stage: stage, Method: "POST", Protocol: "json", Origin: safeOrigin(req.URL), started: time.Now(), Attempt: captureAttempt(req.Context()), RequestHeaders: ProtocolHeaders(req.Header), Request: NewBody(req.Header.Get("Content-Type"), entityBudget)}
+	exchange := &Exchange{original: encoded, Stage: stage, Method: "POST", Protocol: "json", Origin: safeOrigin(req.URL), started: time.Now(), Attempt: captureAttempt(req.Context()), RequestHeaders: ProtocolHeaders(req.Header), Request: NewBody(req.Header.Get("Content-Type"), entityBudget)}
 	collector.exchanges = append(collector.exchanges, exchange)
 	collector.mu.Unlock()
 
@@ -137,7 +138,7 @@ func BeginNative(ctx context.Context, request []byte) func(int, string, []byte, 
 	if request == nil {
 		protocol = "chat"
 	}
-	exchange := &Exchange{Stage: "generation", Method: "POST", Origin: origin, Protocol: protocol, started: time.Now(), RequestUnavailable: request == nil, Attempt: captureAttempt(ctx), Request: NewBody("application/json", entityBudget)}
+	exchange := &Exchange{original: request, Stage: "generation", Method: "POST", Origin: origin, Protocol: protocol, started: time.Now(), RequestUnavailable: request == nil, Attempt: captureAttempt(ctx), Request: NewBody("application/json", entityBudget)}
 	if request != nil {
 		exchange.Request.Feed(request)
 		exchange.Request.Finish("complete")
@@ -163,6 +164,9 @@ func BeginNative(ctx context.Context, request []byte) func(int, string, []byte, 
 			return
 		}
 		if media == "request" {
+			if exchange.original == nil {
+				exchange.original = append([]byte{}, data...)
+			}
 			exchange.RequestUnavailable = false
 			exchange.Request.Feed(data)
 			exchange.Request.Finish(end)

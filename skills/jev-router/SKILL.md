@@ -256,3 +256,8 @@ Pass `{"request_id":"REQUEST_ID"}` as JSON input to get or delete. Redirect
 the get response to a local file to export the structured evidence. Delete
 is retry-safe and removes the capture while retaining the routing record.
 An expired or deleted capture returns `not_found` on get.
+
+Failure capture exports may include confidential original request bodies
+under `original_requests`. Decode `bytes_base64` for byte-exact inspection
+and check each body's state before using it. Treat exports as sensitive and
+avoid printing or sharing original payloads unless authorized.

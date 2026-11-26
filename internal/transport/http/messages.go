@@ -49,7 +49,7 @@ func messagesPrincipal(r *http.Request, auth func(string) (management.Principal,
 	return p, nil
 }
 func (s *server) messages(w http.ResponseWriter, r *http.Request) {
-	w, r, finishCapture := beginFailureCapture(w, r, s.store)
+	w, r, finishCapture := beginFailureCapture(w, r, s.store, s.limits.MaxBodyBytes)
 	id := w.Header().Get("X-Request-ID")
 	execution := s.inference.Begin(r.Context(), id)
 	var finalErr error

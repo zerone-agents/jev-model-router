@@ -7,17 +7,19 @@ import (
 	"time"
 
 	"github.com/zerone-agents/jev-model-router/contracts"
+	"github.com/zerone-agents/jev-model-router/internal/failurecapture"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 )
 
 const captureRetention = 24 * time.Hour
-const captureCapacity = 64 << 20
+const captureCapacity = 256 << 20
 
 type FailureCapture struct {
-	ErrorCode string          `json:"error_code"`
-	RequestID string          `json:"request_id"`
-	CreatedAt time.Time       `json:"created_at"`
-	Evidence  json.RawMessage `json:"evidence"`
+	Originals *failurecapture.Originals `json:"original_requests,omitempty"`
+	ErrorCode string                    `json:"error_code"`
+	RequestID string                    `json:"request_id"`
+	CreatedAt time.Time                 `json:"created_at"`
+	Evidence  json.RawMessage           `json:"evidence"`
 }
 
 func (s *Store) SaveFailureCapture(ctx context.Context, capture FailureCapture) error {
@@ -28,13 +30,29 @@ func (s *Store) SaveFailureCapture(ctx context.Context, capture FailureCapture) 
 
 func (s *Store) saveFailureCapture(ctx context.Context, capture FailureCapture, capacity int) error {
 	capture.ErrorCode = contracts.SafeErrorCode(capture.ErrorCode)
-	body, err := json.Marshal(capture)
+	stored := storedFailureCapture{FailureCapture: capture}
+	stored.Originals = nil
+	if capture.Originals != nil {
+		cipher, err := loadCaptureCipher(s.captureKeyPath, true)
+		if err != nil {
+			return storageError()
+		}
+		plain, err := json.Marshal(capture.Originals)
+		if err != nil {
+			return storageError()
+		}
+		stored.EncryptedRequests, err = cipher.Seal("failure-capture", capture.RequestID, plain)
+		if err != nil {
+			return storageError()
+		}
+	}
+	body, err := json.Marshal(stored)
 	if err != nil {
 		return storageError()
 	}
 	charge := max(len(body), 1024)
 	if charge > capacity {
-		return nil
+		return storageError()
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -83,14 +101,26 @@ type FailureCaptureSummary struct {
 
 func (s *Store) GetFailureCapture(ctx context.Context, requestID string) (FailureCapture, error) {
 	var body string
+	var stored storedFailureCapture
 	var capture FailureCapture
 	err := s.db.QueryRowContext(ctx, `SELECT body FROM failure_captures
 WHERE request_id=? AND created_ns>?`, requestID, s.now().Add(-captureRetention).UnixNano()).Scan(&body)
 	if err == sql.ErrNoRows {
 		return capture, routing.Fail("not_found", "failure capture not found")
 	}
-	if err != nil || json.Unmarshal([]byte(body), &capture) != nil {
+	if err != nil || json.Unmarshal([]byte(body), &stored) != nil {
 		return capture, storageError()
+	}
+	capture = stored.FailureCapture
+	if stored.EncryptedRequests != "" {
+		cipher, err := loadCaptureCipher(s.captureKeyPath, false)
+		if err != nil {
+			return FailureCapture{}, storageError()
+		}
+		plain, err := cipher.Open("failure-capture", requestID, stored.EncryptedRequests)
+		if err != nil || json.Unmarshal(plain, &capture.Originals) != nil {
+			return FailureCapture{}, storageError()
+		}
 	}
 	capture.ErrorCode = contracts.SafeErrorCode(capture.ErrorCode)
 	return capture, nil
@@ -132,3 +162,8 @@ func (s *Store) pruneFailureCaptures(ctx context.Context, now time.Time) error {
 }
 
 func (s *Store) FailureCaptureDegraded() bool { return s.failureCaptureDegraded.Load() }
+
+type storedFailureCapture struct {
+	FailureCapture
+	EncryptedRequests string `json:"encrypted_requests,omitempty"`
+}

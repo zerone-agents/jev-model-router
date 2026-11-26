@@ -302,3 +302,16 @@ response and in failure capture evidence. It contains a bounded field path,
 a validation rule and, where available, expected and actual JSON shapes.
 Unknown field names are represented as `unknown_field`. The diagnostic does
 not contain raw field values and survives request body truncation.
+
+Failed inference capture detail can also include `original_requests`.
+Decode each `bytes_base64` field to recover the exact received client bytes
+or available outbound request bytes. Check the accompanying state before
+replay. Outbound bodies carry stage and attempt; SDK-derived representations
+without original bytes are unavailable. Authentication headers and raw
+responses are excluded from these originals. Successful requests and
+successful fallback leave no persisted originals.
+
+The Router uses a separate owner-only key file beside SQLite
+(`<database>.capture-key`). Keep it with the database when moving an instance
+that needs to read existing encrypted captures. Capture expiry and deletion
+remove the encrypted originals from normal retrieval.

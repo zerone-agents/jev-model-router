@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/zerone-agents/jev-model-router/internal/failurecapture"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -67,5 +69,37 @@ func TestFailureCaptureReportsStorageDegradation(t *testing.T) {
 	}
 	if err := store.SaveFailureCapture(context.Background(), capture); err != nil || store.FailureCaptureDegraded() {
 		t.Fatalf("successful write should clear degradation: %v", err)
+	}
+}
+
+func TestOriginalCaptureEncryptedAcrossRestart(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state.db")
+	store, err := Open(path, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	raw := []byte(" byte-exact confidential request \x00\n")
+	capture := FailureCapture{RequestID: "example", CreatedAt: time.Now(), Evidence: json.RawMessage(`{}`),
+		Originals: &failurecapture.Originals{Client: failurecapture.OriginalBody{Bytes: raw, State: "complete"}}}
+	if err := store.SaveFailureCapture(ctx, capture); err != nil {
+		t.Fatal(err)
+	}
+	var row string
+	if err := store.db.QueryRow("SELECT body FROM failure_captures").Scan(&row); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(row, "bytes_base64") || !strings.Contains(row, "encrypted_requests") {
+		t.Fatal("original stored outside ciphertext")
+	}
+	store.Close()
+	store, err = Open(path, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	got, err := store.GetFailureCapture(ctx, capture.RequestID)
+	if err != nil || got.Originals == nil || string(got.Originals.Client.Bytes) != string(raw) {
+		t.Fatalf("original unavailable after restart: %v", err)
 	}
 }

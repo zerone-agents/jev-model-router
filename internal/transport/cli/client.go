@@ -42,8 +42,12 @@ func request(ctx context.Context, base, method, path string, token []byte, body 
 		return result, routing.Fail("upstream_error", "instance request failed; outcome may be unknown")
 	}
 	defer resp.Body.Close()
-	b, e = io.ReadAll(io.LimitReader(resp.Body, (16<<20)+1))
-	if e != nil || len(b) > 16<<20 || json.Unmarshal(b, &result) != nil || (!result.OK && result.Error == nil) {
+	limit := 16 << 20
+	if path == "/admin/v1/call/records.capture.get" {
+		limit = 256 << 20
+	}
+	b, e = io.ReadAll(io.LimitReader(resp.Body, int64(limit)+1))
+	if e != nil || len(b) > limit || json.Unmarshal(b, &result) != nil || (!result.OK && result.Error == nil) {
 		return result, routing.Fail("upstream_error", "invalid instance response")
 	}
 	return result, nil

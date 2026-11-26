@@ -2554,6 +2554,16 @@
       "additionalProperties": false
     },
     "output_schema": {
+      "$defs": {
+        "original_body": {
+          "type": "object",
+          "properties": {
+            "state": {"enum": ["complete", "incomplete", "oversized", "unavailable", "omitted"]},
+            "bytes_base64": {"type": "string", "contentEncoding": "base64"}
+          },
+          "required": ["state"]
+        }
+      },
       "type": "object",
       "properties": {
         "request_id": {
@@ -2563,6 +2573,27 @@
           "type": "string"
         },
         "error_code": {"type": "string"},
+        "original_requests": {
+          "type": "object",
+          "description": "Original request bodies encoded as base64, with explicit availability and completeness states.",
+          "properties": {
+            "client": {"$ref": "#/$defs/original_body"},
+            "upstream": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "stage": {"type": "string"},
+                  "attempt": {"type": "integer", "minimum": 1},
+                  "body": {"$ref": "#/$defs/original_body"}
+                },
+                "required": ["stage", "attempt", "body"]
+              }
+            },
+            "upstream_omitted": {"type": "boolean"}
+          },
+          "required": ["client"]
+        },
         "evidence": {
           "type": "object"
         }

@@ -12,7 +12,10 @@ import (
 
 func TestFailureCaptureNativeToolStream(t *testing.T) {
 	instance := newInstance(t)
+	outbound := make(chan []byte, 1)
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		outbound <- body
 		w.Header().Set("Content-Type", "text/event-stream")
 		for _, frame := range []struct{ name, body string }{
 			{"message_start", `{"type":"message_start","message":{"id":"m","type":"message","role":"assistant","model":"upstream","content":[],"usage":{"input_tokens":3,"output_tokens":0}}}`},
@@ -45,6 +48,27 @@ func TestFailureCaptureNativeToolStream(t *testing.T) {
 		t.Fatalf("unexpected response %d: %s (%v)", response.StatusCode, wire, err)
 	}
 	capture := instance.call("records.capture.get", map[string]string{"request_id": response.Header.Get("X-Request-ID")}, 0, "")
+	var original struct {
+		Requests struct {
+			Upstream []struct {
+				Stage   string
+				Attempt int
+				Body    struct {
+					State string
+					Bytes []byte `json:"bytes_base64"`
+				}
+			}
+		} `json:"original_requests"`
+	}
+	if err := json.Unmarshal(capture.Data, &original); err != nil {
+		t.Fatal(err)
+	}
+	requests := original.Requests.Upstream
+	if len(requests) != 1 || requests[0].Stage != "generation" || requests[0].Attempt != 1 ||
+		requests[0].Body.State != "complete" || string(requests[0].Body.Bytes) != string(<-outbound) {
+		t.Fatal("converted upstream request did not round-trip")
+	}
+
 	var exported struct {
 		Evidence struct {
 			Upstream struct {
