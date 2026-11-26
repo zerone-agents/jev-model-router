@@ -20,6 +20,7 @@ import (
 var migrations embed.FS
 
 type Store struct {
+	captureKeyPath         string
 	failureCaptureDegraded atomic.Bool
 	recordLimit            int // Configured before serving requests.
 	cipher                 *credential.Cipher
@@ -49,7 +50,7 @@ func OpenWithCipher(path string, now func() time.Time, cipher *credential.Cipher
 		return nil, storageError()
 	}
 	db.SetMaxOpenConns(1)
-	s := &Store{db: db, now: now, cipher: cipher, recordLimit: DefaultRecordLimit}
+	s := &Store{captureKeyPath: absolute + ".capture-key", db: db, now: now, cipher: cipher, recordLimit: DefaultRecordLimit}
 	if e = s.migrate(); e != nil {
 		db.Close()
 		return nil, e

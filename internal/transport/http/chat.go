@@ -8,7 +8,7 @@ import (
 )
 
 func (s *server) chat(w http.ResponseWriter, r *http.Request) {
-	w, r, finishCapture := beginFailureCapture(w, r, s.store)
+	w, r, finishCapture := beginFailureCapture(w, r, s.store, s.limits.MaxBodyBytes)
 	execution := s.inference.Begin(r.Context(), w.Header().Get("X-Request-ID"))
 	var finalErr error
 	defer func() { execution.Finish(finalErr); finishCapture(finalErr) }()

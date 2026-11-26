@@ -3,6 +3,7 @@ package app_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http/httptest"
 	"os"
@@ -90,8 +91,8 @@ func TestFailureCaptureThroughManagementHTTP(t *testing.T) {
 	if list.Code != 200 || !strings.Contains(list.Body.String(), `"failure_capture_available":true`) {
 		t.Fatalf("missing record marker: %d %s", list.Code, list.Body)
 	}
-	oversized := request("POST", "/v1/chat/completions", "inference-test",
-		`{"model":"auto","messages":[{"role":"user","content":"`+strings.Repeat("x", 64<<10)+`"},{"role":"user","content":[{"type":null}]}]}`)
+	raw := `{"model":"auto","messages":[{"role":"user","content":"` + strings.Repeat("x", 64<<10) + `"},{"role":"user","content":[{"type":null}]}]} ` + "\n"
+	oversized := request("POST", "/v1/chat/completions", "inference-test", raw)
 	if oversized.Code != 400 || !strings.Contains(oversized.Body.String(), "messages[1].content[0].type") {
 		t.Fatalf("missing nested HTTP diagnostic: %d %s", oversized.Code, oversized.Body)
 	}
@@ -99,6 +100,24 @@ func TestFailureCaptureThroughManagementHTTP(t *testing.T) {
 	nested := runCLI(string(nestedInput), "call", "records.capture.get", "--json", "-")
 	if !strings.Contains(nested, "messages[1].content[0].type") || !strings.Contains(nested, `"truncated":true`) {
 		t.Fatalf("missing independent capture diagnostic: %s", nested)
+	}
+
+	var original struct {
+		Data struct {
+			OriginalRequests struct {
+				Client struct {
+					State string
+					Bytes string `json:"bytes_base64"`
+				}
+			} `json:"original_requests"`
+		}
+	}
+	if err := json.Unmarshal([]byte(nested), &original); err != nil {
+		t.Fatal(err)
+	}
+	body, err := base64.StdEncoding.DecodeString(original.Data.OriginalRequests.Client.Bytes)
+	if err != nil || string(body) != raw || original.Data.OriginalRequests.Client.State != "complete" {
+		t.Fatal("original client bytes did not round-trip")
 	}
 
 	second := request("POST", "/v1/chat/completions", "inference-test", `{"model":"auto","max_tokens":1}`)

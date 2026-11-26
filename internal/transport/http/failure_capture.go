@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"time"
 
@@ -21,10 +22,11 @@ var captureSlots = make(chan struct{}, 32)
 
 type captureWriter struct {
 	http.ResponseWriter
-	body        *failurecapture.Body
-	status      int
-	collectBody bool
-	protocol    string
+	body         *failurecapture.Body
+	status       int
+	collectBody  bool
+	protocol     string
+	drainRequest func()
 }
 
 func (w *captureWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
@@ -39,6 +41,9 @@ func (w *captureWriter) FlushError() error {
 }
 
 func (w *captureWriter) WriteHeader(status int) {
+	if status >= 400 && w.drainRequest != nil {
+		w.drainRequest()
+	}
 	if w.status == 0 && status >= 200 {
 		w.status = status
 	}
@@ -63,7 +68,7 @@ func (w *captureWriter) Write(data []byte) (int, error) {
 	return n, err
 }
 
-func beginFailureCapture(w http.ResponseWriter, r *http.Request, store any) (http.ResponseWriter, *http.Request, func(error)) {
+func beginFailureCapture(w http.ResponseWriter, r *http.Request, store any, limits ...int64) (http.ResponseWriter, *http.Request, func(error)) {
 	sink, ok := store.(failureCaptureSink)
 	if !ok {
 		return w, r, func(error) {}
@@ -84,14 +89,30 @@ func beginFailureCapture(w http.ResponseWriter, r *http.Request, store any) (htt
 	var request *failurecapture.Body
 	var collector *failurecapture.Collector
 	writer := &captureWriter{ResponseWriter: w, protocol: protocol}
+	limit := int64(16 << 20)
+	if len(limits) != 0 {
+		limit = limits[0]
+	}
+	original := failurecapture.ObserveOriginal(r.Body, limit)
+	r.Body = original
+	collector = &failurecapture.Collector{}
+	r = r.WithContext(failurecapture.WithCollector(ctx, collector))
 	select {
 	case captureSlots <- struct{}{}:
 		writer.collectBody = true
-		collector = &failurecapture.Collector{}
 		request = failurecapture.NewBody(r.Header.Get("Content-Type"), 48<<10)
-		r = r.WithContext(failurecapture.WithCollector(ctx, collector))
 		r.Body = failurecapture.Observe(r.Body, request)
 	default:
+	}
+	writer.drainRequest = func() {
+		// Validation can return before consuming the entity. Drain only within
+		// the supported limit, without delaying an already failed response indefinitely.
+		if original.Result().State == "incomplete" && ctx.Err() == nil {
+			controller := http.NewResponseController(w)
+			_ = controller.SetReadDeadline(time.Now().Add(time.Second))
+			_, _ = io.Copy(io.Discard, io.LimitReader(original, max(0, limit-int64(len(original.Result().Bytes))+1)))
+			_ = controller.SetReadDeadline(time.Time{})
+		}
 	}
 	return writer, r, func(finalErr error) {
 		if writer.collectBody {
@@ -104,6 +125,9 @@ func beginFailureCapture(w http.ResponseWriter, r *http.Request, store any) (htt
 		if errors.Is(ctx.Err(), context.Canceled) && errors.As(finalErr, &failure) && failure.Code == "cancelled" {
 			return
 		}
+		writer.drainRequest()
+		originalUpstream, omitted := collector.OriginalRequests()
+		originals := &failurecapture.Originals{Client: original.Result(), Upstream: originalUpstream, UpstreamOmitted: omitted}
 		var upstream json.RawMessage
 		if request != nil {
 			request.Finish("closed")
@@ -135,6 +159,6 @@ func beginFailureCapture(w http.ResponseWriter, r *http.Request, store any) (htt
 		}
 		saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
 		defer cancel()
-		_ = sink.SaveFailureCapture(saveCtx, state.FailureCapture{ErrorCode: routing.Diagnose(finalErr).Code, RequestID: id, CreatedAt: time.Now(), Evidence: encoded})
+		_ = sink.SaveFailureCapture(saveCtx, state.FailureCapture{Originals: originals, ErrorCode: routing.Diagnose(finalErr).Code, RequestID: id, CreatedAt: time.Now(), Evidence: encoded})
 	}
 }

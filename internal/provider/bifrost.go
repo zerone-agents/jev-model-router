@@ -423,6 +423,9 @@ func sdkBody(value any) []byte {
 }
 
 func recordSDKRequest(record func(int, string, []byte, string), value any) {
+	if _, reencoded := value.(map[string]any); reencoded {
+		return
+	}
 	if body := sdkBody(value); body != nil {
 		record(0, "request", body, "complete")
 	}

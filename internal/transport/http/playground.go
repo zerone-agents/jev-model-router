@@ -53,7 +53,7 @@ func (p *playgroundHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{"enabled": p.limits.Enabled, "limits": p.limits, "timeout_seconds": int(p.limits.Timeout / time.Second), "quota": q})
 		return
 	}
-	w, r, finishCapture := beginFailureCapture(w, r, p.inference.Store)
+	w, r, finishCapture := beginFailureCapture(w, r, p.inference.Store, int64(p.limits.BodyBytes))
 	var finalErr error
 	defer func() { finishCapture(finalErr) }()
 	fail := func(err error) {
