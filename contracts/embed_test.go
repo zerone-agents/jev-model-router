@@ -80,6 +80,8 @@ func TestChatAndInspectionOutputLimitContracts(t *testing.T) {
 
 func TestChatSchemaViolationNested(t *testing.T) {
 	for _, tc := range []struct{ input, path, rule, actual string }{
+		{`{"model":"auto","messages":[{"role":"user","content":[{"type":"image_url"}]}]}`, "messages[0].content[0].image_url", "required", "missing"},
+		{`{"model":"auto","messages":[{"role":"user","content":"hello"}],"temperature":"private"}`, "temperature", "type", "string"},
 		{`{"model":"auto","messages":[{"role":"user","content":[{"type":null}]}]}`, "messages[0].content[0].type", "const", "null"},
 		{`{"model":"auto","messages":[{"role":"user","content":"hello"}],"tools":[{"type":"function","function":{"name":null}}]}`, "tools[0].function.name", "type", "null"},
 		{`{"model":"auto","messages":[{"content":"hello"}]}`, "messages[0].role", "required", "missing"},

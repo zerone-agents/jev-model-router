@@ -33,7 +33,7 @@ func ChatSchemaViolation(input json.RawMessage) *ChatViolation {
 	var visit func(*jsonschema.ValidationError)
 	visit = func(e *jsonschema.ValidationError) {
 		if len(e.Causes) > 0 {
-			for _, child := range e.Causes {
+			for _, child := range chatDiagnosticBranches(e) {
 				visit(child)
 			}
 			return
@@ -95,10 +95,9 @@ func safeChatPath(value any, parts []string) string {
 		if path.Len() > 0 {
 			path.WriteByte('.')
 		}
-		switch part {
-		case "model", "messages", "role", "content", "type", "text", "image_url", "url", "detail", "name", "tool_calls", "tool_call_id", "tools", "function", "arguments", "parameters", "description", "strict", "id", "stream", "max_tokens", "max_completion_tokens", "response_format", "json_schema", "schema", "tool_choice", "stream_options":
+		if _, declared := chatFieldNames[part]; declared {
 			path.WriteString(part)
-		default:
+		} else {
 			path.WriteString("unknown_field")
 		}
 		object, _ := value.(map[string]any)
@@ -126,4 +125,67 @@ func chatJSONType(value any) string {
 		return "object"
 	}
 	return ""
+}
+
+var chatFieldNames = func() map[string]struct{} {
+	data, _ := files.ReadFile("schemas/chat.json")
+	var schema any
+	_ = json.Unmarshal(data, &schema)
+	names := make(map[string]struct{})
+	var walk func(any)
+	walk = func(value any) {
+		switch node := value.(type) {
+		case map[string]any:
+			if properties, ok := node["properties"].(map[string]any); ok {
+				for name := range properties {
+					names[name] = struct{}{}
+				}
+			}
+			for _, child := range node {
+				walk(child)
+			}
+		case []any:
+			for _, child := range node {
+				walk(child)
+			}
+		}
+	}
+	walk(schema)
+	return names
+}()
+
+// Ignore incompatible oneOf alternatives when a branch matches the object's
+// discriminator and failed for another reason.
+func chatDiagnosticBranches(e *jsonschema.ValidationError) []*jsonschema.ValidationError {
+	if _, ok := e.ErrorKind.(*kind.OneOf); !ok {
+		return e.Causes
+	}
+	var compatible []*jsonschema.ValidationError
+	for _, branch := range e.Causes {
+		if !chatBranchMismatch(branch, e.InstanceLocation) {
+			compatible = append(compatible, branch)
+		}
+	}
+	if len(compatible) != 0 {
+		return compatible
+	}
+	return e.Causes
+}
+
+func chatBranchMismatch(e *jsonschema.ValidationError, location []string) bool {
+	switch e.ErrorKind.(type) {
+	case *kind.Type:
+		return len(e.InstanceLocation) == len(location)
+	case *kind.Const:
+		return len(e.InstanceLocation) == len(location)+1 &&
+			e.InstanceLocation[len(location)] == "type"
+	case *kind.OneOf:
+		return false
+	}
+	for _, child := range e.Causes {
+		if chatBranchMismatch(child, location) {
+			return true
+		}
+	}
+	return false
 }
