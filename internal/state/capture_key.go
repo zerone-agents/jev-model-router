@@ -18,7 +18,8 @@ func loadCaptureCipher(path string, create bool) (*credential.Cipher, error) {
 		if _, err = rand.Read(raw[:]); err != nil {
 			return nil, err
 		}
-		tmp, err := os.CreateTemp(filepath.Dir(path), ".capture-key-*")
+		var tmp *os.File
+		tmp, err = os.CreateTemp(filepath.Dir(path), ".capture-key-*")
 		if err != nil {
 			return nil, err
 		}

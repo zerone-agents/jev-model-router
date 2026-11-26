@@ -2558,7 +2558,7 @@
         "original_body": {
           "type": "object",
           "properties": {
-            "state": {"enum": ["complete", "incomplete", "oversized", "unavailable"]},
+            "state": {"enum": ["complete", "incomplete", "oversized", "unavailable", "omitted"]},
             "bytes_base64": {"type": "string", "contentEncoding": "base64"}
           },
           "required": ["state"]

@@ -93,26 +93,26 @@ func beginFailureCapture(w http.ResponseWriter, r *http.Request, store any, limi
 	if len(limits) != 0 {
 		limit = limits[0]
 	}
-	original := failurecapture.ObserveOriginal(r.Body, limit)
-	r.Body = original
-	collector = &failurecapture.Collector{}
-	r = r.WithContext(failurecapture.WithCollector(ctx, collector))
+	var original *failurecapture.OriginalReader
 	select {
 	case captureSlots <- struct{}{}:
 		writer.collectBody = true
+		original = failurecapture.ObserveOriginal(r.Body, limit)
+		collector = &failurecapture.Collector{}
+		r = r.WithContext(failurecapture.WithCollector(ctx, collector))
 		request = failurecapture.NewBody(r.Header.Get("Content-Type"), 48<<10)
-		r.Body = failurecapture.Observe(r.Body, request)
-	default:
-	}
-	writer.drainRequest = func() {
-		// Validation can return before consuming the entity. Drain only within
-		// the supported limit, without delaying an already failed response indefinitely.
-		if original.Result().State == "incomplete" && ctx.Err() == nil {
-			controller := http.NewResponseController(w)
-			_ = controller.SetReadDeadline(time.Now().Add(time.Second))
-			_, _ = io.Copy(io.Discard, io.LimitReader(original, max(0, limit-int64(len(original.Result().Bytes))+1)))
-			_ = controller.SetReadDeadline(time.Time{})
+		r.Body = failurecapture.Observe(original, request)
+		writer.drainRequest = func() {
+			// Validation can return before consuming the entity. Bound the
+			// remaining read by the supported size and a short deadline.
+			if original.Result().State == "incomplete" && ctx.Err() == nil {
+				controller := http.NewResponseController(w)
+				_ = controller.SetReadDeadline(time.Now().Add(time.Second))
+				_, _ = io.Copy(io.Discard, io.LimitReader(original, max(0, limit-int64(len(original.Result().Bytes))+1)))
+				_ = controller.SetReadDeadline(time.Time{})
+			}
 		}
+	default:
 	}
 	return writer, r, func(finalErr error) {
 		if writer.collectBody {
@@ -125,11 +125,15 @@ func beginFailureCapture(w http.ResponseWriter, r *http.Request, store any, limi
 		if errors.Is(ctx.Err(), context.Canceled) && errors.As(finalErr, &failure) && failure.Code == "cancelled" {
 			return
 		}
-		writer.drainRequest()
-		originalUpstream, omitted := collector.OriginalRequests()
-		originals := &failurecapture.Originals{Client: original.Result(), Upstream: originalUpstream, UpstreamOmitted: omitted}
+		originals := &failurecapture.Originals{
+			Client:          failurecapture.OriginalBody{State: "omitted"},
+			UpstreamOmitted: true,
+		}
 		var upstream json.RawMessage
-		if request != nil {
+		if original != nil {
+			writer.drainRequest()
+			originals.Client = original.Result()
+			originals.Upstream, originals.UpstreamOmitted = collector.OriginalRequests()
 			request.Finish("closed")
 			upstream = collector.Evidence()
 		}
