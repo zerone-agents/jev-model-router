@@ -77,7 +77,7 @@ func TestFailureCaptureThroughManagementHTTP(t *testing.T) {
 	if schema := runCLI("", "schema", "records.capture.get"); !strings.Contains(schema, "request_id") {
 		t.Fatalf("CLI discovery missing request_id: %s", schema)
 	}
-	if captures := runCLI("{}", "call", "records.capture.list", "--json", "-"); !strings.Contains(captures, id) {
+	if captures := runCLI("{}", "call", "records.capture.list", "--json", "-"); !strings.Contains(captures, id) || !strings.Contains(captures, `"error_code":"invalid_request"`) {
 		t.Fatalf("CLI list missing request: %s", captures)
 	}
 	cliInput, _ := json.Marshal(map[string]string{"request_id": id})
@@ -99,7 +99,7 @@ func TestFailureCaptureThroughManagementHTTP(t *testing.T) {
 		t.Fatalf("ordinary record was not evicted: %s", records)
 	}
 	captures := runCLI("{}", "call", "records.capture.list", "--json", "-")
-	if !strings.Contains(captures, id) {
+	if !strings.Contains(captures, id) || !strings.Contains(captures, `"error_code":"invalid_request"`) {
 		t.Fatalf("capture lost after ordinary record eviction: %s", captures)
 	}
 	runCLI(string(cliInput), "call", "records.capture.get", "--json", "-")

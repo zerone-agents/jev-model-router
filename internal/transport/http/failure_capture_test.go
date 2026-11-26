@@ -39,3 +39,21 @@ func TestFailureCaptureCancellation(t *testing.T) {
 		})
 	}
 }
+
+func TestSaturatedCaptureKeepsTerminalError(t *testing.T) {
+	for range cap(captureSlots) {
+		captureSlots <- struct{}{}
+	}
+	defer func() {
+		for range cap(captureSlots) {
+			<-captureSlots
+		}
+	}()
+	sink := &captureTestSink{}
+	writer, _, finish := beginFailureCapture(httptest.NewRecorder(), httptest.NewRequest("POST", "/v1/chat/completions", nil), sink)
+	writer.WriteHeader(200)
+	finish(&routing.UpstreamError{Status: 429})
+	if len(sink.saved) != 1 || sink.saved[0].ErrorCode != "upstream_rate_limit" {
+		t.Fatalf("missing terminal classification: %+v", sink.saved)
+	}
+}

@@ -2510,7 +2510,15 @@
         "captures": {
           "type": "array",
           "items": {
-            "type": "object"
+            "type": "object",
+            "properties": {
+              "request_id": {"type": "string"},
+              "sequence": {"type": "integer", "minimum": 1},
+              "created_at": {"type": "string", "format": "date-time"},
+              "error_code": {"type": "string"}
+            },
+            "required": ["request_id", "sequence", "created_at", "error_code"],
+            "additionalProperties": false
           }
         },
         "next_before": {
@@ -2554,6 +2562,7 @@
         "created_at": {
           "type": "string"
         },
+        "error_code": {"type": "string"},
         "evidence": {
           "type": "object"
         }
@@ -2561,6 +2570,7 @@
       "required": [
         "request_id",
         "created_at",
+        "error_code",
         "evidence"
       ],
       "additionalProperties": false

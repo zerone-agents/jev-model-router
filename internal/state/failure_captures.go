@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/zerone-agents/jev-model-router/contracts"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 )
 
@@ -13,6 +14,7 @@ const captureRetention = 24 * time.Hour
 const captureCapacity = 64 << 20
 
 type FailureCapture struct {
+	ErrorCode string          `json:"error_code"`
 	RequestID string          `json:"request_id"`
 	CreatedAt time.Time       `json:"created_at"`
 	Evidence  json.RawMessage `json:"evidence"`
@@ -25,6 +27,7 @@ func (s *Store) SaveFailureCapture(ctx context.Context, capture FailureCapture) 
 }
 
 func (s *Store) saveFailureCapture(ctx context.Context, capture FailureCapture, capacity int) error {
+	capture.ErrorCode = contracts.SafeErrorCode(capture.ErrorCode)
 	body, err := json.Marshal(capture)
 	if err != nil {
 		return storageError()
@@ -72,6 +75,7 @@ func (s *Store) DeleteFailureCapture(ctx context.Context, requestID string) erro
 }
 
 type FailureCaptureSummary struct {
+	ErrorCode string    `json:"error_code"`
 	Sequence  int64     `json:"sequence"`
 	RequestID string    `json:"request_id"`
 	CreatedAt time.Time `json:"created_at"`
@@ -88,6 +92,7 @@ WHERE request_id=? AND created_ns>?`, requestID, s.now().Add(-captureRetention).
 	if err != nil || json.Unmarshal([]byte(body), &capture) != nil {
 		return capture, storageError()
 	}
+	capture.ErrorCode = contracts.SafeErrorCode(capture.ErrorCode)
 	return capture, nil
 }
 
@@ -95,7 +100,7 @@ func (s *Store) ListFailureCaptures(ctx context.Context, before int64, limit int
 	if limit < 1 || limit > 200 || before < 0 {
 		return nil, routing.Fail("invalid_request", "invalid failure capture pagination")
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT sequence,request_id,created_ns FROM failure_captures
+	rows, err := s.db.QueryContext(ctx, `SELECT sequence,request_id,created_ns,COALESCE(json_extract(body,'$.error_code'),'') FROM failure_captures
 WHERE created_ns>? AND (?=0 OR sequence<?) ORDER BY sequence DESC LIMIT ?`,
 		s.now().Add(-captureRetention).UnixNano(), before, before, limit)
 	if err != nil {
@@ -106,9 +111,10 @@ WHERE created_ns>? AND (?=0 OR sequence<?) ORDER BY sequence DESC LIMIT ?`,
 	for rows.Next() {
 		var item FailureCaptureSummary
 		var created int64
-		if rows.Scan(&item.Sequence, &item.RequestID, &created) != nil {
+		if rows.Scan(&item.Sequence, &item.RequestID, &created, &item.ErrorCode) != nil {
 			return nil, storageError()
 		}
+		item.ErrorCode = contracts.SafeErrorCode(item.ErrorCode)
 		item.CreatedAt = time.Unix(0, created).UTC()
 		items = append(items, item)
 	}

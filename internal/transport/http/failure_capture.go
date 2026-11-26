@@ -131,6 +131,6 @@ func beginFailureCapture(w http.ResponseWriter, r *http.Request, store any) (htt
 		}
 		saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
 		defer cancel()
-		_ = sink.SaveFailureCapture(saveCtx, state.FailureCapture{RequestID: id, CreatedAt: time.Now(), Evidence: encoded})
+		_ = sink.SaveFailureCapture(saveCtx, state.FailureCapture{ErrorCode: routing.Diagnose(finalErr).Code, RequestID: id, CreatedAt: time.Now(), Evidence: encoded})
 	}
 }
