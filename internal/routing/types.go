@@ -183,12 +183,13 @@ type Usage struct {
 	OutputTokens  int64           `json:"output_tokens"`
 }
 type Error struct {
-	Field                     string            `json:"-"`
-	HealthExclusionsTruncated bool              `json:"health_exclusions_truncated,omitempty"`
-	HealthExclusions          []HealthExclusion `json:"health_exclusions,omitempty"`
-	Code                      string            `json:"code"`
-	Message                   string            `json:"message"`
-	Retryable                 bool              `json:"retryable"`
+	ChatValidation            *contracts.ChatViolation `json:"chat_validation,omitempty"`
+	Field                     string                   `json:"-"`
+	HealthExclusionsTruncated bool                     `json:"health_exclusions_truncated,omitempty"`
+	HealthExclusions          []HealthExclusion        `json:"health_exclusions,omitempty"`
+	Code                      string                   `json:"code"`
+	Message                   string                   `json:"message"`
+	Retryable                 bool                     `json:"retryable"`
 }
 
 func (e *Error) Error() string        { return e.Code + ": " + e.Message }

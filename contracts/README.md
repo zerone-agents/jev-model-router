@@ -296,3 +296,9 @@ A body projection marks omissions and truncation separately. SSE preserves
 safe event order, the last complete frame projection and terminal evidence
 even when earlier frames exceed the retention budget. Free text and
 credentials are excluded from capture body projections.
+
+Chat schema rejections may include a `chat_validation` object in the error
+response and in failure capture evidence. It contains a bounded field path,
+a validation rule and, where available, expected and actual JSON shapes.
+Unknown field names are represented as `unknown_field`. The diagnostic does
+not contain raw field values and survives request body truncation.

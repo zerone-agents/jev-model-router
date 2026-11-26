@@ -121,11 +121,15 @@ func beginFailureCapture(w http.ResponseWriter, r *http.Request, store any) (htt
 			}
 			writer.body.Finish(end)
 		}
-		encoded, err := json.Marshal(map[string]any{
+		evidence := map[string]any{
 			"request": request, "response": writer.body, "status": writer.status, "upstream": upstream, "payload_omitted": !writer.collectBody,
 			"method": "POST", "protocol": protocol, "duration_ms": time.Since(start).Milliseconds(),
 			"request_headers": requestHeaders, "response_headers": failurecapture.ProtocolHeaders(writer.Header()),
-		})
+		}
+		if errors.As(finalErr, &failure) && failure.ChatValidation != nil {
+			evidence["chat_validation"] = failure.ChatValidation
+		}
+		encoded, err := json.Marshal(evidence)
 		if err != nil {
 			return
 		}

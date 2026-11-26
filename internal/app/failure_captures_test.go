@@ -90,6 +90,17 @@ func TestFailureCaptureThroughManagementHTTP(t *testing.T) {
 	if list.Code != 200 || !strings.Contains(list.Body.String(), `"failure_capture_available":true`) {
 		t.Fatalf("missing record marker: %d %s", list.Code, list.Body)
 	}
+	oversized := request("POST", "/v1/chat/completions", "inference-test",
+		`{"model":"auto","messages":[{"role":"user","content":"`+strings.Repeat("x", 64<<10)+`"},{"role":"user","content":[{"type":null}]}]}`)
+	if oversized.Code != 400 || !strings.Contains(oversized.Body.String(), "messages[1].content[0].type") {
+		t.Fatalf("missing nested HTTP diagnostic: %d %s", oversized.Code, oversized.Body)
+	}
+	nestedInput, _ := json.Marshal(map[string]string{"request_id": oversized.Header().Get("X-Request-ID")})
+	nested := runCLI(string(nestedInput), "call", "records.capture.get", "--json", "-")
+	if !strings.Contains(nested, "messages[1].content[0].type") || !strings.Contains(nested, `"truncated":true`) {
+		t.Fatalf("missing independent capture diagnostic: %s", nested)
+	}
+
 	second := request("POST", "/v1/chat/completions", "inference-test", `{"model":"auto","max_tokens":1}`)
 	if second.Code != 400 || second.Header().Get("X-Request-ID") == id {
 		t.Fatalf("failed to generate another routing record: %d %s", second.Code, second.Body)
