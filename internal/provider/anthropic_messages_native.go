@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	bifrost "github.com/maximhq/bifrost/core"
 	"github.com/maximhq/bifrost/core/schemas"
+	"github.com/zerone-agents/jev-model-router/internal/failurecapture"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 )
 
@@ -15,6 +16,7 @@ func completeNativeMessages(ctx *schemas.BifrostContext, client *bifrost.Bifrost
 	if err != nil {
 		return nil, err
 	}
+	record := failurecapture.BeginNative(ctx, body)
 	out, failure := client.Passthrough(ctx, schemas.Anthropic, nativeMessagesTransportRequest(target.Model.UpstreamName, body))
 	if ctx.Err() != nil || failure != nil {
 		return nil, anthropicUpstreamError(ctx, failure)
@@ -22,6 +24,8 @@ func completeNativeMessages(ctx *schemas.BifrostContext, client *bifrost.Bifrost
 	if out == nil {
 		return nil, nativeError(502)
 	}
+	failurecapture.RecordSDKHeaders(record, out.Headers)
+	record(out.StatusCode, "application/json", out.Body, "complete")
 	if out.StatusCode != 200 {
 		err := nativeReportedError(out.StatusCode, out.Body, upstreamSecret(ctx)).(*routing.UpstreamError)
 		addUpstreamRequestID(ctx, err.Details, out.Headers)

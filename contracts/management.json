@@ -28,6 +28,10 @@
           "minimum": 0,
           "description": "Enabled models whose observed upstream health is healthy; omitted when health is unavailable."
         },
+        "failure_capture_degraded": {
+          "type": "boolean",
+          "description": "The latest failed-capture write could not be persisted."
+        },
         "records_degraded": {
           "type": "boolean"
         },
@@ -2080,6 +2084,10 @@
           "items": {
             "type": "object",
             "properties": {
+              "failure_capture_available": {
+                "type": "boolean",
+                "description": "A retained failure capture can be retrieved by Request ID using Settings Bearer authentication."
+              },
               "request_id": {
                 "type": "string"
               },
@@ -2475,5 +2483,134 @@
       }
     ],
     "write": true
+  },
+  {
+    "id": "records.capture.list",
+    "description": "List retained failure captures independently of routing records",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "before": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "captures": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "request_id": {"type": "string"},
+              "sequence": {"type": "integer", "minimum": 1},
+              "created_at": {"type": "string", "format": "date-time"},
+              "error_code": {"type": "string"}
+            },
+            "required": ["request_id", "sequence", "created_at", "error_code"],
+            "additionalProperties": false
+          }
+        },
+        "next_before": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "captures",
+        "next_before"
+      ],
+      "additionalProperties": false
+    },
+    "risk": "L0",
+    "examples": [{}],
+    "write": false
+  },
+  {
+    "id": "records.capture.get",
+    "description": "Retrieve or export sanitized failure evidence by request ID",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "request_id"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "request_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "error_code": {"type": "string"},
+        "evidence": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "request_id",
+        "created_at",
+        "error_code",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "risk": "L0",
+    "examples": [{"request_id": "EXAMPLE_REQUEST"}],
+    "write": false
+  },
+  {
+    "id": "records.capture.delete",
+    "description": "Delete failure evidence by request ID; retry-safe and independent of configuration versions",
+    "role": "settings",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "request_id"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "deleted"
+      ],
+      "additionalProperties": false
+    },
+    "risk": "L2",
+    "examples": [{"request_id": "EXAMPLE_REQUEST"}],
+    "write": false
   }
 ]

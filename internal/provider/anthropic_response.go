@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"github.com/zerone-agents/jev-model-router/internal/failurecapture"
 	"time"
 
 	"github.com/maximhq/bifrost/core/providers/anthropic"
@@ -19,6 +20,7 @@ func (g *bifrostGenerator) completeMessages(ctx context.Context, t routing.Targe
 		return nil, err
 	}
 	defer release()
+	ctx = failurecapture.WithUpstreamOrigin(ctx, t.Provider.BaseURL)
 	ctx = context.WithValue(ctx, upstreamSecretKey{}, secret)
 	bc := schemas.NewBifrostContext(ctx, time.Time{})
 	defer bc.Cancel()

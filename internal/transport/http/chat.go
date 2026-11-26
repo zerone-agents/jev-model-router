@@ -8,9 +8,10 @@ import (
 )
 
 func (s *server) chat(w http.ResponseWriter, r *http.Request) {
+	w, r, finishCapture := beginFailureCapture(w, r, s.store)
 	execution := s.inference.Begin(r.Context(), w.Header().Get("X-Request-ID"))
 	var finalErr error
-	defer func() { execution.Finish(finalErr) }()
+	defer func() { execution.Finish(finalErr); finishCapture(finalErr) }()
 	fail := func(e error) { finalErr = e; writeError(w, e) }
 	r.Body = http.MaxBytesReader(w, r.Body, s.limits.MaxBodyBytes)
 	req, e := decodeChatRequest(r.Body)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/zerone-agents/jev-model-router/internal/failurecapture"
 	"io"
 	"sync"
 	"time"
@@ -57,6 +58,7 @@ func (g *bifrostGenerator) streamMessages(ctx context.Context, t routing.Target,
 	if err != nil {
 		return nil, err
 	}
+	ctx = failurecapture.WithUpstreamOrigin(ctx, t.Provider.BaseURL)
 	ctx = context.WithValue(ctx, upstreamSecretKey{}, secret)
 	bc := schemas.NewBifrostContext(ctx, time.Time{})
 	bc.SetValue(schemas.BifrostContextKeyAllowPerRequestRawOverride, true)

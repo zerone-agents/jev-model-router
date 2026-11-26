@@ -176,16 +176,34 @@ type Mapping struct {
 	Exit int `json:"exit_code"`
 }
 
-func ErrorMapping(code string) Mapping {
+func errorMappings() map[string]Mapping {
 	var v struct {
 		Errors map[string]Mapping `json:"error_mapping"`
 	}
 	b, _ := files.ReadFile("schemas/results.json")
 	json.Unmarshal(b, &v)
-	if m, ok := v.Errors[code]; ok {
+	return v.Errors
+}
+
+// SafeErrorCode permits public error codes and stable upstream classifications.
+func SafeErrorCode(code string) string {
+	switch code {
+	case "upstream_authentication", "upstream_content_rejected", "upstream_invalid_request",
+		"upstream_not_found", "upstream_permission", "upstream_quota", "upstream_rate_limit", "upstream_unavailable":
+		return code
+	}
+	if _, ok := errorMappings()[code]; ok {
+		return code
+	}
+	return "internal_error"
+}
+
+func ErrorMapping(code string) Mapping {
+	mappings := errorMappings()
+	if m, ok := mappings[code]; ok {
 		return m
 	}
-	return v.Errors["internal_error"]
+	return mappings["internal_error"]
 }
 
 // callSchema is shared by discovery and the write boundary. Business input

@@ -20,14 +20,15 @@ type ConfigStore interface {
 }
 type Handler func(context.Context, string, Call) (Result, error)
 type Service struct {
-	Fallback        map[string]any
-	Health          *routing.HealthGate
-	store           ConfigStore
-	validate        func(routing.Snapshot) error
-	mu              sync.RWMutex
-	handlers        map[string]Handler
-	RecordsDegraded func() bool
-	ResolveSecret   func(string) ([]byte, error)
+	Fallback               map[string]any
+	Health                 *routing.HealthGate
+	store                  ConfigStore
+	validate               func(routing.Snapshot) error
+	mu                     sync.RWMutex
+	handlers               map[string]Handler
+	RecordsDegraded        func() bool
+	FailureCaptureDegraded func() bool
+	ResolveSecret          func(string) ([]byte, error)
 }
 
 func New(store ConfigStore, validate func(routing.Snapshot) error) *Service {
@@ -135,7 +136,8 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 			}
 		}
 		degraded := s.RecordsDegraded != nil && s.RecordsDegraded()
-		result := Success(map[string]any{"version": cfg.Version, "ready": n > 0 && ((n == 1 && !needsDecision) || cfg.Decision.Model != ""), "enabled_models": n, "records_degraded": degraded, "auto_fallback": s.Fallback}, time.Now())
+		captureDegraded := s.FailureCaptureDegraded != nil && s.FailureCaptureDegraded()
+		result := Success(map[string]any{"failure_capture_degraded": captureDegraded, "version": cfg.Version, "ready": n > 0 && ((n == 1 && !needsDecision) || cfg.Decision.Model != ""), "enabled_models": n, "records_degraded": degraded, "auto_fallback": s.Fallback}, time.Now())
 		if healthAvailable {
 			var data map[string]any
 			_ = json.Unmarshal(result.Data, &data)
@@ -144,6 +146,9 @@ func (s *Service) Execute(ctx context.Context, principal string, c Call) (Result
 		}
 		if s.Health != nil && (!healthAvailable || s.Health.Service.Warning()) {
 			result.Warnings = append(result.Warnings, "health_degraded")
+		}
+		if captureDegraded {
+			result.Warnings = append(result.Warnings, "failure_capture_degraded")
 		}
 		if degraded {
 			result.Warnings = append(result.Warnings, "records_degraded")

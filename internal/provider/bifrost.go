@@ -7,6 +7,7 @@ import (
 	"errors"
 	bifrost "github.com/maximhq/bifrost/core"
 	"github.com/maximhq/bifrost/core/schemas"
+	"github.com/zerone-agents/jev-model-router/internal/failurecapture"
 	"github.com/zerone-agents/jev-model-router/internal/health"
 	"github.com/zerone-agents/jev-model-router/internal/routing"
 	"io"
@@ -91,6 +92,7 @@ func (g *bifrostGenerator) complete(ctx context.Context, t routing.Target, r rou
 		return routing.Completion{}, e
 	}
 	defer release()
+	ctx = failurecapture.WithUpstreamOrigin(ctx, t.Provider.BaseURL)
 	ctx = context.WithValue(ctx, upstreamSecretKey{}, secret)
 	bc := schemas.NewBifrostContext(ctx, time.Time{})
 	defer bc.Cancel()
@@ -103,7 +105,17 @@ func (g *bifrostGenerator) complete(ctx context.Context, t routing.Target, r rou
 	if t.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
 		return completeNativePassthrough(bc, client, req, routing.RequiresTools(r), nativeSignatureOptional(t))
 	}
+	record := failurecapture.BeginNative(bc, nil)
+	bc.SetValue(schemas.BifrostContextKeySendBackRawRequest, true)
 	out, fail := client.ChatCompletionRequest(bc, req)
+	if out != nil {
+		recordSDKRequest(record, out.ExtraFields.RawRequest)
+		failurecapture.RecordSDKHeaders(record, out.ExtraFields.ProviderResponseHeaders)
+		record(200, "application/json", sdkBody(out.ExtraFields.RawResponse), "complete")
+	}
+	if fail != nil {
+		recordSDKFailure(record, fail)
+	}
 	if fail != nil {
 		return routing.Completion{}, providerError(bc, fail)
 	}
@@ -117,6 +129,7 @@ func (g *bifrostGenerator) stream(ctx context.Context, t routing.Target, r routi
 	if e != nil {
 		return nil, e
 	}
+	ctx = failurecapture.WithUpstreamOrigin(ctx, t.Provider.BaseURL)
 	ctx = context.WithValue(ctx, upstreamSecretKey{}, secret)
 	bc := schemas.NewBifrostContext(ctx, time.Time{})
 	// Inspect original usage presence: the pinned SDK otherwise invents a zero
@@ -132,18 +145,22 @@ func (g *bifrostGenerator) stream(ctx context.Context, t routing.Target, r routi
 	if t.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
 		return streamNativePassthrough(bc, client, req, routing.RequiresTools(r), nativeSignatureOptional(t), release)
 	}
-	captureStreamErrors(bc)
+	record := failurecapture.BeginNative(bc, nil)
+	bc.SetValue(schemas.BifrostContextKeySendBackRawRequest, true)
+	captureStreamErrors(bc, record)
 	ch, fail := client.ChatCompletionStreamRequest(bc, req)
 	if fail != nil {
+		recordSDKFailure(record, fail)
 		err := providerError(bc, fail)
 		bc.Cancel()
 		release()
 		return nil, err
 	}
-	return &stream{ctx: bc, ch: ch, release: release}, nil
+	return &stream{ctx: bc, ch: ch, release: release, record: record}, nil
 }
 
 type stream struct {
+	record        func(int, string, []byte, string)
 	ctx           *schemas.BifrostContext
 	ch            chan *schemas.BifrostStreamChunk
 	release       func()
@@ -167,10 +184,18 @@ func (s *stream) Next(ctx context.Context) (routing.Event, error) {
 			return routing.Event{}, io.EOF
 		}
 		if chunk.BifrostError != nil {
+			if s.record != nil {
+				fail := chunk.BifrostError
+				recordSDKFailure(s.record, fail)
+			}
 			return routing.Event{}, providerError(s.ctx, chunk.BifrostError)
 		}
 		if chunk.BifrostChatResponse == nil {
 			return routing.Event{}, routing.TemporaryUpstream(routing.Fail("upstream_error", "invalid stream event"))
+		}
+		if s.record != nil {
+			recordSDKRequest(s.record, chunk.BifrostChatResponse.ExtraFields.RawRequest)
+			failurecapture.RecordSDKHeaders(s.record, chunk.BifrostChatResponse.ExtraFields.ProviderResponseHeaders)
 		}
 		s.reportedUsage = s.reportedUsage || hasReportedUsage(chunk.BifrostChatResponse.ExtraFields.RawResponse)
 		out, e := completion(chunk.BifrostChatResponse)
@@ -185,7 +210,16 @@ func (s *stream) Next(ctx context.Context) (routing.Event, error) {
 		return out, e
 	}
 }
-func (s *stream) Close() error { s.once.Do(func() { s.ctx.Cancel(); s.release() }); return nil }
+func (s *stream) Close() error {
+	s.once.Do(func() {
+		s.ctx.Cancel()
+		if s.record != nil {
+			s.record(0, "", nil, "closed")
+		}
+		s.release()
+	})
+	return nil
+}
 func completion(in *schemas.BifrostChatResponse) (routing.Completion, error) {
 	if in == nil {
 		return routing.Completion{}, routing.TemporaryUpstream(routing.Fail("upstream_error", "empty generation result"))
@@ -369,5 +403,37 @@ func addUpstreamRequestID(ctx context.Context, details *routing.UpstreamDetails,
 				return
 			}
 		}
+	}
+}
+
+func sdkBody(value any) []byte {
+	switch body := value.(type) {
+	case string:
+		return []byte(body)
+	case []byte:
+		return body
+	case json.RawMessage:
+		return body
+	case map[string]any:
+		encoded, _ := json.Marshal(body)
+		return encoded
+	default:
+		return nil
+	}
+}
+
+func recordSDKRequest(record func(int, string, []byte, string), value any) {
+	if body := sdkBody(value); body != nil {
+		record(0, "request", body, "complete")
+	}
+}
+
+func recordSDKFailure(record func(int, string, []byte, string), fail *schemas.BifrostError) {
+	recordSDKRequest(record, fail.ExtraFields.RawRequest)
+	if fail.StatusCode != nil {
+		record(*fail.StatusCode, "application/json", sdkBody(fail.ExtraFields.RawResponse), "complete")
+	}
+	if fail.Error != nil && fail.Error.Type != nil {
+		record(0, "parsed_error_type", []byte(*fail.Error.Type), "")
 	}
 }

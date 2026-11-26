@@ -35,6 +35,13 @@ func newRequestManagementHandler(s *management.Service, authenticate func(*http.
 			return
 		}
 		path := r.URL.Path
+		if strings.HasPrefix(path, "/admin/v1/call/records.capture.") {
+			w.Header().Set("Cache-Control", "no-store")
+			if !strings.HasPrefix(strings.ToLower(r.Header.Get("Authorization")), "bearer ") {
+				writeResult(w, management.Failure(routing.Fail("forbidden", "settings bearer credential required")))
+				return
+			}
+		}
 		if r.Method == "GET" && path == "/admin/v1/schema" {
 			writeResult(w, management.Success(s.Catalog(), time.Now()))
 			return
