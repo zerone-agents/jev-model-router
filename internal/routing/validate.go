@@ -163,9 +163,9 @@ func ValidateChatSchema(b json.RawMessage) error {
 			if err != nil || name == "" {
 				name = "unknown_field"
 			}
-			return &Error{Code: "unsupported_request", Message: "unsupported or invalid chat field: " + field, Field: name}
+			return &Error{Code: "unsupported_request", Message: "unsupported or invalid chat field: " + field, Field: name, ChatValidation: contracts.ChatSchemaViolation(b)}
 		}
-		return Fail("unsupported_request", "request is outside the supported chat schema")
+		return &Error{Code: "unsupported_request", Message: "request is outside the supported chat schema", ChatValidation: contracts.ChatSchemaViolation(b)}
 	}
 	return nil
 }

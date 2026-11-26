@@ -77,3 +77,16 @@ func TestChatAndInspectionOutputLimitContracts(t *testing.T) {
 		}
 	}
 }
+
+func TestChatSchemaViolationNested(t *testing.T) {
+	for _, tc := range []struct{ input, path, rule, actual string }{
+		{`{"model":"auto","messages":[{"role":"user","content":[{"type":null}]}]}`, "messages[0].content[0].type", "const", "null"},
+		{`{"model":"auto","messages":[{"role":"user","content":"hello"}],"tools":[{"type":"function","function":{"name":null}}]}`, "tools[0].function.name", "type", "null"},
+		{`{"model":"auto","messages":[{"content":"hello"}]}`, "messages[0].role", "required", "missing"},
+	} {
+		d := ChatSchemaViolation(json.RawMessage(tc.input))
+		if d == nil || d.Path != tc.path || d.Rule != tc.rule || d.Actual != tc.actual {
+			t.Errorf("%s: got %+v", tc.input, d)
+		}
+	}
+}

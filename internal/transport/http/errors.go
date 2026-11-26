@@ -21,6 +21,9 @@ func errorBody(e error) map[string]any {
 	}
 	known := management.Failure(e).Error
 	body := map[string]any{"message": known.Message, "type": known.Code, "code": known.Code, "param": nil}
+	if known.ChatValidation != nil {
+		body["chat_validation"] = known.ChatValidation
+	}
 	if len(known.HealthExclusions) > 0 {
 		body["health_exclusions"] = known.HealthExclusions
 		if known.HealthExclusionsTruncated {
