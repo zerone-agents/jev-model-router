@@ -28,10 +28,11 @@ func (p Provider) MarshalJSON() ([]byte, error) {
 }
 
 type Provider struct {
-	Protocol  ProviderProtocol `json:"protocol"`
-	ID        string           `json:"id"`
-	BaseURL   string           `json:"base_url"`
-	SecretRef string           `json:"secret_ref"`
+	ChatUnsignedThinking *bool            `json:"chat_unsigned_thinking,omitempty"`
+	Protocol             ProviderProtocol `json:"protocol"`
+	ID                   string           `json:"id"`
+	BaseURL              string           `json:"base_url"`
+	SecretRef            string           `json:"secret_ref"`
 }
 
 // ReasoningCombination declares supported controls. Effort entries drive Auto
@@ -49,14 +50,15 @@ type Capabilities struct {
 	StructuredOutput bool                   `json:"structured_output"`
 }
 type Model struct {
-	Revision     string       `json:"-"`
-	ID           string       `json:"id"`
-	ProviderID   string       `json:"provider_id"`
-	UpstreamName string       `json:"upstream_name"`
-	Description  string       `json:"description"`
-	Location     string       `json:"location"`
-	Enabled      bool         `json:"enabled"`
-	Capabilities Capabilities `json:"capabilities"`
+	ChatUnsignedThinking *bool        `json:"chat_unsigned_thinking,omitempty"`
+	Revision             string       `json:"-"`
+	ID                   string       `json:"id"`
+	ProviderID           string       `json:"provider_id"`
+	UpstreamName         string       `json:"upstream_name"`
+	Description          string       `json:"description"`
+	Location             string       `json:"location"`
+	Enabled              bool         `json:"enabled"`
+	Capabilities         Capabilities `json:"capabilities"`
 }
 type DecisionConfig struct {
 	Location  string `json:"location,omitempty"`

@@ -71,14 +71,15 @@ func (s *Store) prepareCredential(ctx context.Context, tx *sql.Tx, c management.
 		return c, nil
 	}
 	var input struct {
-		Model     string                   `json:"model"`
-		Location  string                   `json:"location"`
-		Path      string                   `json:"path"`
-		Protocol  routing.ProviderProtocol `json:"protocol"`
-		ID        string                   `json:"id"`
-		BaseURL   string                   `json:"base_url"`
-		SecretRef string                   `json:"secret_ref"`
-		APIKey    *string                  `json:"api_key"`
+		Model                string                   `json:"model"`
+		Location             string                   `json:"location"`
+		Path                 string                   `json:"path"`
+		ChatUnsignedThinking *bool                    `json:"chat_unsigned_thinking,omitempty"`
+		Protocol             routing.ProviderProtocol `json:"protocol"`
+		ID                   string                   `json:"id"`
+		BaseURL              string                   `json:"base_url"`
+		SecretRef            string                   `json:"secret_ref"`
+		APIKey               *string                  `json:"api_key"`
 	}
 	if json.Unmarshal(c.Input, &input) != nil {
 		return c, routing.Fail("invalid_request", "invalid credential input")
@@ -109,7 +110,7 @@ func (s *Store) prepareCredential(ctx context.Context, tx *sql.Tx, c management.
 		c.Input, _ = json.Marshal(routing.DecisionConfig{BaseURL: input.BaseURL, Path: input.Path, Model: input.Model, SecretRef: input.SecretRef, Location: input.Location})
 		return c, nil
 	}
-	c.Input, _ = json.Marshal(routing.Provider{Protocol: input.Protocol, ID: input.ID, BaseURL: input.BaseURL, SecretRef: input.SecretRef})
+	c.Input, _ = json.Marshal(routing.Provider{ChatUnsignedThinking: input.ChatUnsignedThinking, Protocol: input.Protocol, ID: input.ID, BaseURL: input.BaseURL, SecretRef: input.SecretRef})
 	return c, nil
 }
 

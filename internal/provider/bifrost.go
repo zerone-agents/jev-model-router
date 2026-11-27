@@ -103,7 +103,7 @@ func (g *bifrostGenerator) complete(ctx context.Context, t routing.Target, r rou
 		return routing.Completion{}, e
 	}
 	if t.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
-		return completeNativePassthrough(bc, client, req, routing.RequiresTools(r), nativeSignatureOptional(t))
+		return completeNativePassthrough(bc, client, req, routing.RequiresTools(r), chatSignatureOptional(t))
 	}
 	record := failurecapture.BeginNative(bc, nil)
 	bc.SetValue(schemas.BifrostContextKeySendBackRawRequest, true)
@@ -143,7 +143,7 @@ func (g *bifrostGenerator) stream(ctx context.Context, t routing.Target, r routi
 		return nil, e
 	}
 	if t.Provider.EffectiveProtocol() == routing.ProtocolAnthropic {
-		return streamNativePassthrough(bc, client, req, routing.RequiresTools(r), nativeSignatureOptional(t), release)
+		return streamNativePassthrough(bc, client, req, routing.RequiresTools(r), chatSignatureOptional(t), release)
 	}
 	record := failurecapture.BeginNative(bc, nil)
 	bc.SetValue(schemas.BifrostContextKeySendBackRawRequest, true)

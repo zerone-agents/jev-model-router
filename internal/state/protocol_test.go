@@ -31,7 +31,7 @@ func TestProviderProtocolPersistence(t *testing.T) {
 		t.Fatalf("legacy read: %s version %d", b, cfg.Version)
 	}
 	v := cfg.Version
-	c := management.Call{CapabilityID: "providers.put", Input: json.RawMessage(`{"id":"p","base_url":"https://example.com/v1","api_key":"secret","protocol":"anthropic"}`), ExpectedVersion: &v, IdempotencyKey: "native"}
+	c := management.Call{CapabilityID: "providers.put", Input: json.RawMessage(`{"id":"p","base_url":"https://example.com/v1","api_key":"secret","protocol":"anthropic","chat_unsigned_thinking":true}`), ExpectedVersion: &v, IdempotencyKey: "native"}
 	first, e := s.Apply(ctx, "settings", c, nil)
 	if e != nil {
 		t.Fatal(e)
@@ -39,8 +39,8 @@ func TestProviderProtocolPersistence(t *testing.T) {
 	cfg, _ = s.Snapshot(ctx)
 	b, _ = json.Marshal(cfg.Providers[0])
 	json.Unmarshal(b, &old)
-	if old["protocol"] != "anthropic" {
-		t.Fatalf("managed DTO lost protocol: %s", b)
+	if old["protocol"] != "anthropic" || old["chat_unsigned_thinking"] != true {
+		t.Fatalf("managed DTO lost provider settings: %s", b)
 	}
 	replay, e := s.Apply(ctx, "settings", c, nil)
 	if e != nil || replay.Meta.OperationID != first.Meta.OperationID {
