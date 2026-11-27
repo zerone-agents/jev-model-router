@@ -261,3 +261,9 @@ Failure capture exports may include confidential original request bodies
 under `original_requests`. Decode `bytes_base64` for byte-exact inspection
 and check each body's state before using it. Treat exports as sensitive and
 avoid printing or sharing original payloads unless authorized.
+
+For OpenAI-compatible provider endpoints, `providers.put` accepts optional
+`thinking_format`. Use `top_level` for Alibaba Model Studio endpoints that
+expect `enable_thinking`, and `chat_template_kwargs` for vLLM. Omission
+preserves nested outbound encoding. Chat accepts either boolean spelling
+and rejects conflicting aliases.

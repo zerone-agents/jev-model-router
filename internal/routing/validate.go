@@ -167,6 +167,18 @@ func ValidateChatSchema(b json.RawMessage) error {
 		}
 		return &Error{Code: "unsupported_request", Message: "request is outside the supported chat schema", ChatValidation: contracts.ChatSchemaViolation(b)}
 	}
+	if top := fields["enable_thinking"]; top != nil && fields["chat_template_kwargs"] != nil {
+		var flag bool
+		var nested struct {
+			Enable bool `json:"enable_thinking"`
+		}
+		_ = json.Unmarshal(top, &flag)
+		_ = json.Unmarshal(fields["chat_template_kwargs"], &nested)
+		if flag != nested.Enable {
+			return &Error{Code: "invalid_request", Field: "enable_thinking", Message: "enable_thinking conflicts with chat_template_kwargs.enable_thinking",
+				ChatValidation: &contracts.ChatViolation{Path: "enable_thinking", Rule: "alias_conflict", Expected: "same boolean as chat_template_kwargs.enable_thinking", Actual: "boolean"}}
+		}
+	}
 	return nil
 }
 
@@ -179,7 +191,7 @@ func SafeErrorField(err error) string {
 	}
 	name := known.Field
 	switch name {
-	case "model", "messages", "tools", "stream", "temperature", "top_p", "max_completion_tokens", "stop", "tool_choice", "parallel_tool_calls", "response_format", "stream_options", "max_tokens", "reasoning_effort", "chat_template_kwargs", "frequency_penalty", "presence_penalty", "logit_bias", "logprobs", "top_logprobs", "n", "seed", "user", "service_tier", "store", "metadata", "modalities", "audio", "prediction", "functions", "function_call", "web_search_options", "prompt_cache_key", "safety_identifier":
+	case "model", "messages", "tools", "stream", "temperature", "top_p", "max_completion_tokens", "stop", "tool_choice", "parallel_tool_calls", "response_format", "stream_options", "max_tokens", "reasoning_effort", "enable_thinking", "chat_template_kwargs", "frequency_penalty", "presence_penalty", "logit_bias", "logprobs", "top_logprobs", "n", "seed", "user", "service_tier", "store", "metadata", "modalities", "audio", "prediction", "functions", "function_call", "web_search_options", "prompt_cache_key", "safety_identifier":
 		return name
 	default:
 		return "unknown_field"

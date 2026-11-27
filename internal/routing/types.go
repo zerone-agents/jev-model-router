@@ -28,10 +28,11 @@ func (p Provider) MarshalJSON() ([]byte, error) {
 }
 
 type Provider struct {
-	Protocol  ProviderProtocol `json:"protocol"`
-	ID        string           `json:"id"`
-	BaseURL   string           `json:"base_url"`
-	SecretRef string           `json:"secret_ref"`
+	ThinkingFormat string           `json:"thinking_format,omitempty"`
+	Protocol       ProviderProtocol `json:"protocol"`
+	ID             string           `json:"id"`
+	BaseURL        string           `json:"base_url"`
+	SecretRef      string           `json:"secret_ref"`
 }
 
 // ReasoningCombination declares supported controls. Effort entries drive Auto
@@ -142,6 +143,13 @@ func (r *Request) UnmarshalJSON(b []byte) error {
 		if e != nil {
 			return Fail("invalid_request", "invalid chat field: "+k)
 		}
+	}
+	// Keep the original for schema and alias conflict validation.
+	if top := r.Options["enable_thinking"]; top != nil {
+		if r.Options["chat_template_kwargs"] == nil {
+			r.Options["chat_template_kwargs"], _ = json.Marshal(map[string]json.RawMessage{"enable_thinking": top})
+		}
+		delete(r.Options, "enable_thinking")
 	}
 	// Retain raw input for validation, but expose one output limit internally.
 	if value, ok := r.Options["max_tokens"]; ok && r.Options["max_completion_tokens"] == nil {

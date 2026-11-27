@@ -233,3 +233,10 @@ not a paid-provider quality benchmark.
 See the [service guide](../services/laya/README.md) for deployment and current
 publication status. Preserve the existing hosted decision backend when the local
 service is not explicitly configured; there is no implicit backend switching.
+
+Chat and route inspection accept top-level boolean `enable_thinking` as an
+alias for `chat_template_kwargs.enable_thinking`. Both may be supplied if
+their values agree. An OpenAI-compatible provider's `thinking_format`
+selects outbound encoding: `top_level` for Alibaba Model Studio or
+`chat_template_kwargs` for vLLM. Omission preserves nested encoding.
+Anthropic upstream encoding uses its existing native thinking mapping.
