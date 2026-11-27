@@ -37,6 +37,28 @@ func TestNativeSignatureOptionalProfile(t *testing.T) {
 	}
 }
 
+func TestChatUnsignedThinkingPolicy(t *testing.T) {
+	enabled, disabled := true, false
+	target := nativeTarget("https://open.bigmodel.cn/api/anthropic/v1")
+	target.Model.UpstreamName = "glm-future"
+	if chatSignatureOptional(target) {
+		t.Fatal("unconfigured model inherited the legacy exception")
+	}
+	target.Provider.ChatUnsignedThinking = &enabled
+	if !chatSignatureOptional(target) || nativeSignatureOptional(target) {
+		t.Fatal("provider policy must apply only to Chat")
+	}
+	target.Model.ChatUnsignedThinking = &disabled
+	if chatSignatureOptional(target) {
+		t.Fatal("model did not override provider policy")
+	}
+	target.Model.ChatUnsignedThinking = nil
+	target.Provider.BaseURL = "https://proxy.example/api/anthropic/v1"
+	if chatSignatureOptional(target) {
+		t.Fatal("policy leaked to a third-party endpoint")
+	}
+}
+
 func TestNativeOptionalSignatureResponses(t *testing.T) {
 	raw := []byte(`{"id":"m","type":"message","role":"assistant","model":"glm-5.3","content":[{"type":"thinking","thinking":"Need lookup.","signature":"provider-signature"},{"type":"tool_use","id":"c1","name":"lookup","input":{"q":"x"}}],"stop_reason":"tool_use"}`)
 	var native anthropic.AnthropicMessageResponse
@@ -72,7 +94,10 @@ func TestNativeOptionalSignatureResponses(t *testing.T) {
 		}
 		body += nativeFrame("content_block_stop", `{"type":"content_block_stop","index":0}`) + nativeFrame("content_block_start", `{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"c1","name":"lookup","input":{"q":"x"}}}`) + nativeFrame("content_block_stop", `{"type":"content_block_stop","index":1}`) + strings.Replace(nativeEnd(), "end_turn", "tool_use", 1)
 		for _, optional := range []bool{false, true} {
-			state := &anthropicUpstreamValidation{tools: true, signatureOptional: optional}
+			target := nativeTarget("https://open.bigmodel.cn/api/anthropic/v1")
+			target.Model.UpstreamName = "glm-5.4"
+			target.Provider.ChatUnsignedThinking = &optional
+			state := &anthropicUpstreamValidation{tools: true, signatureOptional: chatSignatureOptional(target)}
 			reader := newAnthropicUpstreamReader(strings.NewReader(body), state)
 			var err error
 			for err == nil {

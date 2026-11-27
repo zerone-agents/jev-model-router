@@ -315,3 +315,7 @@ The Router uses a separate owner-only key file beside SQLite
 (`<database>.capture-key`). Keep it with the database when moving an instance
 that needs to read existing encrypted captures. Capture expiry and deletion
 remove the encrypted originals from normal retrieval.
+
+## BigModel Chat thinking compatibility
+
+For Chat requests targeting the official BigModel HTTPS Anthropic endpoint (`https://open.bigmodel.cn/api/anthropic/v1`), set `chat_unsigned_thinking: true` in `providers.put` to retain visible thinking and omit the signature when translating responses with tools. A model can override this policy using the same field in `models.put`. Preserve the field on replacements. When both fields are omitted, the existing GLM-5.3 and GLM-5.3 Flash compatibility remains active. This setting only applies to Chat conversion. Native Messages continues to preserve signatures. Validate a tool call and its tool-result continuation before enabling this policy for a new upstream.
