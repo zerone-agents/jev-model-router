@@ -192,3 +192,31 @@ func TestCancelDuringReasoning(t *testing.T) {
 		t.Fatal("cancellation did not reach upstream")
 	}
 }
+
+func TestThinkingAliasEndpointFormat(t *testing.T) {
+	for _, format := range []string{"", "chat_template_kwargs", "top_level"} {
+		t.Run(format, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var body map[string]json.RawMessage
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Error(err)
+				}
+				if format == "top_level" {
+					if string(body["enable_thinking"]) != "false" || body["chat_template_kwargs"] != nil {
+						t.Errorf("unexpected top-level format: %s", body)
+					}
+				} else if string(body["chat_template_kwargs"]) != `{"enable_thinking":false}` || body["enable_thinking"] != nil {
+					t.Errorf("unexpected nested format: %s", body)
+				}
+				fmt.Fprint(w, `{"id":"x","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}`)
+			}))
+			defer server.Close()
+			target := reasoningTarget(server.URL)
+			target.Provider.ThinkingFormat = format
+			r := req(t, `{"model":"fast","messages":[{"role":"user","content":"hi"}],"enable_thinking":false,"chat_template_kwargs":{"enable_thinking":false}}`)
+			if _, err := generator(t).Complete(context.Background(), target, r); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

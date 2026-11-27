@@ -49,3 +49,17 @@ func TestInvalidReasoningControls(t *testing.T) {
 		}
 	}
 }
+
+func TestThinkingAliasValidation(t *testing.T) {
+	for _, tc := range []struct{ fields, code string }{
+		{`"enable_thinking":true`, ""},
+		{`"enable_thinking":false,"chat_template_kwargs":{"enable_thinking":false}`, ""},
+		{`"enable_thinking":true,"chat_template_kwargs":{"enable_thinking":false}`, "invalid_request"},
+		{`"enable_thinking":null`, "unsupported_request"},
+	} {
+		err := ValidateChatSchema(json.RawMessage(`{"model":"auto","messages":[{"role":"user","content":"hi"}],` + tc.fields + "}"))
+		if tc.code == "" && err != nil || tc.code != "" && (err == nil || err.(*Error).Code != tc.code) {
+			t.Errorf("%s: got %v, want %q", tc.fields, err, tc.code)
+		}
+	}
+}

@@ -47,6 +47,7 @@ func encodeOpenAI(ctx *schemas.BifrostContext, target routing.Target, r routing.
 			req.Params.ExtraParams[key] = value
 		}
 	}
+	formatThinkingOption(req.Params.ExtraParams, target.Provider)
 	ctx.SetValue(schemas.BifrostContextKeyPassthroughExtraParams, true)
 	return req, nil
 }
@@ -90,6 +91,7 @@ func checkWire(target routing.Target, r routing.Request) error {
 	var a, b map[string]any
 	json.Unmarshal(before, &a)
 	json.Unmarshal(after, &b)
+	formatThinkingOption(a, target.Provider)
 	normalizeToolHistory(a)
 	normalizeToolHistory(b)
 	delete(a, "model")
@@ -150,5 +152,15 @@ func PrepareCheck(r routing.Request) func(routing.Target) error {
 			return historyError
 		}
 		return checkWire(target, parameters)
+	}
+}
+
+func formatThinkingOption(fields map[string]any, provider routing.Provider) {
+	if provider.ThinkingFormat != "top_level" {
+		return
+	}
+	if knobs, ok := fields["chat_template_kwargs"].(map[string]any); ok {
+		fields["enable_thinking"] = knobs["enable_thinking"]
+		delete(fields, "chat_template_kwargs")
 	}
 }

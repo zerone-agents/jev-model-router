@@ -382,6 +382,7 @@
         "max"
       ]
     },
+    "enable_thinking": {"type": "boolean", "description": "Alias of chat_template_kwargs.enable_thinking."},
     "chat_template_kwargs": {
       "type": "object",
       "properties": {
